@@ -19,6 +19,8 @@ Báo cáo (view): `staff_monthly_commissions`, `technician_monthly_fees`, `servi
 
 ### Quy tắc tự động
 - Chốt hoá đơn (`status = 'paid'`) phải đủ tiền; tự tạo gói cho khách, tự nạp thẻ + tiền tặng theo mức, tự trừ kho bán lẻ.
+- Hoa hồng: dịch vụ lẻ, sản phẩm, combo, nạp thẻ đều tính doanh số; trừ gội đầu (`commission_eligible = false`) và dòng hoá đơn trả bằng thẻ (`paid_with_card`). Buổi trừ từ gói combo không có hoá đơn nên không tính. Doanh số tháng ≥ 30tr thì cả tháng 5%.
+- Danh mục dịch vụ nhập từ sheet Menu (103 dịch vụ, 18 nhóm). Thời lượng và tiền dịch vụ KTV chưa có, đang tạm 60 phút / 0đ.
 - Thẻ tài khoản không trả được cho dịch vụ có `card_allowed = false` (BAP, filler, botox, hifu, căng cấy chỉ).
 - Lịch hẹn hoàn thành thì trừ buổi trong gói; một KTV không thể bị xếp 2 lịch trùng giờ.
 - Phiếu yêu cầu xuất kho chỉ quản lý kho duyệt; không cho xuất quá tồn.
