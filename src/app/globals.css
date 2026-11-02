@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #2b2d64;
+  --color-navy-dark: #1f2050;
+  --color-beige: #eee5d6;
+  --color-beige-dark: #dfd2b8;
+  --color-cream: #f7f4ed;
+  --color-brown: #a0845e;
+  --color-ink: #282b38;
+  --font-sans: var(--font-be-vietnam), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+}
+
+@layer components {
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 bg-navy text-white hover:bg-navy-dark;
+}
+.btn-outline {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 border border-navy text-navy hover:bg-beige;
+}
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-3 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 text-navy hover:bg-beige;
+}
+.input {
+  @apply w-full rounded-xl border border-beige-dark bg-white px-4 py-3 text-base outline-none focus:border-navy focus:ring-2 focus:ring-navy/15;
+}
+.label {
+  @apply mb-1.5 block text-sm font-medium text-ink;
+}
+.card {
+  @apply rounded-2xl border border-beige-dark/70 bg-white p-5 shadow-sm;
+}
+}

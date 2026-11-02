@@ -3,7 +3,7 @@
 Web app quản lý Moana Spa (2 chi nhánh: 67 Lưu Quang Vũ và 109 Nguyễn Sơn, Hà Nội).
 
 - Cơ sở dữ liệu: Supabase (project `spa-manager`, khu vực Singapore)
-- Giao diện: Next.js (đang làm)
+- Giao diện: Next.js 15 + Tailwind (thư mục `src/`)
 - Hosting: Vercel
 
 ## Cơ sở dữ liệu (`supabase/migrations`)
@@ -28,3 +28,15 @@ Báo cáo (view): `staff_monthly_commissions`, `technician_monthly_fees`, `servi
 ### Vai trò
 `owner` (chủ), `manager`, `receptionist`, `technician` (KTV), `warehouse` (quản lý kho), `customer`.
 Tài khoản mới đăng ký mặc định là `customer`; chủ spa đổi vai trò bằng `select set_user_role('<user id>', 'technician', '<branch id>');`
+
+## Giao diện web (giai đoạn 2)
+
+| Trang | Ai dùng | Việc |
+|---|---|---|
+| `/dang-nhap` | mọi người | Đăng nhập, đăng ký (họ tên, SĐT, email, mật khẩu), quên mật khẩu |
+| `/dat-lich` | khách | Chọn chi nhánh → dịch vụ (tối đa 5) → ngày giờ → ghi chú, gửi lịch "chờ xác nhận" |
+| `/lich-hen` | khách | Lịch sắp tới + lịch sử, huỷ lịch còn chờ xác nhận |
+| `/quan-ly` | nhân viên | Lịch theo ngày + chi nhánh; Xác nhận / Khách đã đến / Hoàn thành / Không đến / Huỷ |
+
+Giờ nhận đặt online, bước giờ, đặt trước tối thiểu: sửa trong `src/lib/config.ts` (đang để 9:00–19:30, 30 phút/suất, trước ≥ 60 phút).
+Đăng ký online với SĐT trùng khách cũ sẽ **không** tự nối hồ sơ (tránh mạo danh); lễ tân thấy ghi chú trên lịch hẹn để kiểm tra.
