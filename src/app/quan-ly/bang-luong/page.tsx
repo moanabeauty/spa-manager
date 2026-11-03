@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { todayVn } from "@/lib/format";
 import { isMonth, shiftMonth, shortLabel } from "@/lib/reports";
 import ReportNav from "../bao-cao/ReportNav";
-import PayrollEditor, { type AttDay, type AttSum, type Branch, type Entry, type PaySetting, type Penalty, type PayrollRow, type PayrollConfig, type Staff } from "./PayrollEditor";
+import PayrollEditor, { type AttDay, type AttSum, type Branch, type Holiday, type Entry, type PaySetting, type Penalty, type PayrollRow, type PayrollConfig, type Staff } from "./PayrollEditor";
 
 export const metadata = { title: "Bảng lương – Moana Beauty" };
 
@@ -35,7 +35,11 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     supabase.rpc("attendance_report", { p_month: m1 }),
     supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
   ]);
-  const { data: holidays } = await supabase.from("public_holidays").select("holiday_date, name").order("holiday_date", { ascending: false }).limit(60);
+  const { data: holidays } = await supabase
+    .from("public_holidays")
+    .select("holiday_date, name, applies_to_all, holiday_assignments(staff_id)")
+    .order("holiday_date", { ascending: false })
+    .limit(60);
 
   let rows: PayrollRow[] = [];
   let settings: PaySetting[] = [];
@@ -82,7 +86,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         posted={posted}
         attSum={(attSum ?? []) as AttSum[]}
         attDays={(attDays ?? []) as AttDay[]}
-        holidays={(holidays ?? []) as { holiday_date: string; name: string }[]}
+        holidays={(holidays ?? []) as Holiday[]}
       />
     </div>
   );

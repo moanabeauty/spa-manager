@@ -164,3 +164,4 @@ Cơ sở dữ liệu (`20261103000022_reports_payroll_cashbook.sql`, `…23_repo
 - Ngày lễ, Tết (`public_holidays`): chủ spa nhập ở Bảng lương → Cài đặt; mỗi ngày lễ cộng 9 giờ cho mọi nhân viên (nghỉ hưởng nguyên lương), ngoài định mức nghỉ tháng.
 - Ngày lễ: hưởng lương cơ bản (cộng 9 giờ) nhưng **không** có phụ cấp ăn (phụ cấp ăn chỉ tính ngày đi làm).
 - Tiền dịch vụ KTV: dịch vụ có cờ `fee_once_per_visit` (Meso chấm nốt mụn) chỉ tính 1 lần / lượt khách dù làm nhiều điểm (`20261103000028_fee_once_per_visit.sql`); bật / tắt ở Menu dịch vụ → chi tiết.
+- Ngày lễ chọn được người nghỉ (`holiday_assignments`, `20261103000029_holiday_staff.sql`): tất cả hoặc từng nhân viên. Đi làm ngày lễ của mình → giờ làm hôm đó trả 300% (1 ngày đủ = 3 ngày lương), ngoài lương nghỉ lễ.

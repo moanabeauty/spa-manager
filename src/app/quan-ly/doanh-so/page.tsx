@@ -106,6 +106,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
           <p className="mb-2 font-semibold text-navy">Phiếu lương tạm tính của tôi</p>
           {[
             ["Lương cơ bản", num("base_pay"), `${num("work_hours")}/${num("standard_hours")} giờ`],
+            ["Đi làm ngày lễ (300%)", num("holiday_work_pay"), num("holiday_work_hours") ? `${num("holiday_work_hours")} giờ` : ""],
             ["Lương trách nhiệm", num("responsibility_pay"), ""],
             ["Phụ cấp ăn", num("meal_allowance"), `${num("work_days")} ngày`],
             ["Làm thêm giờ", num("overtime_pay"), num("overtime_hours") ? `${num("overtime_hours")} giờ` : ""],
