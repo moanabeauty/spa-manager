@@ -16,6 +16,7 @@ export type MenuService = {
   technician_fee: number;
   card_allowed: boolean;
   commission_eligible: boolean;
+  fee_once_per_visit: boolean;
   is_active: boolean;
   branch_id: string | null;
 };
@@ -24,7 +25,7 @@ type Draft = Partial<Omit<MenuService, "id">>;
 
 const FIELDS: (keyof Draft)[] = [
   "category_id", "name", "name_en", "duration_minutes", "price", "member_price",
-  "technician_fee", "card_allowed", "commission_eligible", "is_active", "branch_id",
+  "technician_fee", "card_allowed", "commission_eligible", "fee_once_per_visit", "is_active", "branch_id",
 ];
 
 /** "1.200.000" -> 1200000; "" -> null */
@@ -236,6 +237,10 @@ export default function MenuEditor({
                         <label className="flex items-center gap-2">
                           <input type="checkbox" checked={val(s, "commission_eligible")} onChange={(e) => edit(s.id, { commission_eligible: e.target.checked })} />
                           Tính doanh số hoa hồng
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input type="checkbox" checked={!!val(s, "fee_once_per_visit")} onChange={(e) => edit(s.id, { fee_once_per_visit: e.target.checked })} />
+                          Tiền dịch vụ KTV chỉ tính 1 lần / lượt khách (vd Meso chấm nốt mụn nhiều điểm)
                         </label>
                         <label className="flex items-center gap-2">
                           <input type="checkbox" checked={!val(s, "is_active")} onChange={(e) => edit(s.id, { is_active: !e.target.checked })} />

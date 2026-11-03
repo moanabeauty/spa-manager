@@ -162,3 +162,5 @@ Cơ sở dữ liệu (`20261103000022_reports_payroll_cashbook.sql`, `…23_repo
 - Tháng N ngày được nghỉ N − 27 ngày (30 ngày → 3, 31 ngày → 4), nhân viên tự đăng ký, làm đủ 243 giờ thì đủ lương (ngày nghỉ không cộng giờ). Quá định mức → "nghỉ thêm, không lương". Làm nửa ngày: ca sáng 9:00 – 13:30 / ca chiều 13:30 – 18:00 (0,5 ngày nghỉ).
 - Đơn giá tăng ca giữ lương ÷ 27 ÷ 8 (8 giờ làm thực tế); giờ có mặt 9:00 – 18:00 (9 giờ, gồm nghỉ trưa) dùng để tính đủ 243 giờ.
 - Ngày lễ, Tết (`public_holidays`): chủ spa nhập ở Bảng lương → Cài đặt; mỗi ngày lễ cộng 9 giờ cho mọi nhân viên (nghỉ hưởng nguyên lương), ngoài định mức nghỉ tháng.
+- Ngày lễ: hưởng lương cơ bản (cộng 9 giờ) nhưng **không** có phụ cấp ăn (phụ cấp ăn chỉ tính ngày đi làm).
+- Tiền dịch vụ KTV: dịch vụ có cờ `fee_once_per_visit` (Meso chấm nốt mụn) chỉ tính 1 lần / lượt khách dù làm nhiều điểm (`20261103000028_fee_once_per_visit.sql`); bật / tắt ở Menu dịch vụ → chi tiết.
