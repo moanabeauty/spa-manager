@@ -44,5 +44,5 @@ export async function getCurrentUser() {
 }
 
 export function isStaffRole(role: string | undefined | null): boolean {
-  return role === "owner" || role === "manager" || role === "receptionist" || role === "technician";
+  return role === "owner" || role === "manager" || role === "receptionist" || role === "technician" || role === "warehouse";
 }

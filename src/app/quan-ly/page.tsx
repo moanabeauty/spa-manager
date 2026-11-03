@@ -49,6 +49,8 @@ export default async function StaffAppointmentsPage({
     );
   }
 
+  if (profile?.role === "warehouse") redirect("/quan-ly/kho");
+
   const sp = await searchParams;
   const date = sp.ngay && /^\d{4}-\d{2}-\d{2}$/.test(sp.ngay) ? sp.ngay : todayVn();
   const { data: branches } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");

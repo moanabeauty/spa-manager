@@ -17,6 +17,8 @@ import {
 } from "@/lib/billing";
 import { techLabel, type Seller } from "@/lib/staff";
 import MoneyInput from "@/components/MoneyInput";
+import CameraScanner from "@/components/CameraScanner";
+import { cleanBarcode, productLabel, retailMinPrice } from "@/lib/inventory";
 
 export type CheckoutService = {
   id: string;
@@ -52,12 +54,24 @@ export type ApptInfo = {
   services: { id: string; service_id: string; technician_id: string | null; start_at: string; customer_package_item_id: string | null }[];
 };
 type Tier = { id: string; topup_amount: number; bonus_amount: number };
+/** Sản phẩm bán lẻ (kho bán lẻ) */
+export type RetailProduct = {
+  id: string;
+  name: string;
+  brand: string | null;
+  capacity: string | null;
+  unit: string;
+  barcode: string | null;
+  retail_price: number;
+  max_staff_discount_pct: number | null;
+};
 
 type SellerShare = { staffId: string; share: number };
 type Line = {
   key: number;
-  type: "service" | "package" | "card_topup";
+  type: "service" | "package" | "card_topup" | "product";
   apsId?: string;
+  productId?: string;
   serviceId?: string;
   packageId?: string;
   tierId?: string;
@@ -83,6 +97,10 @@ export default function CheckoutForm({
   sellers,
   canDiscount,
   initialRequest,
+  retailProducts,
+  retailStock,
+  retailPct,
+  meId,
 }: {
   appt: ApptInfo | null;
   initialCustomer: CustomerInfo | null;
@@ -95,6 +113,10 @@ export default function CheckoutForm({
   sellers: Seller[];
   canDiscount: boolean; // chủ / quản lý: tự giảm (ghi lý do); người khác: xin chủ spa duyệt
   initialRequest: DiscountRequest | null;
+  retailProducts: RetailProduct[];
+  retailStock: Record<string, Record<string, number>>; // chi nhánh -> sản phẩm -> tồn kho bán lẻ
+  retailPct: number; // % giảm tối đa chung khi nhân viên bán lẻ
+  meId: string;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -102,6 +124,8 @@ export default function CheckoutForm({
   const pkgById = useMemo(() => new Map(packages.map((p) => [p.id, p])), [packages]);
   const tierById = useMemo(() => new Map(tiers.map((t) => [t.id, t])), [tiers]);
   const sellerById = useMemo(() => new Map(sellers.map((s) => [s.id, s])), [sellers]);
+  const prodById = useMemo(() => new Map(retailProducts.map((p) => [p.id, p])), [retailProducts]);
+  const minPrice = (p: RetailProduct) => retailMinPrice(Number(p.retail_price), p.max_staff_discount_pct, retailPct);
 
   const [branchId, setBranchId] = useState(defaultBranchId);
   const [customer, setCustomer] = useState<CustomerInfo | null>(initialCustomer);
@@ -126,6 +150,9 @@ export default function CheckoutForm({
     })),
   );
   const [query, setQuery] = useState("");
+  const [pQuery, setPQuery] = useState("");
+  const [pCamera, setPCamera] = useState(false);
+  const [pMsg, setPMsg] = useState<string | null>(null);
 
   const [discountMode, setDiscountMode] = useState<"vnd" | "pct">("vnd");
   const [discountInput, setDiscountInput] = useState(0);
@@ -196,6 +223,7 @@ export default function CheckoutForm({
       return Number(s.price);
     }
     if (l.type === "package") return Number(pkgById.get(l.packageId!)?.price ?? 0);
+    if (l.type === "product") return l.customPrice;
     if (l.tierId) return Number(tierById.get(l.tierId)?.topup_amount ?? 0);
     return 0;
   }
@@ -289,6 +317,40 @@ export default function CheckoutForm({
       .slice(0, 10);
   }, [query, services, branchId]);
 
+  // ---- bán lẻ sản phẩm ----
+  const meSeller = sellers.some((x) => x.id === meId) ? [{ staffId: meId, share: 100 }] : [];
+  function addProduct(p: RetailProduct) {
+    const existing = lines.find((l) => l.type === "product" && l.productId === p.id);
+    if (existing) update(existing.key, { qty: existing.qty + 1 });
+    else
+      addLine({
+        type: "product",
+        productId: p.id,
+        member: false,
+        customPrice: Number(p.retail_price),
+        qty: 1,
+        discount: 0,
+        card: false,
+        pkgId: "",
+        sellers: meSeller,
+      });
+    setPQuery("");
+    setPMsg(null);
+  }
+  function scanProduct(raw: string) {
+    const c = cleanBarcode(raw);
+    const p = retailProducts.find((x) => x.barcode === c);
+    if (p) addProduct(p);
+    else setPMsg(`Không thấy sản phẩm bán lẻ có mã vạch ${c}.`);
+  }
+  const pFound = useMemo(() => {
+    const q = normalizeText(pQuery.trim());
+    if (!q) return [];
+    return retailProducts
+      .filter((p) => normalizeText(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""} ${p.barcode ?? ""}`).includes(q))
+      .slice(0, 8);
+  }, [pQuery, retailProducts]);
+
   // ---- kiểm tra trước khi gửi ----
   const problems: string[] = [];
   if (lines.length === 0) problems.push("Hoá đơn chưa có dòng nào.");
@@ -299,7 +361,18 @@ export default function CheckoutForm({
     }
     if (l.type === "card_topup" && rows[i].unit <= 0) problems.push("Nhập số tiền nạp thẻ.");
   });
-  if (!customer && lines.some((l) => l.type !== "service")) problems.push("Bán gói / nạp thẻ cần chọn khách hàng.");
+  if (!customer && lines.some((l) => l.type === "package" || l.type === "card_topup"))
+    problems.push("Bán gói / nạp thẻ cần chọn khách hàng.");
+  const stockHere = retailStock[branchId] ?? {};
+  lines.forEach((l) => {
+    if (l.type !== "product") return;
+    const p = prodById.get(l.productId!);
+    if (!p) return;
+    const used = lines.filter((o) => o.type === "product" && o.productId === l.productId).reduce((a, o) => a + o.qty, 0);
+    if (used > (stockHere[p.id] ?? 0)) problems.push(`Kho bán lẻ chỉ còn ${stockHere[p.id] ?? 0} "${p.name}".`);
+    if (l.customPrice > Number(p.retail_price)) problems.push(`Giá bán "${p.name}" cao hơn giá niêm yết.`);
+    if (l.customPrice < minPrice(p)) problems.push(`Giá bán "${p.name}" thấp nhất ${formatVnd(minPrice(p))}.`);
+  });
   if (canDiscount && totalDiscount > 0 && !discountReason.trim()) problems.push("Ghi lý do giảm giá.");
   if (cardTotal > balance) problems.push(`Số dư thẻ không đủ (còn ${formatVnd(balance)}).`);
   if (lines.some((l) => l.card) && lines.some((l) => l.type === "card_topup"))
@@ -316,6 +389,7 @@ export default function CheckoutForm({
       appointment_service_id: l.apsId ?? null,
       service_id: l.serviceId ?? null,
       package_id: l.packageId ?? null,
+      product_id: l.productId ?? null,
       topup_tier_id: l.tierId ?? null,
       technician_id: l.technicianId ?? null,
       unit_price: l.customPrice,
@@ -475,6 +549,9 @@ export default function CheckoutForm({
             svc={l.serviceId ? svcById.get(l.serviceId) : undefined}
             pkg={l.packageId ? pkgById.get(l.packageId) : undefined}
             tier={l.tierId ? tierById.get(l.tierId) : undefined}
+            product={l.productId ? prodById.get(l.productId) : undefined}
+            productMin={l.productId && prodById.get(l.productId) ? minPrice(prodById.get(l.productId)!) : 0}
+            productStock={l.productId ? stockHere[l.productId] ?? 0 : 0}
             hasCard={hasCard}
             inAppt={!!appt}
             packageOptions={packageOptions(l)}
@@ -539,6 +616,65 @@ export default function CheckoutForm({
               ))}
             </select>
           </div>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (pFound.length === 1) addProduct(pFound[0]);
+              else if (pQuery.trim()) scanProduct(pQuery);
+            }}
+          >
+            <input
+              className="input flex-1 py-2"
+              placeholder="+ Bán sản phẩm lẻ (gõ tên hoặc quét mã vạch)"
+              value={pQuery}
+              onChange={(e) => {
+                setPQuery(e.target.value);
+                setPMsg(null);
+              }}
+              autoComplete="off"
+            />
+            <button type="button" className="btn-outline px-3 py-2" title="Quét bằng camera" onClick={() => setPCamera(true)}>
+              📷
+            </button>
+          </form>
+          {pMsg && <p className="text-xs text-[#8A2323]">{pMsg}</p>}
+          {pFound.length > 0 && (
+            <ul className="divide-y divide-beige rounded-xl border border-beige-dark">
+              {pFound.map((p) => {
+                const have = stockHere[p.id] ?? 0;
+                return (
+                  <li key={p.id}>
+                    <button
+                      className="flex w-full justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-cream disabled:opacity-50"
+                      disabled={have <= 0}
+                      onClick={() => addProduct(p)}
+                    >
+                      <span className="min-w-0">
+                        {productLabel(p)}
+                        {p.brand && <span className="block text-xs text-ink/50">{p.brand}</span>}
+                      </span>
+                      <span className="shrink-0 text-right">
+                        {formatVnd(p.retail_price)}
+                        <span className={`block text-xs ${have <= 0 ? "text-[#8A2323]" : "text-ink/50"}`}>
+                          {have <= 0 ? "hết hàng" : `còn ${have} ${p.unit}`}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {pCamera && (
+            <CameraScanner
+              onScan={(c) => {
+                scanProduct(c);
+                setPCamera(false);
+              }}
+              onClose={() => setPCamera(false)}
+            />
+          )}
           {packages.length === 0 && (
             <p className="text-xs text-ink/60">Chưa có gói combo nào. Chủ / quản lý tạo gói ở trang <b>Gói combo</b>.</p>
           )}
@@ -728,6 +864,9 @@ function LineRow({
   svc,
   pkg,
   tier,
+  product,
+  productMin,
+  productStock,
   hasCard,
   inAppt,
   packageOptions,
@@ -745,6 +884,9 @@ function LineRow({
   svc?: CheckoutService;
   pkg?: CheckoutPackage;
   tier?: Tier;
+  product?: RetailProduct;
+  productMin: number;
+  productStock: number;
   hasCard: boolean;
   inAppt: boolean;
   packageOptions: { id: string; name: string; left: number }[];
@@ -756,7 +898,15 @@ function LineRow({
   onRemove: () => void;
 }) {
   const title =
-    l.type === "service" ? svc?.name ?? "Dịch vụ" : l.type === "package" ? `Gói ${pkg?.name ?? ""}` : "Nạp thẻ tài khoản";
+    l.type === "service"
+      ? svc?.name ?? "Dịch vụ"
+      : l.type === "package"
+        ? `Gói ${pkg?.name ?? ""}`
+        : l.type === "product"
+          ? product
+            ? productLabel(product)
+            : "Sản phẩm"
+          : "Nạp thẻ tài khoản";
   const usesPackage = !!l.pkgId;
   const cardBlocked = l.type === "service" && svc && (!svc.card_allowed || svc.member_price === null);
   const showSellers = final > 0 && !l.card;
@@ -779,6 +929,11 @@ function LineRow({
                 .map((i) => `${i.label} ${i.quantity === null ? "(không giới hạn)" : `×${i.quantity}`}`)
                 .join(", ")}
               {pkg.validity_days ? ` · hạn ${pkg.validity_days} ngày` : ""}
+            </p>
+          )}
+          {l.type === "product" && product && (
+            <p className="text-xs text-ink/60">
+              {product.brand ? `${product.brand} · ` : ""}Bán lẻ – kho còn {productStock} {product.unit}
             </p>
           )}
           {l.type === "card_topup" && (
@@ -839,6 +994,41 @@ function LineRow({
               Giá
               <MoneyInput value={l.customPrice} onChange={(n) => onChange({ customPrice: n })} className="w-32" ariaLabel="Giá dịch vụ" />
             </label>
+          )}
+          {l.type === "product" && product && (
+            <>
+              <label className="flex items-center gap-1">
+                SL
+                <input
+                  type="number"
+                  min={1}
+                  max={Math.max(1, productStock)}
+                  className="w-14 rounded-lg border border-beige-dark px-2 py-1"
+                  value={l.qty}
+                  onChange={(e) => onChange({ qty: Math.max(1, Math.min(50, Math.floor(Number(e.target.value) || 1))) })}
+                />
+              </label>
+              <label className="flex items-center gap-1">
+                Giá bán
+                <MoneyInput
+                  value={l.customPrice}
+                  onChange={(n) => onChange({ customPrice: n })}
+                  className={`w-32 ${l.customPrice < productMin || l.customPrice > Number(product.retail_price) ? "border-[#8A2323]" : ""}`}
+                  ariaLabel="Giá bán sản phẩm"
+                />
+              </label>
+              <span className="text-ink/55">
+                niêm yết {formatVnd(product.retail_price)}
+                {productMin < Number(product.retail_price) && (
+                  <>
+                    {" · "}
+                    <button className="text-navy underline" onClick={() => onChange({ customPrice: productMin })}>
+                      thấp nhất {formatVnd(productMin)}
+                    </button>
+                  </>
+                )}
+              </span>
+            </>
           )}
           {l.type === "package" && (
             <label className="flex items-center gap-1">

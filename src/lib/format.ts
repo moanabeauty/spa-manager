@@ -73,6 +73,7 @@ export function vnError(message: string | undefined): string {
   if (m.includes("rate limit")) return "Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút.";
   if (m.includes("row-level security")) return "Bạn không có quyền thực hiện thao tác này.";
   if (m.includes("no_technician_overlap")) return "Kỹ thuật viên đã có lịch trùng giờ.";
+  if (m.includes("duplicate key") && m.includes("barcode")) return "Mã vạch này đã gắn cho sản phẩm khác.";
   if (m.includes("duplicate key") && m.includes("phone")) return "Số điện thoại này đã có hồ sơ khách.";
   if (m.includes("customer_package_items_used_le_total")) return "Gói không còn đủ buổi cho dịch vụ này.";
   if (m.includes("invoices_one_per_appointment")) return "Lịch hẹn này đã được thanh toán.";

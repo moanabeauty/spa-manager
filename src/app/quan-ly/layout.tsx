@@ -29,19 +29,32 @@ export default async function ManagerLayout({ children }: { children: React.Reac
       .eq("status", "pending");
     pendingDiscounts = count ?? 0;
   }
-  const tabs = [
-    { href: "/quan-ly", label: "Lịch hẹn" },
-    { href: "/quan-ly/tao-lich", label: "+ Tạo lịch" },
-    { href: "/quan-ly/khach-hang", label: "Khách hàng" },
-    { href: "/quan-ly/hoa-don", label: "Hoá đơn" },
-    { href: "/quan-ly/doanh-so", label: role === "owner" || role === "manager" ? "Doanh số" : "Doanh số của tôi" },
-    ...(role === "owner" || role === "manager"
-      ? [{ href: "/quan-ly/duyet-giam-gia", label: pendingDiscounts ? `Duyệt giảm giá (${pendingDiscounts})` : "Duyệt giảm giá" }]
-      : []),
-    ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/goi-combo", label: "Gói combo" }] : []),
-    ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/dich-vu", label: "Menu dịch vụ" }] : []),
-    ...(role === "owner" ? [{ href: "/quan-ly/nhan-vien", label: "Nhân viên" }] : []),
-  ];
+  let pendingStock = 0;
+  if (role === "owner" || role === "manager" || role === "warehouse") {
+    const supabase = await createClient();
+    let q = supabase.from("stock_requests").select("id, warehouses!inner(branch_id)", { count: "exact", head: true }).eq("status", "pending");
+    if (role === "warehouse" && profile!.branch_id) q = q.eq("warehouses.branch_id", profile!.branch_id);
+    const { count } = await q;
+    pendingStock = count ?? 0;
+  }
+  const kho = { href: "/quan-ly/kho", label: pendingStock ? `Kho (${pendingStock})` : "Kho" };
+  const tabs =
+    role === "warehouse"
+      ? [kho]
+      : [
+          { href: "/quan-ly", label: "Lịch hẹn" },
+          { href: "/quan-ly/tao-lich", label: "+ Tạo lịch" },
+          { href: "/quan-ly/khach-hang", label: "Khách hàng" },
+          { href: "/quan-ly/hoa-don", label: "Hoá đơn" },
+          { href: "/quan-ly/doanh-so", label: role === "owner" || role === "manager" ? "Doanh số" : "Doanh số của tôi" },
+          kho,
+          ...(role === "owner" || role === "manager"
+            ? [{ href: "/quan-ly/duyet-giam-gia", label: pendingDiscounts ? `Duyệt giảm giá (${pendingDiscounts})` : "Duyệt giảm giá" }]
+            : []),
+          ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/goi-combo", label: "Gói combo" }] : []),
+          ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/dich-vu", label: "Menu dịch vụ" }] : []),
+          ...(role === "owner" ? [{ href: "/quan-ly/nhan-vien", label: "Nhân viên" }] : []),
+        ];
   return (
     <div className="space-y-4">
       <div className="print:hidden"><ManagerTabs tabs={tabs} /></div>

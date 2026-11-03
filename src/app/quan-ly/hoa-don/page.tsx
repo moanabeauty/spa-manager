@@ -70,7 +70,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
           <p className="text-sm capitalize text-ink/70">{formatDate(vnDateTime(date, "12:00").toISOString())}</p>
           {profile?.role === "technician" && <p className="text-xs text-ink/60">Chỉ hiện hoá đơn bạn bán hoặc bạn thu.</p>}
         </div>
-        <Link href="/quan-ly/thu-tien" className="btn-primary">+ Bán gói / nạp thẻ / thu lẻ</Link>
+        <Link href="/quan-ly/thu-tien" className="btn-primary">+ Bán lẻ sản phẩm / gói / nạp thẻ</Link>
       </div>
 
       <div className="flex flex-wrap gap-2">

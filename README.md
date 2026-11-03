@@ -79,3 +79,23 @@ Cơ sở dữ liệu (`20261103000010_checkout.sql`, `20261103000011_seed_combos
 ### Cập nhật sau giai đoạn 4
 - `20261103000013_menu_member_prices.sql`: đồng bộ giá niêm yết, giá thành viên, tiền dịch vụ KTV theo sheet Menu (73 dịch vụ có giá thành viên). Cắt đáy sẹo: sheet ghi tiền KTV 120.000.000đ (nghi gõ nhầm) nên giữ 100.000đ.
 - `20261103000014_discount_approval.sql`: **giảm giá** chỉ chủ / quản lý tự làm và phải ghi lý do. Lễ tân / KTV bấm "Gửi chủ spa duyệt" (số tiền + lý do) → chủ spa duyệt ở trang **Duyệt giảm giá** (được duyệt số thấp hơn) → người thu bấm "Kiểm tra lại" rồi thu với số đã duyệt. Mỗi yêu cầu dùng 1 lần, đúng lịch / khách đã xin; huỷ hoá đơn thì yêu cầu trả về "đã duyệt". Giao diện gọi `checkout_invoice_v2`.
+
+## Giai đoạn 5: kho
+
+Mỗi chi nhánh 2 kho: **kho liệu trình** (hàng KTV dùng làm dịch vụ) và **kho bán lẻ** (hàng bán cho khách).
+
+| Trang | Ai dùng | Việc |
+|---|---|---|
+| `/quan-ly/kho` | mọi nhân viên | Tồn kho theo chi nhánh + kho, tìm theo tên / nhãn hàng / mã vạch, lọc "sắp hết". Quản lý kho: **Kiểm kê** (nhập số đếm thực tế + lý do, hệ thống ghi chênh lệch) |
+| `/quan-ly/kho/nhap-hang` | quản lý kho, quản lý, chủ | Chọn kho → quét mã vạch (máy quét cầm tay hoặc camera điện thoại) → số lượng + giá nhập → lưu **phiếu nhập** (mã PN…). Mã vạch lạ: gắn cho sản phẩm có sẵn hoặc tạo sản phẩm mới (bắt buộc nhãn hàng, tên, dung tích) |
+| `/quan-ly/kho/xin-xuat` | KTV gửi, quản lý kho duyệt | KTV chọn hàng trong kho liệu trình (thấy số còn), ghi dùng cho khách / liệu trình nào → phiếu XK… chờ duyệt. Quản lý kho **Duyệt & xuất kho** (tự trừ kho) hoặc **Từ chối** (bắt buộc lý do). KTV huỷ được phiếu đang chờ |
+| `/quan-ly/kho/lich-su` | mọi nhân viên | 200 lần nhập / xuất gần nhất theo kho |
+| `/quan-ly/kho/san-pham` | quản lý kho, quản lý, chủ | Danh mục sản phẩm: nhãn hàng, tên, dung tích, đơn vị đếm, mã vạch, giá niêm yết, giá nhập, hàng liệu trình / bán lẻ, mức báo sắp hết. Chủ spa đặt **% giảm tối đa khi bán lẻ** |
+| `/quan-ly/thu-tien` | lễ tân, KTV, quản lý, chủ | **Bán sản phẩm lẻ**: gõ tên hoặc quét mã vạch, thấy tồn kho bán lẻ của chi nhánh. Giá bán từ *giá niêm yết × (100% − % giảm tối đa)* đến giá niêm yết, không cần chủ spa duyệt. Chốt hoá đơn thì trừ kho bán lẻ; huỷ hoá đơn thì nhập lại |
+
+Cơ sở dữ liệu (`20261103000015_inventory.sql`, `…16_retail_checkout.sql`, `…17_seed_treatment_products.sql`):
+- `products` thêm nhãn hàng, dung tích, mã vạch (không trùng), nhóm, dùng trong liệu trình, giá nhập (KTV / lễ tân không đọc được – hàm `product_costs()`), hàng liệu trình / bán lẻ, `% giảm tối đa riêng`, mức sắp hết.
+- 110 sản phẩm kho liệu trình nhập từ sheet PRODUCT (bỏ nhóm "ĐÃ CẮT MÃ"); 4 mã DMK sheet ghi nhãn BR được sửa thành DMK.
+- Quản lý kho chỉ thao tác kho của chi nhánh mình (`can_manage_warehouse`); chủ / quản lý mọi kho.
+- Hàm: `receive_stock`, `adjust_stock`, `create_stock_request`, `review_stock_request`, `cancel_stock_request`, `set_retail_max_discount`, `retail_min_price`. Không xuất / bán quá tồn kho.
+- Vai trò `warehouse` (quản lý kho) vào được trang Quản lý nhưng chỉ thấy mục Kho.

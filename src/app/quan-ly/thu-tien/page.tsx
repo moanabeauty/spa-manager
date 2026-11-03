@@ -2,12 +2,14 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { fetchSellers, canCheckout } from "@/lib/staff";
 import { fetchWallet, type Wallet } from "@/lib/billing";
+import { fetchDefaultDiscountPct, fetchStock } from "@/lib/inventory";
 import CheckoutForm, {
   type ApptInfo,
   type CheckoutPackage,
   type CheckoutService,
   type CustomerInfo,
   type DiscountRequest,
+  type RetailProduct,
 } from "./CheckoutForm";
 
 export const metadata = { title: "Thu tiền – Moana Beauty" };
@@ -79,6 +81,23 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   dq = appt ? dq.eq("appointment_id", appt.id) : customer ? dq.eq("customer_id", customer.id).is("appointment_id", null) : dq.eq("id", "00000000-0000-0000-0000-000000000000");
   const { data: lastRequest } = await dq.maybeSingle();
 
+  const [{ data: retail }, { data: retailWh }, retailPct] = await Promise.all([
+    supabase
+      .from("products")
+      .select("id, name, brand, capacity, unit, barcode, retail_price, max_staff_discount_pct")
+      .eq("is_active", true)
+      .eq("for_retail", true)
+      .not("retail_price", "is", null)
+      .order("name"),
+    supabase.from("warehouses").select("id, branch_id").eq("type", "retail"),
+    fetchDefaultDiscountPct(supabase),
+  ]);
+  const whList = (retailWh ?? []) as { id: string; branch_id: string }[];
+  const stock = await fetchStock(supabase, whList.map((w) => w.id));
+  const retailStock: Record<string, Record<string, number>> = Object.fromEntries(
+    whList.map((w) => [w.branch_id, Object.fromEntries(stock.get(w.id) ?? new Map())]),
+  );
+
   const [{ data: branches }, { data: services }, { data: packages }, { data: tiers }, sellers, wallet] = await Promise.all([
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
     supabase
@@ -108,6 +127,10 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       sellers={sellers}
       canDiscount={profile?.role === "owner" || profile?.role === "manager"}
       initialRequest={(lastRequest as DiscountRequest | null) ?? null}
+      retailProducts={(retail ?? []) as RetailProduct[]}
+      retailStock={retailStock}
+      retailPct={retailPct}
+      meId={profile!.id}
     />
   );
 }
