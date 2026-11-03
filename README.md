@@ -157,3 +157,7 @@ Cơ sở dữ liệu (`20261103000022_reports_payroll_cashbook.sql`, `…23_repo
 - **Tăng ca**: check-out từ 18:30 bắt buộc ghi lý do (vd làm cho khách nào) → quản lý / chủ duyệt số giờ (Bảng lương / Chấm công → Check-in / out). Đơn giá = lương ÷ 27 ÷ 8 × 150%.
 - **Nghỉ phép** (`/quan-ly/nghi-phep`): nhân viên đăng ký (có lương / không lương, nửa ngày) → quản lý / chủ duyệt. Phép có lương được cộng 9 giờ / ngày. **Nghỉ không phép** do quản lý ghi: không lương ngày đó + trừ thêm 1 ngày lương (lương ÷ 27).
 - Tab Chấm công: ô Giờ làm / Ngày ăn / Giờ tăng ca để trống = tự lấy theo check-in; gõ số để tính khác.
+
+### Ngày nghỉ định mức (`20261103000027_leave_quota.sql`)
+- Tháng N ngày được nghỉ N − 27 ngày (30 ngày → 3, 31 ngày → 4), nhân viên tự đăng ký, làm đủ 243 giờ thì đủ lương (ngày nghỉ không cộng giờ). Quá định mức → "nghỉ thêm, không lương". Làm nửa ngày: ca sáng 9:00 – 13:30 / ca chiều 13:30 – 18:00 (0,5 ngày nghỉ).
+- Đơn giá tăng ca giữ lương ÷ 27 ÷ 8 (8 giờ làm thực tế); giờ có mặt 9:00 – 18:00 (9 giờ, gồm nghỉ trưa) dùng để tính đủ 243 giờ.

@@ -13,10 +13,10 @@ export default async function LeavePage({ searchParams }: { searchParams: Promis
   const month = isMonth(sp.thang) ? sp.thang : todayVn().slice(0, 7);
   const manage = profile.role === "owner" || profile.role === "manager";
 
-  const [{ data: leaves }, { data: pending }, { data: staff }] = await Promise.all([
+  const [{ data: leaves }, { data: pending }, { data: staff }, { data: cfg }] = await Promise.all([
     supabase
       .from("staff_leaves")
-      .select("id, staff_id, leave_date, kind, half_day, reason, status, review_note, created_at")
+      .select("id, staff_id, leave_date, kind, half_day, work_shift, reason, status, review_note, created_at")
       .gte("leave_date", `${month}-01`)
       .lte("leave_date", monthEnd(month))
       .in("status", ["pending", "approved", "rejected"])
@@ -24,7 +24,7 @@ export default async function LeavePage({ searchParams }: { searchParams: Promis
     manage
       ? supabase
           .from("staff_leaves")
-          .select("id, staff_id, leave_date, kind, half_day, reason, status, review_note, created_at")
+          .select("id, staff_id, leave_date, kind, half_day, work_shift, reason, status, review_note, created_at")
           .eq("status", "pending")
           .order("leave_date")
       : Promise.resolve({ data: [] }),
@@ -34,7 +34,10 @@ export default async function LeavePage({ searchParams }: { searchParams: Promis
       .in("role", ["manager", "receptionist", "technician", "warehouse"])
       .eq("is_active", true)
       .order("full_name"),
+    supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
   ]);
+  const std = Number((cfg?.value as { standard_days?: number } | null)?.standard_days ?? 27);
+  const quota = Math.max(0, Number(monthEnd(month).slice(8, 10)) - std);
 
   return (
     <div className="space-y-4">
@@ -58,6 +61,7 @@ export default async function LeavePage({ searchParams }: { searchParams: Promis
         leaves={(leaves ?? []) as Leave[]}
         pending={(pending ?? []) as Leave[]}
         staff={(staff ?? []) as { id: string; full_name: string | null; role: string }[]}
+        quota={quota}
       />
     </div>
   );

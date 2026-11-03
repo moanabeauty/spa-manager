@@ -222,7 +222,7 @@ function Payslip({ r, config, month }: { r: PayrollRow; config: PayrollConfig | 
       <div>
         <p className="mb-1 text-xs font-semibold uppercase text-ink/50">Thu nhập tháng {shortLabel(month)}</p>
         {line("Lương cơ bản theo giờ làm", n(r.base_pay),
-          `${formatVnd(n(r.base_salary))} × ${n(r.work_hours)}/${n(r.standard_hours)} giờ${n(r.paid_leave_days) ? ` (gồm ${n(r.paid_leave_days)} ngày phép có lương)` : ""}`)}
+          `${formatVnd(n(r.base_salary))} × ${n(r.work_hours)}/${n(r.standard_hours)} giờ`)}
         {line("Lương trách nhiệm", n(r.responsibility_pay))}
         {line("Phụ cấp ăn", n(r.meal_allowance), `${n(r.work_days)} ngày đi làm`)}
         {line("Làm thêm giờ", n(r.overtime_pay), n(r.overtime_hours) ? `${n(r.overtime_hours)} giờ × ${formatVnd(hourly)} × ${config?.overtime_rate ?? 1.5}` : undefined)}
@@ -262,7 +262,7 @@ function Attendance({ month, people, entries, attSum, branchName, config }: {
   const router = useRouter();
   const hpd = n(config?.hours_per_day ?? 9);
   const att = (id: string) => attSum.find((a) => a.staff_id === id);
-  const autoHours = (id: string) => n(att(id)?.work_hours) + n(att(id)?.paid_leave_days) * hpd;
+  const autoHours = (id: string) => n(att(id)?.work_hours);
   const str = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(Number(v)));
   const init = useMemo(() => {
     const m: Record<string, EntryDraft> = {};
@@ -343,8 +343,8 @@ function Attendance({ month, people, entries, attSum, branchName, config }: {
                       <>
                         <span className="font-semibold">{Math.round(autoHours(p.id) * 100) / 100} giờ</span> · {n(a.days)} ngày
                         {n(a.ot_hours) > 0 && <span> · {n(a.ot_hours)}h tăng ca</span>}
-                        {n(a.paid_leave_days) > 0 && <span className="block">phép có lương {n(a.paid_leave_days)} ngày</span>}
-                        {n(a.unpaid_leave_days) > 0 && <span className="block">phép không lương {n(a.unpaid_leave_days)} ngày</span>}
+                        {n(a.paid_leave_days) > 0 && <span className="block">nghỉ trong định mức {n(a.paid_leave_days)} ngày</span>}
+                        {n(a.unpaid_leave_days) > 0 && <span className="block">nghỉ thêm không lương {n(a.unpaid_leave_days)} ngày</span>}
                         {n(a.absences) > 0 && <span className="block text-[#8A2323]">không phép {n(a.absences)} ngày</span>}
                         {n(a.missing_out) > 0 && <span className="block text-[#8A2323]">{n(a.missing_out)} ngày quên check-out</span>}
                         {n(a.pending) > 0 && <span className="block text-[#7A5600]">{n(a.pending)} ngày chờ chủ duyệt</span>}
@@ -380,8 +380,7 @@ function Attendance({ month, people, entries, attSum, branchName, config }: {
         {msg && <span className="text-sm">{msg}</span>}
       </div>
       <p className="text-xs text-ink/60">
-        Ô <b>Giờ làm / Ngày ăn / Giờ tăng ca</b> để trống thì bảng lương tự lấy số mờ (tính từ check-in / out đã hợp lệ, tăng ca đã duyệt,
-        nghỉ phép có lương cộng {hpd} giờ / ngày). Chỉ gõ số khi muốn tính khác. Tháng chuẩn {config?.standard_days ?? 27} công ×{" "}
+        Ô <b>Giờ làm / Ngày ăn / Giờ tăng ca</b> để trống thì bảng lương tự lấy số mờ (tính từ check-in / out đã hợp lệ và tăng ca đã duyệt). Chỉ gõ số khi muốn tính khác. Tháng chuẩn {config?.standard_days ?? 27} công ×{" "}
         {hpd} giờ = {n(config?.standard_days ?? 27) * hpd} giờ; thiếu giờ thì lương cơ bản trừ theo tỉ lệ. “Cộng khác” / “Trừ khác” ghi rõ
         ở ô ghi chú.
       </p>

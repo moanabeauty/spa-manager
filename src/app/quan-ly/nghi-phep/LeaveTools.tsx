@@ -7,27 +7,28 @@ import { todayVn, vnError } from "@/lib/format";
 import { shortLabel } from "@/lib/reports";
 
 export type Leave = {
-  id: string; staff_id: string; leave_date: string; kind: "paid" | "unpaid" | "unexcused"; half_day: boolean;
+  id: string; staff_id: string; leave_date: string; kind: "off" | "unpaid" | "unexcused"; half_day: boolean; work_shift: string | null;
   reason: string | null; status: string; review_note: string | null; created_at: string;
 };
 
-const KIND: Record<string, string> = { paid: "Nghỉ phép có lương", unpaid: "Nghỉ phép không lương", unexcused: "Nghỉ không phép" };
+const KIND: Record<string, string> = { off: "Ngày nghỉ trong tháng", unpaid: "Nghỉ thêm (không lương)", unexcused: "Nghỉ không phép" };
+const SHIFT: Record<string, string> = { morning: "làm ca sáng 9:00 – 13:30", afternoon: "làm ca chiều 13:30 – 18:00" };
 const STATUS: Record<string, { t: string; c: string }> = {
   pending: { t: "Chờ duyệt", c: "bg-[#FFE8BA] text-[#7A5600]" },
   approved: { t: "Đã duyệt", c: "bg-[#D6EDD8] text-[#22612A]" },
   rejected: { t: "Từ chối", c: "bg-[#F6D5D5] text-[#8A2323]" },
 };
 
-export default function LeaveTools({ me, manage, month, leaves, pending, staff }: {
-  me: string; manage: boolean; month: string; leaves: Leave[]; pending: Leave[];
+export default function LeaveTools({ me, manage, month, leaves, pending, staff, quota }: {
+  me: string; manage: boolean; month: string; leaves: Leave[]; pending: Leave[]; quota: number;
   staff: { id: string; full_name: string | null; role: string }[];
 }) {
   const router = useRouter();
   const today = todayVn();
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
-  const [kind, setKind] = useState<"paid" | "unpaid">("unpaid");
   const [half, setHalf] = useState(false);
+  const [shift, setShift] = useState<"morning" | "afternoon">("morning");
   const [reason, setReason] = useState("");
   const [absStaff, setAbsStaff] = useState("");
   const [absDate, setAbsDate] = useState(today);
@@ -52,13 +53,13 @@ export default function LeaveTools({ me, manage, month, leaves, pending, staff }
   }
 
   async function submit() {
-    if (!reason.trim()) return setMsg({ ok: false, t: "Ghi lý do nghỉ" });
-    if (await call("request_leave", { p_from: from, p_to: half ? from : to, p_kind: kind, p_reason: reason, p_half_day: half }, "Đã gửi đơn, chờ quản lý duyệt.")) {
+    if (await call("request_leave", { p_from: from, p_to: half ? from : to, p_reason: reason, p_half_day: half, p_work_shift: half ? shift : null }, "Đã gửi đơn, chờ quản lý duyệt.")) {
       setReason("");
     }
   }
 
   const mine = leaves.filter((l) => l.staff_id === me);
+  const used = mine.filter((l) => l.kind === "off" && l.status !== "rejected").reduce((a, l) => a + (l.half_day ? 0.5 : 1), 0);
   const others = manage ? leaves.filter((l) => l.staff_id !== me) : [];
 
   return (
@@ -72,7 +73,7 @@ export default function LeaveTools({ me, manage, month, leaves, pending, staff }
             {pending.map((l) => (
               <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
                 <span>
-                  <span className="font-medium">{name(l.staff_id)}</span> · {day(l.leave_date)}{l.half_day ? " (nửa ngày)" : ""}
+                  <span className="font-medium">{name(l.staff_id)}</span> · {day(l.leave_date)}{l.half_day ? ` (nửa ngày, ${SHIFT[l.work_shift ?? ""] ?? ""})` : ""}
                   <span className="block text-xs text-ink/60">{KIND[l.kind]} · {l.reason}</span>
                 </span>
                 <span className="flex gap-2">
@@ -86,7 +87,11 @@ export default function LeaveTools({ me, manage, month, leaves, pending, staff }
       )}
 
       <div className="card space-y-3 p-4">
-        <p className="text-sm font-semibold text-navy">Đăng ký nghỉ</p>
+        <p className="text-sm font-semibold text-navy">Đăng ký ngày nghỉ</p>
+        <p className="text-sm">
+          Tháng {shortLabel(month)} được nghỉ <b>{quota} ngày</b> (vẫn đủ lương) · đã đăng ký <b>{used}</b> · còn{" "}
+          <b className={quota - used < 0 ? "text-[#8A2323]" : ""}>{Math.max(0, quota - used)}</b>
+        </p>
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="text-xs">
             Từ ngày
@@ -96,18 +101,20 @@ export default function LeaveTools({ me, manage, month, leaves, pending, staff }
             Đến ngày
             <input type="date" className="input mt-1 py-2 text-sm" value={half ? from : to} min={from} disabled={half} onChange={(e) => setTo(e.target.value)} />
           </label>
-          <label className="text-xs">
-            Loại
-            <select className="input mt-1 py-2 text-sm" value={kind} onChange={(e) => setKind(e.target.value as "paid" | "unpaid")}>
-              <option value="unpaid">Nghỉ phép không lương</option>
-              <option value="paid">Nghỉ phép có lương (phép năm)</option>
-            </select>
-          </label>
           <label className="flex items-end gap-2 pb-3 text-sm">
-            <input type="checkbox" checked={half} onChange={(e) => setHalf(e.target.checked)} /> Nghỉ nửa ngày
+            <input type="checkbox" checked={half} onChange={(e) => setHalf(e.target.checked)} /> Chỉ nghỉ nửa ngày
           </label>
+          {half && (
+            <label className="text-xs">
+              Ngày đó làm ca
+              <select className="input mt-1 py-2 text-sm" value={shift} onChange={(e) => setShift(e.target.value as "morning" | "afternoon")}>
+                <option value="morning">Ca sáng 9:00 – 13:30</option>
+                <option value="afternoon">Ca chiều 13:30 – 18:00</option>
+              </select>
+            </label>
+          )}
           <label className="text-xs sm:col-span-2">
-            Lý do
+            Ghi chú (không bắt buộc)
             <input className="input mt-1 py-2 text-sm" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Việc gia đình, ốm…" />
           </label>
         </div>
@@ -161,8 +168,10 @@ export default function LeaveTools({ me, manage, month, leaves, pending, staff }
       )}
 
       <p className="text-xs text-ink/60">
-        Nghỉ có phép không lương: ngày đó không tính lương. Nghỉ phép có lương: được tính đủ giờ ngày đó. <b>Nghỉ không phép</b> (quản lý
-        ghi): không có lương ngày đó và bị trừ thêm 1 ngày lương.
+        Mỗi tháng làm 27 công: tháng 30 ngày được nghỉ 3 ngày, tháng 31 ngày được nghỉ 4 ngày. Tự đăng ký các ngày nghỉ này (quản lý
+        duyệt), làm đủ 27 công (243 giờ) thì nhận đủ lương. Đăng ký quá số ngày được nghỉ thì thành “nghỉ thêm, không lương”. Làm nửa
+        ngày: ca sáng 9:00 – 13:30 hoặc ca chiều 13:30 – 18:00 (tính nửa ngày nghỉ). <b>Nghỉ không phép</b> (không đăng ký, quản lý ghi):
+        không có lương ngày đó và bị trừ thêm 1 ngày lương.
       </p>
     </div>
   );
@@ -181,7 +190,7 @@ function List({ title, rows, name, day, action }: {
           {rows.map((l) => (
             <li key={l.id} className="flex items-center justify-between gap-2 px-4 py-2">
               <span className="min-w-0">
-                <span className="font-medium">{name(l.staff_id)}</span> · {day(l.leave_date)}{l.half_day ? " (nửa ngày)" : ""}
+                <span className="font-medium">{name(l.staff_id)}</span> · {day(l.leave_date)}{l.half_day ? ` (nửa ngày, ${SHIFT[l.work_shift ?? ""] ?? ""})` : ""}
                 <span className={`block text-xs ${l.kind === "unexcused" ? "text-[#8A2323]" : "text-ink/60"}`}>
                   {KIND[l.kind]}{l.reason ? ` · ${l.reason}` : ""}{l.review_note ? ` · ${l.review_note}` : ""}
                 </span>
