@@ -12,22 +12,25 @@ export default async function Header() {
           <span className="text-lg font-bold tracking-[0.2em]">MOANA</span>
           <span className="text-[10px] uppercase tracking-[0.3em] text-beige">Beauty · Spa</span>
         </Link>
-        <nav className="flex items-center gap-1 text-sm">
+        <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto text-sm">
+          <Link href="/khuyen-mai" className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 hover:bg-white/10">
+            Khuyến mãi
+          </Link>
           {user ? (
             <>
               {staff && (
-                <Link href="/quan-ly" className="rounded-full px-3 py-1.5 hover:bg-white/10">
+                <Link href="/quan-ly" className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 hover:bg-white/10">
                   Quản lý
                 </Link>
               )}
-              <Link href="/dat-lich" className="rounded-full px-3 py-1.5 hover:bg-white/10">
+              <Link href="/dat-lich" className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 hover:bg-white/10">
                 Đặt lịch
               </Link>
-              <Link href="/lich-hen" className="rounded-full px-3 py-1.5 hover:bg-white/10">
+              <Link href="/lich-hen" className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 hover:bg-white/10">
                 Lịch của tôi
               </Link>
               <form action="/dang-xuat" method="post">
-                <button className="rounded-full px-3 py-1.5 text-beige hover:bg-white/10" title={profile?.full_name ?? ""}>
+                <button className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-beige hover:bg-white/10" title={profile?.full_name ?? ""}>
                   Thoát
                 </button>
               </form>

@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { fetchSellers, canCheckout } from "@/lib/staff";
 import { fetchWallet, type Wallet } from "@/lib/billing";
 import { fetchDefaultDiscountPct, fetchStock } from "@/lib/inventory";
+import { fetchCustomerPromos, type CustomerPromo } from "@/lib/promotions";
 import CheckoutForm, {
   type ApptInfo,
   type CheckoutPackage,
@@ -98,7 +99,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
     whList.map((w) => [w.branch_id, Object.fromEntries(stock.get(w.id) ?? new Map())]),
   );
 
-  const [{ data: branches }, { data: services }, { data: packages }, { data: tiers }, sellers, wallet] = await Promise.all([
+  const [{ data: branches }, { data: services }, { data: packages }, { data: tiers }, sellers, wallet, promos] = await Promise.all([
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
     supabase
       .from("services")
@@ -112,6 +113,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
     supabase.from("card_topup_tiers").select("id, topup_amount, bonus_amount").eq("is_active", true).order("topup_amount"),
     fetchSellers(supabase),
     customer ? fetchWallet(supabase, customer.id) : Promise.resolve<Wallet>({ cards: [], packages: [] }),
+    customer ? fetchCustomerPromos(supabase, customer.id) : Promise.resolve<CustomerPromo[]>([]),
   ]);
 
   return (
@@ -119,6 +121,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       appt={appt}
       initialCustomer={customer}
       initialWallet={wallet}
+      initialPromos={promos}
       defaultBranchId={appt?.branch_id ?? profile?.branch_id ?? branches?.[0]?.id ?? ""}
       branches={branches ?? []}
       services={(services ?? []) as CheckoutService[]}

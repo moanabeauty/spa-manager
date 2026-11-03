@@ -19,6 +19,7 @@ import { techLabel, type Seller } from "@/lib/staff";
 import MoneyInput from "@/components/MoneyInput";
 import CameraScanner from "@/components/CameraScanner";
 import { cleanBarcode, productLabel, retailMinPrice } from "@/lib/inventory";
+import { dmy, fetchCustomerPromos, type CustomerPromo, type PromoItem } from "@/lib/promotions";
 
 export type CheckoutService = {
   id: string;
@@ -83,12 +84,20 @@ type Line = {
   card: boolean;
   pkgId: string; // phần gói của khách dùng để trừ buổi ("" = trả tiền)
   sellers: SellerShare[];
+  // khuyến mãi khách đã đăng ký (giá cố định, không tính là giảm giá)
+  promoRegId?: string;
+  promoItemId?: string;
+  promoPrice?: number;
+  promoName?: string;
+  promoLabel?: string;
+  promoAdded?: boolean; // dòng do bấm "Áp dụng" thêm vào (bỏ KM thì xoá dòng)
 };
 
 export default function CheckoutForm({
   appt,
   initialCustomer,
   initialWallet,
+  initialPromos,
   defaultBranchId,
   branches,
   services,
@@ -105,6 +114,7 @@ export default function CheckoutForm({
   appt: ApptInfo | null;
   initialCustomer: CustomerInfo | null;
   initialWallet: Wallet;
+  initialPromos: CustomerPromo[];
   defaultBranchId: string;
   branches: { id: string; name: string }[];
   services: CheckoutService[];
@@ -130,6 +140,7 @@ export default function CheckoutForm({
   const [branchId, setBranchId] = useState(defaultBranchId);
   const [customer, setCustomer] = useState<CustomerInfo | null>(initialCustomer);
   const [wallet, setWallet] = useState<Wallet>(initialWallet);
+  const [promos, setPromos] = useState<CustomerPromo[]>(initialPromos);
 
   // ---- dòng hoá đơn ----
   const [nextKey, setNextKey] = useState(1000);
@@ -214,6 +225,7 @@ export default function CheckoutForm({
 
   // ---- tính tiền (giống hàm checkout_invoice) ----
   function unitPrice(l: Line): number {
+    if (l.promoItemId) return l.promoPrice ?? 0;
     if (l.type === "service") {
       const s = svcById.get(l.serviceId!);
       if (!s) return 0;
@@ -234,7 +246,7 @@ export default function CheckoutForm({
     return { unit, gross, disc, net: gross - disc };
   });
   // giảm cả hoá đơn không áp dụng cho nạp thẻ và sản phẩm bán lẻ (sản phẩm chỉ giảm trong mức % cho phép)
-  const commonOk = (l: Line) => l.type !== "card_topup" && l.type !== "product";
+  const commonOk = (l: Line) => l.type !== "card_topup" && l.type !== "product" && !l.promoItemId;
   const eligibleSum = rows.reduce((a, r, i) => a + (commonOk(lines[i]) ? r.net : 0), 0);
   const approved = !canDiscount && request?.status === "approved" ? Number(request.amount) : 0;
   const overall = Math.min(
@@ -305,9 +317,57 @@ export default function CheckoutForm({
     setCustomer(c);
     setPhone("");
     setMatches(null);
-    const w = c ? await fetchWallet(supabase, c.id) : { cards: [], packages: [] };
+    const w: Wallet = c ? await fetchWallet(supabase, c.id) : { cards: [], packages: [] };
+    const pr: CustomerPromo[] = c ? await fetchCustomerPromos(supabase, c.id) : [];
     setWallet(w);
-    setLines((ls) => withCardDefaults(ls.map((l) => ({ ...l, card: false, pkgId: "" })), w));
+    setPromos(pr);
+    setLines((ls) =>
+      withCardDefaults(
+        ls.filter((l) => !l.promoAdded).map((l) => ({ ...clearPromo(l), card: false, pkgId: "" })),
+        w,
+      ),
+    );
+  }
+
+  // ---- khuyến mãi ----
+  function clearPromo(l: Line): Line {
+    return { ...l, promoRegId: undefined, promoItemId: undefined, promoPrice: undefined, promoName: undefined, promoLabel: undefined, promoAdded: undefined };
+  }
+  const promoUsed = (itemId: string, exceptKey?: number) =>
+    lines.filter((l) => l.promoItemId === itemId && l.key !== exceptKey).reduce((a, l) => a + l.qty, 0);
+  function applyPromo(p: CustomerPromo, it: PromoItem) {
+    if (promoUsed(it.id) >= it.quantity) return;
+    const promo = { promoRegId: p.regId, promoItemId: it.id, promoPrice: Number(it.promo_price), promoName: p.name, promoLabel: it.label };
+    if (it.item_type === "service") {
+      // dịch vụ đã có trong hoá đơn (vd trong lịch hẹn) -> áp giá KM vào dòng đó
+      const target = lines.find((l) => l.type === "service" && l.serviceId === it.service_id && !l.promoItemId && !l.pkgId);
+      if (target) return update(target.key, promo);
+      const s = svcById.get(it.service_id!);
+      return addLine({
+        type: "service",
+        serviceId: it.service_id!,
+        member: false,
+        customPrice: 0,
+        qty: 1,
+        discount: 0,
+        card: false,
+        pkgId: "",
+        sellers: [],
+        ...promo,
+        promoAdded: true,
+        promoLabel: s?.name ?? it.label,
+      });
+    }
+    if (it.item_type === "package") {
+      return addLine({ type: "package", packageId: it.package_id!, member: false, customPrice: 0, qty: 1, discount: 0, card: false, pkgId: "", sellers: [], ...promo, promoAdded: true });
+    }
+    const existing = lines.find((l) => l.type === "product" && l.productId === it.product_id && l.promoItemId === it.id);
+    if (existing) return update(existing.key, { qty: existing.qty + 1 });
+    addLine({ type: "product", productId: it.product_id!, member: false, customPrice: 0, qty: 1, discount: 0, card: false, pkgId: "", sellers: meSeller, ...promo, promoAdded: true });
+  }
+  function removePromo(l: Line) {
+    if (l.promoAdded) setLines((ls) => ls.filter((x) => x.key !== l.key));
+    else update(l.key, clearPromo(l));
   }
 
   const filtered = useMemo(() => {
@@ -372,9 +432,15 @@ export default function CheckoutForm({
     if (!p) return;
     const used = lines.filter((o) => o.type === "product" && o.productId === l.productId).reduce((a, o) => a + o.qty, 0);
     if (used > (stockHere[p.id] ?? 0)) problems.push(`Kho bán lẻ chỉ còn ${stockHere[p.id] ?? 0} "${p.name}".`);
+    if (l.promoItemId) return;
     if (l.customPrice > Number(p.retail_price)) problems.push(`Giá bán "${p.name}" cao hơn giá niêm yết.`);
     if (l.customPrice < minPrice(p)) problems.push(`Giá bán "${p.name}" thấp nhất ${formatVnd(minPrice(p))}.`);
   });
+  promos.forEach((p) =>
+    p.items.forEach((it) => {
+      if (promoUsed(it.id) > it.quantity) problems.push(`"${it.label}" chỉ được ${it.quantity} suất khuyến mãi.`);
+    }),
+  );
   if (canDiscount && totalDiscount > 0 && !discountReason.trim()) problems.push("Ghi lý do giảm giá.");
   if (cardTotal > balance) problems.push(`Số dư thẻ không đủ (còn ${formatVnd(balance)}).`);
   if (lines.some((l) => l.card) && lines.some((l) => l.type === "card_topup"))
@@ -399,6 +465,8 @@ export default function CheckoutForm({
       discount: !canDiscount || l.pkgId || l.type === "card_topup" ? 0 : l.discount,
       paid_with_card: l.card,
       customer_package_item_id: l.pkgId || null,
+      promotion_registration_id: l.promoRegId ?? null,
+      promotion_item_id: l.promoItemId ?? null,
       sellers: l.sellers.filter((s) => s.staffId && s.share > 0).map((s) => ({ staff_id: s.staffId, share: s.share })),
     }));
     const payments = [
@@ -535,6 +603,47 @@ export default function CheckoutForm({
             ))}
           </div>
         )}
+        {customer && promos.length > 0 && (
+          <div className="space-y-2 rounded-xl border border-[#E0A526] bg-[#FFE8BA]/30 px-3 py-2 text-xs">
+            <p className="font-semibold text-[#7A5600]">Ưu đãi khách đã đăng ký</p>
+            {promos.map((p) => {
+              const wrongBranch = !!p.branch_id && p.branch_id !== branchId;
+              return (
+                <div key={p.regId}>
+                  <p className="font-medium">
+                    {p.name}
+                    {p.deadline && <span className="font-normal text-ink/60"> · dùng đến {dmy(p.deadline)}</span>}
+                    {wrongBranch && <span className="font-normal text-[#8A2323]"> · chỉ áp dụng ở chi nhánh khác</span>}
+                  </p>
+                  <ul className="mt-1 space-y-1">
+                    {p.items.map((it) => {
+                      const used = promoUsed(it.id);
+                      return (
+                        <li key={it.id} className="flex items-center justify-between gap-2">
+                          <span>
+                            {it.label}: <b>{Number(it.promo_price) === 0 ? "tặng" : formatVnd(Number(it.promo_price))}</b>
+                            {it.list_price !== null && Number(it.list_price) > Number(it.promo_price) && (
+                              <span className="ml-1 text-ink/40 line-through">{formatVnd(Number(it.list_price))}</span>
+                            )}
+                            {it.quantity > 1 && <span className="text-ink/60"> · {used}/{it.quantity} suất</span>}
+                          </span>
+                          <button
+                            className="shrink-0 rounded-full bg-navy px-3 py-1 font-semibold text-white disabled:opacity-40"
+                            disabled={wrongBranch || used >= it.quantity}
+                            onClick={() => applyPromo(p, it)}
+                          >
+                            {used >= it.quantity ? "Đã áp dụng" : "Áp dụng"}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })}
+            <p className="text-ink/60">Chốt hoá đơn thì đăng ký chuyển sang “đã dùng” (món chưa áp dụng cũng không dùng lại được).</p>
+          </div>
+        )}
       </div>
 
       {/* ---- CÁC DÒNG ---- */}
@@ -563,6 +672,7 @@ export default function CheckoutForm({
             canDiscount={canDiscount}
             onChange={(p) => update(l.key, p)}
             onRemove={() => removeLine(l)}
+            onRemovePromo={() => removePromo(l)}
           />
         ))}
 
@@ -878,6 +988,7 @@ function LineRow({
   canDiscount,
   onChange,
   onRemove,
+  onRemovePromo,
 }: {
   line: Line;
   row: { unit: number; gross: number; disc: number; net: number };
@@ -898,16 +1009,20 @@ function LineRow({
   canDiscount: boolean;
   onChange: (p: Partial<Line>) => void;
   onRemove: () => void;
+  onRemovePromo: () => void;
 }) {
+  const isPromo = !!l.promoItemId;
   const title =
     l.type === "service"
-      ? svc?.name ?? "Dịch vụ"
+      ? svc?.name ?? l.promoLabel ?? "Dịch vụ"
       : l.type === "package"
-        ? `Gói ${pkg?.name ?? ""}`
+        ? pkg
+          ? `Gói ${pkg.name}`
+          : l.promoLabel ?? "Gói"
         : l.type === "product"
           ? product
             ? productLabel(product)
-            : "Sản phẩm"
+            : l.promoLabel ?? "Sản phẩm"
           : "Nạp thẻ tài khoản";
   const usesPackage = !!l.pkgId;
   const cardBlocked = l.type === "service" && svc && (!svc.card_allowed || svc.member_price === null);
@@ -924,6 +1039,13 @@ function LineRow({
             {l.type === "service" && l.apsId && <span className="ml-1 text-xs text-ink/50">(trong lịch)</span>}
             {l.type === "service" && !l.apsId && inAppt && <span className="ml-1 text-xs text-brown">(làm thêm)</span>}
           </p>
+          {isPromo && (
+            <p className="mt-0.5 text-xs">
+              <span className="rounded-full bg-[#FFE8BA] px-2 py-0.5 font-semibold text-[#7A5600]">KM {l.promoName}</span>
+              {row.unit === 0 && <b className="ml-1 text-[#22612A]">tặng</b>}
+              <button className="ml-2 text-[#8A2323] underline" onClick={onRemovePromo}>Bỏ khuyến mãi</button>
+            </p>
+          )}
           {l.type === "package" && pkg && (
             <p className="text-xs text-ink/60">
               {[...pkg.package_items]
@@ -971,7 +1093,7 @@ function LineRow({
       )}
 
       {/* trừ gói */}
-      {l.type === "service" && inAppt && (packageOptions.length > 0 || usesPackage) && (
+      {l.type === "service" && inAppt && !isPromo && (packageOptions.length > 0 || usesPackage) && (
         <label className="mt-2 flex items-center gap-2 text-xs">
           <span className="text-ink/60">Cách trả</span>
           <select
@@ -991,7 +1113,7 @@ function LineRow({
 
       {!usesPackage && (
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-          {l.type === "service" && svc?.price === null && (
+          {l.type === "service" && svc?.price === null && !isPromo && (
             <label className="flex items-center gap-1">
               Giá
               <MoneyInput value={l.customPrice} onChange={(n) => onChange({ customPrice: n })} className="w-32" ariaLabel="Giá dịch vụ" />
@@ -1010,6 +1132,7 @@ function LineRow({
                   onChange={(e) => onChange({ qty: Math.max(1, Math.min(50, Math.floor(Number(e.target.value) || 1))) })}
                 />
               </label>
+              {!isPromo && (
               <label className="flex items-center gap-1">
                 Giá bán
                 <MoneyInput
@@ -1019,9 +1142,10 @@ function LineRow({
                   ariaLabel="Giá bán sản phẩm"
                 />
               </label>
+              )}
               <span className="text-ink/55">
                 niêm yết {formatVnd(product.retail_price)}
-                {productMin < Number(product.retail_price) && (
+                {!isPromo && productMin < Number(product.retail_price) && (
                   <>
                     {" · "}
                     <button className="text-navy underline" onClick={() => onChange({ customPrice: productMin })}>
@@ -1032,7 +1156,7 @@ function LineRow({
               </span>
             </>
           )}
-          {l.type === "package" && (
+          {l.type === "package" && !isPromo && (
             <label className="flex items-center gap-1">
               SL
               <input
@@ -1062,9 +1186,11 @@ function LineRow({
               Trừ thẻ nạp sẵn
               {cardBlocked
                 ? " (dịch vụ không có giá thành viên – thanh toán ngoài)"
-                : svc?.member_price != null
-                  ? ` · giá thành viên ${formatVnd(svc.member_price)}`
-                  : ""}
+                : isPromo
+                  ? " · trừ theo giá khuyến mãi"
+                  : svc?.member_price != null
+                    ? ` · giá thành viên ${formatVnd(svc.member_price)}`
+                    : ""}
             </label>
           )}
         </div>

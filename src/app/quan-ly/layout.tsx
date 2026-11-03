@@ -37,6 +37,15 @@ export default async function ManagerLayout({ children }: { children: React.Reac
     const { count } = await q;
     pendingStock = count ?? 0;
   }
+  let pendingPromo = 0;
+  if (role !== "warehouse") {
+    const supabase = await createClient();
+    const { count } = await supabase
+      .from("promotion_registrations")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
+    pendingPromo = count ?? 0;
+  }
   const kho = { href: "/quan-ly/kho", label: pendingStock ? `Kho (${pendingStock})` : "Kho" };
   const tabs =
     role === "warehouse"
@@ -46,6 +55,7 @@ export default async function ManagerLayout({ children }: { children: React.Reac
           { href: "/quan-ly/tao-lich", label: "+ Tạo lịch" },
           { href: "/quan-ly/khach-hang", label: "Khách hàng" },
           { href: "/quan-ly/hoa-don", label: "Hoá đơn" },
+          { href: "/quan-ly/khuyen-mai", label: pendingPromo ? `Khuyến mãi (${pendingPromo})` : "Khuyến mãi" },
           { href: "/quan-ly/doanh-so", label: role === "owner" || role === "manager" ? "Doanh số" : "Doanh số của tôi" },
           kho,
           ...(role === "owner" || role === "manager"

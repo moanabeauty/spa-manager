@@ -99,3 +99,20 @@ Cơ sở dữ liệu (`20261103000015_inventory.sql`, `…16_retail_checkout.sql
 - Quản lý kho chỉ thao tác kho của chi nhánh mình (`can_manage_warehouse`); chủ / quản lý mọi kho.
 - Hàm: `receive_stock`, `adjust_stock`, `create_stock_request`, `review_stock_request`, `cancel_stock_request`, `set_retail_max_discount`, `retail_min_price`. Không xuất / bán quá tồn kho.
 - Vai trò `warehouse` (quản lý kho) vào được trang Quản lý nhưng chỉ thấy mục Kho.
+
+## Giai đoạn 6: khách hàng & khuyến mãi
+
+| Trang | Ai dùng | Việc |
+|---|---|---|
+| `/khuyen-mai` | mọi người (đăng ký cần đăng nhập) | Xem chương trình đang mở: món + giá gạch / giá KM (0đ = tặng), số suất còn, điều kiện, hạn dùng. **Đăng ký ưu đãi**: chọn chi nhánh, ngày giờ muốn đến (không bắt buộc), ghi chú → "chờ xác nhận" |
+| `/lich-hen` | khách | Thêm mục **Ưu đãi đã đăng ký** (trạng thái, hạn dùng), tự huỷ được |
+| `/quan-ly/khuyen-mai` | lễ tân, KTV, quản lý, chủ | Đăng ký theo trạng thái (Chờ xác nhận / Đã xác nhận / Đã dùng / Đã huỷ) + chi nhánh. Gọi khách (bấm SĐT) → **Xác nhận** (đổi chi nhánh / giờ hẹn, ghi chú) hoặc **Huỷ** (bắt buộc lý do). Đã xác nhận: **Tạo lịch hẹn**, **Thu tiền**. **Đăng ký hộ khách** gọi điện / tại quầy (xác nhận luôn) |
+| `/quan-ly/khuyen-mai/chuong-trinh` | chủ, quản lý | Tạo / sửa chương trình: 4 kiểu (giảm giá dịch vụ, gói giá ưu đãi, trải nghiệm lần đầu, mua kèm tặng); thêm dịch vụ / gói / sản phẩm, nhập giá KM hoặc % giảm hoặc "Tặng", số lượng; thời gian đăng ký, hạn dùng, chi nhánh, tổng số suất, số lần / khách, chỉ khách lần đầu, hiện trên web hay chỉ tại quầy, dừng chương trình |
+| `/quan-ly/thu-tien` | người thu | Chọn khách → khung **Ưu đãi khách đã đăng ký** → bấm **Áp dụng** từng món: dịch vụ đã có trong lịch được đổi sang giá KM, món khác thêm dòng mới. Dòng KM có nhãn "KM …", bấm "Bỏ khuyến mãi" để trả về giá thường |
+
+Cơ sở dữ liệu (`20261103000018_promotion_status.sql`, `…19_promotions.sql`, `…20_checkout_promotions.sql`):
+- `promotions` thêm kiểu, điều kiện, chi nhánh, chỉ khách mới, số suất, số lần / khách, hạn dùng, hiện online; bảng mới `promotion_items` (món + giá KM + số lượng, lưu sẵn tên + giá niêm yết để khách xem).
+- Đăng ký chỉ qua hàm `register_promotion` (kiểm tra thời gian, chi nhánh, khách lần đầu, số lần / khách, hết suất – khoá chương trình khi đếm), `confirm_promotion_registration`, `cancel_promotion_registration`; số suất đã đăng ký công khai qua `promotion_taken_counts()`.
+- `checkout_invoice` nhận `promotion_registration_id` + `promotion_item_id` trên từng dòng; `promotion_line_check` kiểm tra đăng ký đã xác nhận, đúng khách, đúng chi nhánh, còn hạn, đúng món; không dùng quá số lượng. Giá KM **không tính là giảm giá** (không cần chủ duyệt), giảm chung cả hoá đơn **không** chia vào dòng KM; dòng dịch vụ KM vẫn trừ thẻ được (theo giá KM). Gói "ngừng bán" vẫn bán được qua KM.
+- Chốt hoá đơn → đăng ký "đã dùng" (cả chương trình, kể cả món chưa áp dụng); chủ huỷ hoá đơn → đăng ký về "đã xác nhận" để dùng lại.
+- Doanh số / hoa hồng tính trên giá KM thực thu như dòng thường.
