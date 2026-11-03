@@ -16,11 +16,10 @@ type Svc = {
   branch_id: string | null;
   menu_tier: string;
 };
-type Locked = { category_id: string | null; category_name: string | null; sort_order: number | null; hidden: number };
 
 export default async function MenuPage() {
-  const { supabase, user, profile } = await getCurrentUser();
-  const [{ data: cats }, { data: svcData }, { data: lockedData }, { data: full }, { data: branchData }] = await Promise.all([
+  const { supabase, profile } = await getCurrentUser();
+  const [{ data: cats }, { data: svcData }, { data: full }, { data: branchData }] = await Promise.all([
     supabase.from("service_categories").select("id, name, sort_order").order("sort_order"),
     // bảng dịch vụ tự lọc theo cấp của người xem (khách mới / đã mua gói / nhân viên)
     supabase
@@ -28,22 +27,17 @@ export default async function MenuPage() {
       .select("id, category_id, name, name_en, description, duration_minutes, price, member_price, branch_id, menu_tier")
       .eq("is_active", true)
       .order("name"),
-    supabase.rpc("menu_locked_summary"),
     supabase.rpc("can_view_full_menu"),
     supabase.from("branches").select("id, name").eq("is_active", true),
   ]);
   const services = (svcData ?? []) as Svc[];
-  const locked = (lockedData ?? []) as Locked[];
   const branches = (branchData ?? []) as { id: string; name: string }[];
-  const hiddenTotal = locked.reduce((a, l) => a + l.hidden, 0);
   const staff = isStaffRole(profile?.role);
   const fullMenu = full === true;
 
   const groups = (cats ?? [])
     .map((c: { id: string; name: string }) => ({ ...c, items: services.filter((s) => s.category_id === c.id) }))
     .filter((g) => g.items.length);
-  const lockedById = new Map(locked.map((l) => [l.category_id, l.hidden]));
-  const lockedOnly = locked.filter((l) => !groups.some((g) => g.id === l.category_id));
 
   return (
     <div className="space-y-5">
@@ -58,7 +52,7 @@ export default async function MenuPage() {
           <p className="mx-auto mt-2 max-w-md text-sm text-ink/80">Cảm ơn bạn đã là khách hàng thân thiết của Moana – bạn xem được toàn bộ menu.</p>
         ) : (
           <p className="mx-auto mt-2 max-w-md text-sm text-ink/80">
-            Các liệu trình chăm sóc da dành cho khách mới. {hiddenTotal > 0 && <>Moana còn <b>{hiddenTotal} dịch vụ chuyên sâu</b> dành riêng cho khách đã mua gói liệu trình.</>}
+            Các liệu trình chăm sóc da tại Moana. Chuyên viên sẽ soi da và tư vấn liệu trình phù hợp khi bạn đến spa.
           </p>
         )}
         <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -73,7 +67,6 @@ export default async function MenuPage() {
             <span className="font-semibold text-navy">{g.name}</span>
             <span className="text-xs text-ink/50">
               {g.items.length} dịch vụ
-              {!fullMenu && !staff && lockedById.get(g.id) ? ` · +${lockedById.get(g.id)} 🔒` : ""}
             </span>
           </summary>
           <ul className="divide-y divide-beige border-t border-beige">
@@ -102,31 +95,9 @@ export default async function MenuPage() {
               </li>
             ))}
           </ul>
-          {!fullMenu && !staff && lockedById.get(g.id) ? (
-            <p className="border-t border-beige px-5 py-3 text-xs text-ink/60">
-              🔒 Còn {lockedById.get(g.id)} dịch vụ trong nhóm này dành cho khách đã mua gói.
-            </p>
-          ) : null}
         </details>
       ))}
 
-      {!fullMenu && !staff && lockedOnly.length > 0 && (
-        <section className="card">
-          <h2 className="font-semibold text-navy">🔒 Dành cho khách đã mua gói</h2>
-          <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-            {lockedOnly.map((l) => (
-              <li key={l.category_id ?? "none"} className="flex justify-between rounded-xl bg-cream px-3 py-2 text-sm">
-                <span>{l.category_name ?? "Dịch vụ khác"}</span>
-                <span className="text-ink/50">{l.hidden} dịch vụ</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-sm text-ink/70">
-            Khách đã mua gói liệu trình tại Moana xem được toàn bộ menu và tự đặt lịch online
-            {user ? "" : <> (<Link href="/dang-nhap" className="font-semibold text-navy underline">đăng nhập</Link> tài khoản đã gắn với hồ sơ khách)</>}. Cần tư vấn? Đặt lịch một buổi chăm sóc cơ bản, chuyên viên Moana sẽ soi da và tư vấn liệu trình phù hợp.
-          </p>
-        </section>
-      )}
 
       {groups.length === 0 && <p className="card text-sm text-ink/60">Menu đang được cập nhật.</p>}
     </div>

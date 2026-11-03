@@ -174,7 +174,7 @@ Cơ sở dữ liệu (`20261103000022_reports_payroll_cashbook.sql`, `…23_repo
 | `/quan-ly/khach-hang?id=…` | như trên | **Hồ sơ khách**: liên hệ, ngày sinh, giới tính, chi nhánh hay đến, địa chỉ, nguồn khách, loại da, tình trạng da, lưu ý sức khoẻ / dị ứng (hiện nổi bật), ghi chú nội bộ (khách không thấy); gắn / bỏ nhóm. Thống kê lần đến, chi tiêu. **Lịch sử dịch vụ** (ngày, chi nhánh, dịch vụ, KTV, trừ gói), lịch sử mua gói / nạp thẻ, gói, thẻ, hoàn tiền, hoá đơn. **Nhắc chăm sóc** của khách + hẹn nhắc / ghi lại cuộc gọi |
 | `/quan-ly/cham-soc` | như trên | **Chăm sóc lại**: nhắc đến hạn / quá hạn, sắp tới, đã xử lý; lọc chi nhánh, loại. Bấm SĐT gọi khách → **Đã liên hệ** (ghi kết quả, hẹn gọi lại sau N ngày) hoặc **Bỏ qua** (lý do); tạo lịch hẹn. Số nhắc đến hạn hiện trên tab |
 | `/quan-ly/khach-hang/nhom` | quản lý, chủ | Tạo / sửa / xoá nhóm khách (màu). Chủ spa: mức chi tiêu VIP, số ngày "lâu chưa quay lại", nhắc gói hết hạn, nhắc sinh nhật, thẻ nạp sẵn có mở toàn bộ menu không |
-| `/menu` | mọi người | **Menu giới thiệu dịch vụ**: khách mới / chưa đăng nhập chỉ thấy dịch vụ 👁; khách đã mua gói thấy toàn bộ. Nhóm có dịch vụ ẩn hiện "+N 🔒" |
+| `/menu` | mọi người | **Menu giới thiệu dịch vụ**: khách mới / chưa đăng nhập chỉ thấy dịch vụ 👁 – dịch vụ 🔒 bị **ẩn hẳn** (không hiện tên, không đếm số, không hiện nhóm chỉ có dịch vụ 🔒); khách đã mua gói thấy toàn bộ |
 | `/quan-ly/dich-vu` | quản lý, chủ | Nhãn 👁 / 🔒 từng dịch vụ (bấm để đổi, hoặc đổi cả nhóm); lọc theo cấp; chi tiết: số ngày **hỏi thăm sau làm**, **mời quay lại** |
 
 Cơ sở dữ liệu (`20261103000030_crm_menu_tiers.sql`):
