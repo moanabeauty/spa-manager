@@ -129,7 +129,7 @@ Cơ sở dữ liệu (`20261103000018_promotion_status.sql`, `…19_promotions.s
 |---|---|---|
 | `/quan-ly/bao-cao` | chủ, quản lý | **Doanh thu** theo ngày / tháng, lọc chi nhánh và khoảng ngày (nút nhanh: hôm nay, tháng này, tháng trước, cả năm). Tiền thực thu (tiền mặt + CK + POS), tiền trừ thẻ, hoàn tiền; tiền đến từ dịch vụ lẻ / gói combo – liệu trình / sản phẩm / nạp thẻ; so sánh 2 chi nhánh; dịch vụ, gói, sản phẩm bán nhiều nhất |
 | `/quan-ly/bao-cao/goi-the` | chủ, quản lý | Gói và thẻ **đã bán** trong tháng; **số buổi còn nợ** khách mua combo (từng phần của gói) + giá trị còn nợ; thẻ còn số dư + **tiền thực nợ** = số dư × mệnh giá / (mệnh giá + tiền tặng). Tìm theo tên / SĐT |
-| `/quan-ly/bang-luong` | chủ (đủ), quản lý (chấm công + phạt) | **Bảng lương**: lương cơ bản theo ngày công (÷ 26 công), lương trách nhiệm, phụ cấp ăn 30k / công, thêm giờ ×150%, hoa hồng, tiền dịch vụ KTV, cộng khác − phạt nội quy − BHXH (10,5%) − trừ khác = thực nhận; tiền BHXH Moana đóng (21,5%). Phiếu lương từng người, in, **ghi vào sổ chi**. Tab Chấm công, Phạt nội quy, Mức lương (từng người), Cài đặt (số ngày công chuẩn, %, mức phụ cấp) |
+| `/quan-ly/bang-luong` | chủ (đủ), quản lý (chấm công + phạt) | **Bảng lương**: lương cơ bản theo ngày công (÷ 27 công, sửa riêng từng người được), lương trách nhiệm, phụ cấp ăn 30k / công, thêm giờ ×150%, hoa hồng, tiền dịch vụ KTV, cộng khác − phạt nội quy − BHXH (10,5%) − trừ khác = thực nhận; tiền BHXH Moana đóng (21,5%). Phiếu lương từng người, in, **ghi vào sổ chi**. Tab Chấm công, Phạt nội quy, Mức lương (từng người), Cài đặt (số ngày công chuẩn, %, mức phụ cấp) |
 | `/quan-ly/doanh-so` | nhân viên | Thêm **phiếu lương tạm tính** của mình |
 | `/quan-ly/thu-chi` | chủ | **Dòng tiền**: nhập mọi khoản thu / chi (danh mục, chi nhánh hoặc chung, hình thức), tự cộng tiền bán hàng thực thu và trừ tiền hoàn khách. Bảng 12 tháng: thu, chi, lợi nhuận, **% lợi nhuận**; cả năm; chi theo danh mục |
 | `/quan-ly/duyet-giam-gia` | chủ | Nút **Bật thông báo** trên điện thoại: lễ tân / KTV gửi yêu cầu giảm giá là điện thoại chủ spa báo ngay (bấm vào mở trang duyệt). iPhone cần "Thêm vào MH chính" trước |
@@ -139,3 +139,10 @@ Cơ sở dữ liệu (`20261103000022_reports_payroll_cashbook.sql`, `…23_repo
 - Lương: `staff_pay_settings` (chỉ chủ), `payroll_entries` + `staff_penalties` (chủ / quản lý ghi, nhân viên xem của mình), cài đặt `app_settings.payroll`; `payroll_sheet` (chủ), `my_payslip` (nhân viên), `post_payroll_to_cashbook` (ghi 2 khoản chi: lương thực nhận + BHXH cả 2 phần, bấm lại thì cập nhật).
 - Thu chi: `cashbook_categories`, `cashbook_entries` (chỉ chủ).
 - Thông báo: `push_subscriptions`, `save_push_subscription`, `discount_push_targets` (mỗi yêu cầu báo 1 lần). Gửi bằng Web Push (`src/lib/webpush.ts`, không cần thư viện), khoá đặt ở biến môi trường Vercel `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
+
+### Chấm công check-in / out (`20261103000024_attendance_checkin.sql`)
+- Nhân viên (trừ chủ spa) bấm **Check-in / Check-out** ở đầu mọi trang Quản lý; giờ lấy theo máy chủ (`check_in()`, `check_out()`, bảng `staff_attendance`).
+- Ca 9:00 – 18:00, nghỉ trưa 60 phút, 8 giờ / công. Làm ≥ 6 giờ = 1 công, 3 – 6 giờ = 0,5 công, quên check-out = 0 công. Về sau 18:00 tính thêm giờ theo nửa tiếng. Sửa ở Bảng lương → Cài đặt.
+- Bảng lương → tab **Check-in / out**: quản lý / chủ xem từng ngày, sửa giờ, thêm hoặc xoá ngày (`save_attendance`, có ghi chú). Tab **Chấm công** hiện cột "Theo check-in" + nút "Điền từ check-in / out"; người chưa lưu tay thì bảng lương tự dùng số check-in.
+- Ngày công chuẩn chung 27 (KTV), sửa riêng từng người ở tab Mức lương. Đơn giá giờ thêm = lương cơ bản ÷ công chuẩn ÷ 8 × 150%.
+- Chủ spa: thẻ **Bật thông báo** hiện ở đầu trang Quản lý cho đến khi bật trên máy đó.

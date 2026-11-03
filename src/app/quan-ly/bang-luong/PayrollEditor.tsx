@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { formatVnd, ROLE_LABEL, todayVn, vnError } from "@/lib/format";
+import { formatTime, formatVnd, ROLE_LABEL, todayVn, vnDateTime, vnError } from "@/lib/format";
 import { shortLabel } from "@/lib/reports";
 import MoneyInput from "@/components/MoneyInput";
 
@@ -12,11 +12,17 @@ export type Entry = { staff_id: string; work_days: number; overtime_hours: numbe
 export type Penalty = { id: string; staff_id: string; penalty_date: string; amount: number; reason: string };
 export type PaySetting = {
   staff_id: string; base_salary: number; responsibility_pay: number; insurance_salary: number;
-  meal_per_day: number | null; on_payroll: boolean; note: string | null;
+  meal_per_day: number | null; standard_days: number | null; on_payroll: boolean; note: string | null;
+};
+export type AttSum = { staff_id: string; days: number; ot_hours: number; records: number; missing_out: number };
+export type AttDay = {
+  staff_id: string; work_date: string; check_in: string; check_out: string | null; net_hours: number; days: number;
+  ot_hours: number; note: string | null; edited: boolean;
 };
 export type PayrollConfig = {
   standard_days: number; hours_per_day: number; overtime_rate: number; meal_per_day: number;
   bhxh_employee_pct: number; bhxh_employer_pct: number;
+  shift_start?: string; shift_end?: string; lunch_minutes?: number; full_day_hours?: number; half_day_hours?: number;
 };
 export type PayrollRow = {
   staff_id: string; full_name: string | null; role: string; branch_id: string | null; has_entry: boolean;
@@ -27,18 +33,20 @@ export type PayrollRow = {
   net_pay: number; insurance_employer: number; note: string | null;
 };
 
-type Tab = "cham-cong" | "phat" | "luong" | "muc-luong" | "cai-dat";
+type Tab = "cham-cong" | "checkin" | "phat" | "luong" | "muc-luong" | "cai-dat";
 const n = (v: unknown) => Number(v ?? 0);
 
 export default function PayrollEditor(props: {
   month: string; isOwner: boolean; staff: Staff[]; branches: { id: string; name: string }[];
   entries: Entry[]; penalties: Penalty[]; rows: PayrollRow[]; settings: PaySetting[]; config: PayrollConfig | null; posted: boolean;
+  attSum: AttSum[]; attDays: AttDay[];
 }) {
   const { month, isOwner } = props;
   const [tab, setTab] = useState<Tab>(isOwner ? "luong" : "cham-cong");
   const tabs: { key: Tab; label: string }[] = [
     ...(isOwner ? [{ key: "luong" as Tab, label: "Bảng lương" }] : []),
     { key: "cham-cong", label: "Chấm công" },
+    { key: "checkin", label: "Check-in / out" },
     { key: "phat", label: `Phạt nội quy${props.penalties.length ? ` (${props.penalties.length})` : ""}` },
     ...(isOwner ? [{ key: "muc-luong" as Tab, label: "Mức lương" }, { key: "cai-dat" as Tab, label: "Cài đặt" }] : []),
   ];
@@ -63,7 +71,8 @@ export default function PayrollEditor(props: {
         ))}
       </div>
       {tab === "luong" && isOwner && <Sheet {...props} branchName={branchName} />}
-      {tab === "cham-cong" && <Attendance month={month} people={people} entries={props.entries} branchName={branchName} />}
+      {tab === "cham-cong" && <Attendance month={month} people={people} entries={props.entries} attSum={props.attSum} branchName={branchName} />}
+      {tab === "checkin" && <CheckinLog month={month} people={people} days={props.attDays} />}
       {tab === "phat" && <Penalties month={month} people={people} penalties={props.penalties} />}
       {tab === "muc-luong" && isOwner && <Salaries people={people} allStaff={props.staff} settings={props.settings} config={props.config} branchName={branchName} />}
       {tab === "cai-dat" && isOwner && props.config && <Settings config={props.config} />}
@@ -195,7 +204,7 @@ function Payslip({ r, config, month }: { r: PayrollRow; config: PayrollConfig | 
       <span className={minus ? "text-[#8A2323]" : ""}>{minus && v ? "−" : ""}{formatVnd(v)}</span>
     </div>
   );
-  const hourly = config ? Math.round(n(r.base_salary) / n(config.standard_days) / n(config.hours_per_day)) : 0;
+  const hourly = config ? Math.round(n(r.base_salary) / n(r.standard_days) / n(config.hours_per_day)) : 0;
   return (
     <div className="grid gap-4 pt-2 text-sm sm:grid-cols-2">
       <div>
@@ -231,9 +240,10 @@ function Payslip({ r, config, month }: { r: PayrollRow; config: PayrollConfig | 
 }
 
 // ============ CHẤM CÔNG ============
-function Attendance({ month, people, entries, branchName }: {
-  month: string; people: Staff[]; entries: Entry[]; branchName: (id: string | null) => string;
+function Attendance({ month, people, entries, attSum, branchName }: {
+  month: string; people: Staff[]; entries: Entry[]; attSum: AttSum[]; branchName: (id: string | null) => string;
 }) {
+  const att = (id: string) => attSum.find((a) => a.staff_id === id);
   const router = useRouter();
   const init = useMemo(() => {
     const m: Record<string, Entry> = {};
@@ -254,6 +264,19 @@ function Attendance({ month, people, entries, branchName }: {
     setDirty((d) => new Set(d).add(id));
     setMsg(null);
   };
+  function fillFromCheckin() {
+    const next = { ...rows };
+    const d = new Set(dirty);
+    people.forEach((p) => {
+      const a = att(p.id);
+      if (!a) return;
+      next[p.id] = { ...next[p.id], work_days: n(a.days), overtime_hours: n(a.ot_hours) };
+      d.add(p.id);
+    });
+    setRows(next);
+    setDirty(d);
+    setMsg("Đã điền theo check-in / out, kiểm tra rồi bấm Lưu.");
+  }
 
   async function save() {
     setBusy(true);
@@ -288,6 +311,7 @@ function Attendance({ month, people, entries, branchName }: {
           <thead className="bg-cream text-left text-xs text-ink/60">
             <tr>
               <th className="px-3 py-2">Nhân viên</th>
+              <th className="px-2 py-2">Theo check-in</th>
               <th className="px-2 py-2">Ngày công</th>
               <th className="px-2 py-2">Giờ thêm</th>
               <th className="px-2 py-2">Cộng khác</th>
@@ -301,6 +325,19 @@ function Attendance({ month, people, entries, branchName }: {
                 <td className="px-3 py-2">
                   <span className="font-medium">{p.full_name ?? "?"}</span>
                   <span className="block text-xs text-ink/50">{ROLE_LABEL[p.role]} {branchName(p.branch_id) && `· ${branchName(p.branch_id)}`}</span>
+                </td>
+                <td className="px-2 py-2 text-xs">
+                  {att(p.id) ? (
+                    <>
+                      <span className="font-semibold">{n(att(p.id)!.days)} công</span>
+                      {n(att(p.id)!.ot_hours) > 0 && <span> · {n(att(p.id)!.ot_hours)}h thêm</span>}
+                      {n(att(p.id)!.missing_out) > 0 && (
+                        <span className="block text-[#8A2323]">{n(att(p.id)!.missing_out)} ngày quên check-out</span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-ink/40">chưa có</span>
+                  )}
                 </td>
                 <td className="px-2 py-2">{numInput(p.id, "work_days", "0.5")}</td>
                 <td className="px-2 py-2">{numInput(p.id, "overtime_hours", "0.5")}</td>
@@ -320,14 +357,149 @@ function Attendance({ month, people, entries, branchName }: {
         </table>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <button className="btn-outline" disabled={busy || attSum.length === 0} onClick={fillFromCheckin}>Điền từ check-in / out</button>
         <button className="btn-primary" disabled={busy || dirty.size === 0} onClick={save}>
           {busy ? "Đang lưu…" : `Lưu chấm công${dirty.size ? ` (${dirty.size} người)` : ""}`}
         </button>
         {msg && <span className="text-sm">{msg}</span>}
       </div>
       <p className="text-xs text-ink/60">
-        Ngày công nhập được nửa ngày (vd 25,5). Giờ thêm được trả 150% đơn giá giờ của lương cơ bản. “Cộng khác” (thưởng, phụ cấp khác) và
+        Người chưa lưu ở bảng này thì bảng lương tự lấy số “Theo check-in”. Đã lưu thì bảng lương dùng số đã lưu (bấm “Điền từ
+        check-in / out” để cập nhật lại). Ngày công nhập được nửa ngày (vd 25,5). Giờ thêm được trả 150% đơn giá giờ của lương cơ bản. “Cộng khác” (thưởng, phụ cấp khác) và
         “Trừ khác” (tạm ứng, đền hàng…) ghi rõ ở ô ghi chú. Phạt nội quy nhập ở mục “Phạt nội quy”.
+      </p>
+    </div>
+  );
+}
+
+// ============ CHECK-IN / OUT ============
+const hhmm = (iso: string | null) => (iso ? formatTime(iso) : "");
+
+function CheckinLog({ month, people, days }: { month: string; people: Staff[]; days: AttDay[] }) {
+  const router = useRouter();
+  const today = todayVn();
+  const [edit, setEdit] = useState<{ staff: string; date: string; inT: string; outT: string; note: string; isNew: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [who, setWho] = useState("");
+  const name = (id: string) => people.find((p) => p.id === id)?.full_name ?? "?";
+  const list = days.filter((d) => !who || d.staff_id === who);
+  const dates = [...new Set(list.map((d) => d.work_date))];
+
+  async function save(remove = false) {
+    if (!edit) return;
+    setError(null);
+    if (!remove && !edit.staff) return setError("Chọn nhân viên");
+    if (!remove && !edit.inT) return setError("Nhập giờ vào");
+    if (!edit.date.startsWith(month)) return setError(`Ngày phải trong tháng ${shortLabel(month)}`);
+    setBusy(true);
+    const { error } = await createClient().rpc("save_attendance", {
+      p_staff: edit.staff,
+      p_date: edit.date,
+      p_in: remove ? null : vnDateTime(edit.date, edit.inT).toISOString(),
+      p_out: remove || !edit.outT ? null : vnDateTime(edit.date, edit.outT).toISOString(),
+      p_note: edit.note,
+    });
+    setBusy(false);
+    if (error) return setError(vnError(error.message));
+    setEdit(null);
+    router.refresh();
+  }
+
+  const form = edit && (
+    <div className="card grid gap-2 border-l-4 border-l-navy p-3 sm:grid-cols-3">
+      {edit.isNew ? (
+        <>
+          <label className="text-xs">
+            Nhân viên
+            <select className="input mt-1 py-2 text-sm" value={edit.staff} onChange={(e) => setEdit({ ...edit, staff: e.target.value })}>
+              <option value="">– Chọn –</option>
+              {people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+            </select>
+          </label>
+          <label className="text-xs">
+            Ngày
+            <input type="date" className="input mt-1 py-2 text-sm" value={edit.date} onChange={(e) => setEdit({ ...edit, date: e.target.value })} />
+          </label>
+        </>
+      ) : (
+        <p className="text-sm font-semibold text-navy sm:col-span-2">{name(edit.staff)} · {shortLabel(edit.date)}</p>
+      )}
+      <label className="text-xs">
+        Giờ vào
+        <input type="time" className="input mt-1 py-2 text-sm" value={edit.inT} onChange={(e) => setEdit({ ...edit, inT: e.target.value })} />
+      </label>
+      <label className="text-xs">
+        Giờ về
+        <input type="time" className="input mt-1 py-2 text-sm" value={edit.outT} onChange={(e) => setEdit({ ...edit, outT: e.target.value })} />
+      </label>
+      <label className="text-xs sm:col-span-2">
+        Ghi chú (lý do sửa)
+        <input className="input mt-1 py-2 text-sm" value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} placeholder="Quên check-out, đi đào tạo…" />
+      </label>
+      <div className="flex flex-wrap items-center gap-2 sm:col-span-3">
+        <button className="btn-primary py-2" disabled={busy} onClick={() => save()}>Lưu</button>
+        {!edit.isNew && <button className="btn-ghost py-2 text-[#8A2323]" disabled={busy} onClick={() => confirm("Xoá ngày công này?") && save(true)}>Xoá ngày này</button>}
+        <button className="btn-ghost py-2" onClick={() => setEdit(null)}>Đóng</button>
+        {error && <span className="text-sm text-[#8A2323]">{error}</span>}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <select className="input w-auto py-2 text-sm" value={who} onChange={(e) => setWho(e.target.value)}>
+          <option value="">Tất cả nhân viên</option>
+          {people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+        </select>
+        <button
+          className="btn-outline py-2"
+          onClick={() => setEdit({ staff: who, date: today.startsWith(month) ? today : `${month}-01`, inT: "09:00", outT: "18:00", note: "", isNew: true })}
+        >
+          + Thêm ngày công
+        </button>
+      </div>
+      {form}
+      {dates.length === 0 && <p className="card text-sm text-ink/60">Chưa có ai check-in trong tháng này.</p>}
+      {dates.map((d) => (
+        <div key={d} className="card p-0">
+          <p className="px-4 pt-3 text-sm font-semibold text-navy">
+            {new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", timeZone: "Asia/Ho_Chi_Minh" }).format(vnDateTime(d, "12:00"))}
+          </p>
+          <ul className="divide-y divide-beige text-sm">
+            {list.filter((x) => x.work_date === d).map((x) => (
+              <li key={x.staff_id} className="flex items-center justify-between gap-2 px-4 py-2">
+                <span className="min-w-0">
+                  <span className="font-medium">{name(x.staff_id)}</span>
+                  <span className="block text-xs text-ink/60">
+                    {hhmm(x.check_in)} → {x.check_out ? hhmm(x.check_out) : <span className="text-[#8A2323]">chưa check-out</span>}
+                    {x.check_out && ` · ${n(x.net_hours)} giờ`}
+                    {x.edited && " · đã sửa"}
+                    {x.note && ` · ${x.note}`}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-3">
+                  <span className="text-right">
+                    <span className="font-semibold">{n(x.days)} công</span>
+                    {n(x.ot_hours) > 0 && <span className="block text-xs text-ink/60">+{n(x.ot_hours)}h thêm</span>}
+                  </span>
+                  <button
+                    className="text-xs text-navy underline"
+                    onClick={() => setEdit({ staff: x.staff_id, date: x.work_date, inT: hhmm(x.check_in), outT: hhmm(x.check_out), note: x.note ?? "", isNew: false })}
+                  >
+                    Sửa
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      <p className="text-xs text-ink/60">
+        Nhân viên bấm Check-in khi đến và Check-out khi về ở đầu trang Quản lý (giờ lấy theo máy chủ, không chỉnh được trên điện thoại).
+        Làm ≥ 6 giờ (đã trừ 1 tiếng nghỉ trưa) = 1 công, 3 – 6 giờ = 0,5 công. Về sau 18:00 thì tính thêm giờ theo từng nửa tiếng. Quên
+        check-out thì ngày đó 0 công đến khi quản lý sửa. Các mức này đổi được ở tab Cài đặt (chủ spa).
       </p>
     </div>
   );
@@ -433,7 +605,7 @@ function Salaries({ people, allStaff, settings, config, branchName }: {
       const s = settings.find((x) => x.staff_id === p.id);
       m[p.id] = s
         ? { ...s, base_salary: n(s.base_salary), responsibility_pay: n(s.responsibility_pay), insurance_salary: n(s.insurance_salary) }
-        : { staff_id: p.id, base_salary: 0, responsibility_pay: 0, insurance_salary: 0, meal_per_day: null, on_payroll: p.role !== "owner", note: null };
+        : { staff_id: p.id, base_salary: 0, responsibility_pay: 0, insurance_salary: 0, meal_per_day: null, standard_days: null, on_payroll: p.role !== "owner", note: null };
     });
     return m;
   }, [list, settings]);
@@ -468,6 +640,7 @@ function Salaries({ people, allStaff, settings, config, branchName }: {
               <th className="px-2 py-2">Lương trách nhiệm</th>
               <th className="px-2 py-2">Lương đóng BHXH</th>
               <th className="px-2 py-2">Phụ cấp ăn / công</th>
+              <th className="px-2 py-2">Công chuẩn</th>
               <th className="px-3 py-2">Tính lương</th>
             </tr>
           </thead>
@@ -492,6 +665,19 @@ function Salaries({ people, allStaff, settings, config, branchName }: {
                       ariaLabel="Phụ cấp ăn"
                     />
                   </td>
+                  <td className="px-2 py-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      step="0.5"
+                      className="w-16 rounded-lg border border-beige-dark bg-white px-2 py-1.5 text-right text-sm"
+                      value={r.standard_days ?? ""}
+                      placeholder={String(config?.standard_days ?? 27)}
+                      onChange={(e) => set(p.id, { standard_days: e.target.value ? Number(e.target.value) : null })}
+                      aria-label="Ngày công chuẩn"
+                    />
+                  </td>
                   <td className="px-3 py-2">
                     <input type="checkbox" checked={r.on_payroll} onChange={(e) => set(p.id, { on_payroll: e.target.checked })} aria-label="Có trong bảng lương" />
                   </td>
@@ -506,7 +692,8 @@ function Salaries({ people, allStaff, settings, config, branchName }: {
         {msg && <span className="text-sm">{msg}</span>}
       </div>
       <p className="text-xs text-ink/60">
-        Lương cơ bản là mức đủ {config?.standard_days ?? 26} ngày công, tháng nào thiếu / thừa công thì tính theo tỉ lệ. Lương trách nhiệm
+        Lương cơ bản là mức đủ ngày công chuẩn (chung {config?.standard_days ?? 27} công; ai khác thì nhập ở cột “Công chuẩn”), tháng
+        nào thiếu / thừa công thì tính theo tỉ lệ. Đơn giá giờ thêm = lương cơ bản ÷ công chuẩn ÷ {config?.hours_per_day ?? 8} giờ. Lương trách nhiệm
         trả đủ theo tháng. Lương đóng BHXH để 0 nếu nhân viên chưa đóng bảo hiểm. Phụ cấp ăn để trống thì theo mức chung
         ({formatVnd(config?.meal_per_day ?? 30000)}/công). Bỏ tích “Tính lương” với người không nhận lương ở đây (vd chủ spa).
       </p>
@@ -528,7 +715,7 @@ function Settings({ config }: { config: PayrollConfig }) {
         step={step}
         min={0}
         className="input mt-1 py-2 text-sm"
-        value={c[k]}
+        value={c[k] ?? ""}
         onChange={(e) => { setC({ ...c, [k]: Number(e.target.value) }); setMsg(null); }}
       />
     </label>
@@ -553,6 +740,20 @@ function Settings({ config }: { config: PayrollConfig }) {
         </label>
         {field("bhxh_employee_pct", "% BHXH trừ lương nhân viên", "0.1")}
         {field("bhxh_employer_pct", "% BHXH Moana đóng", "0.1")}
+      </div>
+      <p className="text-xs font-semibold text-navy">Tính công từ check-in / out</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="text-xs">
+          Giờ vào ca
+          <input type="time" className="input mt-1 py-2 text-sm" value={c.shift_start ?? "09:00"} onChange={(e) => { setC({ ...c, shift_start: e.target.value }); setMsg(null); }} />
+        </label>
+        <label className="text-xs">
+          Giờ hết ca (sau giờ này tính thêm giờ)
+          <input type="time" className="input mt-1 py-2 text-sm" value={c.shift_end ?? "18:00"} onChange={(e) => { setC({ ...c, shift_end: e.target.value }); setMsg(null); }} />
+        </label>
+        {field("lunch_minutes", "Nghỉ trưa (phút)", "5")}
+        {field("full_day_hours", "Làm từ … giờ = 1 công", "0.5")}
+        {field("half_day_hours", "Làm từ … giờ = 0,5 công", "0.5")}
       </div>
       <div className="flex items-center gap-2">
         <button className="btn-primary" disabled={busy} onClick={save}>Lưu cài đặt</button>

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { createClient, getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import ManagerTabs from "./ManagerTabs";
+import CheckInBar from "@/components/CheckInBar";
+import PushToggle from "@/components/PushToggle";
+import { todayVn } from "@/lib/format";
 
 export default async function ManagerLayout({ children }: { children: React.ReactNode }) {
   const { user, profile } = await getCurrentUser();
@@ -72,8 +75,22 @@ export default async function ManagerLayout({ children }: { children: React.Reac
           ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/dich-vu", label: "Menu dịch vụ" }] : []),
           ...(role === "owner" ? [{ href: "/quan-ly/nhan-vien", label: "Nhân viên" }] : []),
         ];
+  let attendance: { check_in: string; check_out: string | null } | null = null;
+  if (role !== "owner") {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("staff_attendance")
+      .select("check_in, check_out")
+      .eq("staff_id", profile!.id)
+      .eq("work_date", todayVn())
+      .maybeSingle();
+    attendance = data;
+  }
+  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
   return (
     <div className="space-y-4">
+      {role !== "owner" && <CheckInBar today={attendance} />}
+      {role === "owner" && vapidKey && <PushToggle publicKey={vapidKey} hideWhenOn />}
       <div className="print:hidden"><ManagerTabs tabs={tabs} /></div>
       {children}
     </div>

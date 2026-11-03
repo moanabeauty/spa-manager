@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { todayVn } from "@/lib/format";
 import { isMonth, shiftMonth, shortLabel } from "@/lib/reports";
 import ReportNav from "../bao-cao/ReportNav";
-import PayrollEditor, { type Entry, type PaySetting, type Penalty, type PayrollRow, type PayrollConfig, type Staff } from "./PayrollEditor";
+import PayrollEditor, { type AttDay, type AttSum, type Entry, type PaySetting, type Penalty, type PayrollRow, type PayrollConfig, type Staff } from "./PayrollEditor";
 
 export const metadata = { title: "Bảng lương – Moana Beauty" };
 
@@ -17,7 +17,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const m1 = `${month}-01`;
   const next = `${shiftMonth(month, 1)}-01`;
 
-  const [{ data: staff }, { data: branches }, { data: entries }, { data: penalties }] = await Promise.all([
+  const [{ data: staff }, { data: branches }, { data: entries }, { data: penalties }, { data: attSum }, { data: attDays }, { data: cfgRow }] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, full_name, role, branch_id, is_active")
@@ -31,22 +31,23 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       .gte("penalty_date", m1)
       .lt("penalty_date", next)
       .order("penalty_date", { ascending: false }),
+    supabase.rpc("attendance_month", { p_month: m1 }),
+    supabase.rpc("attendance_report", { p_month: m1 }),
+    supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
   ]);
 
   let rows: PayrollRow[] = [];
   let settings: PaySetting[] = [];
-  let config: PayrollConfig | null = null;
+  const config: PayrollConfig | null = (cfgRow?.value ?? null) as PayrollConfig | null;
   let posted = false;
   if (isOwner) {
-    const [{ data: sheet }, { data: ps }, { data: cfg }, { count }] = await Promise.all([
+    const [{ data: sheet }, { data: ps }, { count }] = await Promise.all([
       supabase.rpc("payroll_sheet", { p_month: m1 }),
-      supabase.from("staff_pay_settings").select("staff_id, base_salary, responsibility_pay, insurance_salary, meal_per_day, on_payroll, note"),
-      supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
+      supabase.from("staff_pay_settings").select("staff_id, base_salary, responsibility_pay, insurance_salary, meal_per_day, standard_days, on_payroll, note"),
       supabase.from("cashbook_entries").select("id", { count: "exact", head: true }).eq("source", "payroll").eq("source_month", m1),
     ]);
     rows = (sheet ?? []) as PayrollRow[];
     settings = (ps ?? []) as PaySetting[];
-    config = (cfg?.value ?? null) as PayrollConfig | null;
     posted = (count ?? 0) > 0;
   }
 
@@ -57,7 +58,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         <p className="text-sm text-ink/70">
           {isOwner
             ? "Lương cơ bản theo ngày công + trách nhiệm + phụ cấp ăn + thêm giờ + hoa hồng + tiền dịch vụ − phạt − BHXH"
-            : "Nhập ngày công, giờ làm thêm và phạt nội quy cho nhân viên. Chủ spa xem bảng lương."}
+            : "Ngày công lấy từ check-in / check-out của nhân viên; quản lý kiểm tra, sửa và nhập phạt nội quy. Chủ spa xem bảng lương."}
         </p>
       </div>
       <ReportNav active="luong" isOwner={isOwner} />
@@ -78,6 +79,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         settings={settings}
         config={config}
         posted={posted}
+        attSum={(attSum ?? []) as AttSum[]}
+        attDays={(attDays ?? []) as AttDay[]}
       />
     </div>
   );
