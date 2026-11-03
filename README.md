@@ -116,3 +116,9 @@ Cơ sở dữ liệu (`20261103000018_promotion_status.sql`, `…19_promotions.s
 - `checkout_invoice` nhận `promotion_registration_id` + `promotion_item_id` trên từng dòng; `promotion_line_check` kiểm tra đăng ký đã xác nhận, đúng khách, đúng chi nhánh, còn hạn, đúng món; không dùng quá số lượng. Giá KM **không tính là giảm giá** (không cần chủ duyệt), giảm chung cả hoá đơn **không** chia vào dòng KM; dòng dịch vụ KM vẫn trừ thẻ được (theo giá KM). Gói "ngừng bán" vẫn bán được qua KM.
 - Chốt hoá đơn → đăng ký "đã dùng" (cả chương trình, kể cả món chưa áp dụng); chủ huỷ hoá đơn → đăng ký về "đã xác nhận" để dùng lại.
 - Doanh số / hoa hồng tính trên giá KM thực thu như dòng thường.
+
+### Chỉnh theo chủ spa (`20261103000021_promotion_rules.sql`)
+- **Không áp dụng 2 ưu đãi cùng lúc**: món khuyến mãi không trừ thẻ nạp sẵn (giá thành viên), không giảm giá thêm (dòng hay cả hoá đơn), không áp lên buổi trừ gói.
+- Ưu đãi là **gói combo**: khách mua gói theo giá KM, nhận đủ buổi và dùng dần như combo thường; hoàn tiền tính theo số tiền thực trả.
+- **Hết hạn**: hết thời gian đăng ký thì khách không tự đăng ký được, chủ / quản lý vẫn đăng ký hộ. Hết hạn dùng thì lễ tân không áp được; chủ / quản lý bấm **Gia hạn** (ngày + lý do) ở trang Khuyến mãi (`extend_promotion_registration`).
+- **Gói combo ngừng bán**: ngoài khuyến mãi, chỉ chủ / quản lý bán được (hiện trong ô "Bán gói combo" với chữ "ngừng bán").

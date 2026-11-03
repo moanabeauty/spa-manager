@@ -15,6 +15,7 @@ type PromoOpt = {
   show_online: boolean;
   left: number | null;
   summary: string;
+  ended: boolean; // hết thời gian đăng ký (chỉ chủ / quản lý thấy)
 };
 type Cust = { id: string; full_name: string; phone: string | null };
 
@@ -147,6 +148,7 @@ export default function StaffRegisterForm({
               {p.name}
               {p.left !== null ? ` (còn ${p.left} suất)` : ""}
               {!p.show_online ? " · chỉ tại quầy" : ""}
+              {p.ended ? " · đã hết hạn đăng ký (chủ / quản lý duyệt)" : ""}
             </option>
           ))}
         </select>

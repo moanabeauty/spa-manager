@@ -36,6 +36,7 @@ export type CheckoutPackage = {
   id: string;
   name: string;
   price: number;
+  is_active?: boolean;
   validity_days: number | null;
   package_items: { label: string; quantity: number | null; sort_order: number }[];
 };
@@ -193,7 +194,7 @@ export default function CheckoutForm({
     let left = cardBalance(w);
     if (left <= 0) return ls;
     return ls.map((l) => {
-      if (l.type !== "service" || l.pkgId) return l;
+      if (l.type !== "service" || l.pkgId || l.promoItemId) return l;
       const s = svcById.get(l.serviceId!);
       if (!s || !cardOk(s)) return l;
       const price = Number(s.member_price);
@@ -242,7 +243,7 @@ export default function CheckoutForm({
   const rows = lines.map((l) => {
     const unit = unitPrice(l);
     const gross = unit * l.qty;
-    const disc = !canDiscount || l.pkgId || l.type === "card_topup" ? 0 : Math.min(l.discount, gross);
+    const disc = !canDiscount || l.pkgId || l.promoItemId || l.type === "card_topup" ? 0 : Math.min(l.discount, gross);
     return { unit, gross, disc, net: gross - disc };
   });
   // giảm cả hoá đơn không áp dụng cho nạp thẻ và sản phẩm bán lẻ (sản phẩm chỉ giảm trong mức % cho phép)
@@ -264,7 +265,7 @@ export default function CheckoutForm({
   );
   const finals = rows.map((r, i) => r.net - alloc[i]);
   const total = finals.reduce((a, b) => a + b, 0);
-  const cardTotal = finals.reduce((a, f, i) => a + (lines[i].card ? f : 0), 0);
+  const cardTotal = finals.reduce((a, f, i) => a + (lines[i].card && !lines[i].promoItemId ? f : 0), 0);
   const need = total - cardTotal;
   const paid = cash + bank + pos;
   const diff = paid - need;
@@ -341,7 +342,8 @@ export default function CheckoutForm({
     if (it.item_type === "service") {
       // dịch vụ đã có trong hoá đơn (vd trong lịch hẹn) -> áp giá KM vào dòng đó
       const target = lines.find((l) => l.type === "service" && l.serviceId === it.service_id && !l.promoItemId && !l.pkgId);
-      if (target) return update(target.key, promo);
+      // không áp dụng 2 ưu đãi cùng lúc: món KM không trừ thẻ (giá thành viên), không giảm thêm
+      if (target) return update(target.key, { ...promo, card: false, discount: 0 });
       const s = svcById.get(it.service_id!);
       return addLine({
         type: "service",
@@ -462,8 +464,8 @@ export default function CheckoutForm({
       technician_id: l.technicianId ?? null,
       unit_price: l.customPrice,
       quantity: l.qty,
-      discount: !canDiscount || l.pkgId || l.type === "card_topup" ? 0 : l.discount,
-      paid_with_card: l.card,
+      discount: !canDiscount || l.pkgId || l.promoItemId || l.type === "card_topup" ? 0 : l.discount,
+      paid_with_card: l.promoItemId ? false : l.card,
       customer_package_item_id: l.pkgId || null,
       promotion_registration_id: l.promoRegId ?? null,
       promotion_item_id: l.promoItemId ?? null,
@@ -608,12 +610,19 @@ export default function CheckoutForm({
             <p className="font-semibold text-[#7A5600]">Ưu đãi khách đã đăng ký</p>
             {promos.map((p) => {
               const wrongBranch = !!p.branch_id && p.branch_id !== branchId;
+              const blocked = wrongBranch || p.expired;
               return (
                 <div key={p.regId}>
                   <p className="font-medium">
                     {p.name}
                     {p.deadline && <span className="font-normal text-ink/60"> · dùng đến {dmy(p.deadline)}</span>}
                     {wrongBranch && <span className="font-normal text-[#8A2323]"> · chỉ áp dụng ở chi nhánh khác</span>}
+                    {p.expired && (
+                      <span className="font-normal text-[#8A2323]">
+                        {" "}· hết hạn dùng – cần chủ / quản lý gia hạn ở trang{" "}
+                        <Link href="/quan-ly/khuyen-mai?tt=confirmed" className="underline">Khuyến mãi</Link>
+                      </span>
+                    )}
                   </p>
                   <ul className="mt-1 space-y-1">
                     {p.items.map((it) => {
@@ -629,7 +638,7 @@ export default function CheckoutForm({
                           </span>
                           <button
                             className="shrink-0 rounded-full bg-navy px-3 py-1 font-semibold text-white disabled:opacity-40"
-                            disabled={wrongBranch || used >= it.quantity}
+                            disabled={blocked || used >= it.quantity}
                             onClick={() => applyPromo(p, it)}
                           >
                             {used >= it.quantity ? "Đã áp dụng" : "Áp dụng"}
@@ -641,7 +650,10 @@ export default function CheckoutForm({
                 </div>
               );
             })}
-            <p className="text-ink/60">Chốt hoá đơn thì đăng ký chuyển sang “đã dùng” (món chưa áp dụng cũng không dùng lại được).</p>
+            <p className="text-ink/60">
+              Không áp dụng 2 ưu đãi cùng lúc: món khuyến mãi không trừ thẻ nạp sẵn, không giảm thêm. Chốt hoá đơn thì đăng ký chuyển sang “đã dùng”
+              (món chưa áp dụng cũng không dùng lại được; gói combo khuyến mãi vẫn dùng dần theo số buổi).
+            </p>
           </div>
         )}
       </div>
@@ -723,9 +735,14 @@ export default function CheckoutForm({
               }}
             >
               <option value="">+ Bán gói combo…</option>
-              {packages.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} – {formatVnd(p.price)}</option>
-              ))}
+              {packages
+                .filter((p) => p.is_active !== false || canDiscount)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} – {formatVnd(p.price)}
+                    {p.is_active === false ? " (ngừng bán – chủ / quản lý duyệt)" : ""}
+                  </option>
+                ))}
             </select>
           </div>
           <form
@@ -1169,25 +1186,25 @@ function LineRow({
               />
             </label>
           )}
-          {l.type !== "card_topup" && canDiscount && (
+          {l.type !== "card_topup" && canDiscount && !isPromo && (
             <label className="flex items-center gap-1">
               Giảm
               <MoneyInput value={l.discount} onChange={(n) => onChange({ discount: n })} className="w-28" ariaLabel="Giảm giá dòng" />
             </label>
           )}
           {l.type === "service" && hasCard && (
-            <label className={`flex items-center gap-1 ${cardBlocked ? "text-ink/40" : ""}`}>
+            <label className={`flex items-center gap-1 ${cardBlocked || isPromo ? "text-ink/40" : ""}`}>
               <input
                 type="checkbox"
-                checked={l.card}
-                disabled={!!cardBlocked}
+                checked={l.card && !isPromo}
+                disabled={!!cardBlocked || isPromo}
                 onChange={(e) => onChange({ card: e.target.checked })}
               />
               Trừ thẻ nạp sẵn
               {cardBlocked
                 ? " (dịch vụ không có giá thành viên – thanh toán ngoài)"
                 : isPromo
-                  ? " · trừ theo giá khuyến mãi"
+                  ? " (món khuyến mãi không trừ thẻ – thanh toán ngoài)"
                   : svc?.member_price != null
                     ? ` · giá thành viên ${formatVnd(svc.member_price)}`
                     : ""}

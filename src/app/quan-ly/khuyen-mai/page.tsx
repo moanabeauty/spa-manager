@@ -10,13 +10,15 @@ import {
   dmy,
   fetchTakenCounts,
   isOpen,
-  redeemDeadline,
+  regDeadline,
   sortedItems,
   type Promotion,
 } from "@/lib/promotions";
 import ConfirmRegForm from "./ConfirmRegForm";
 import CancelRegButton from "@/app/khuyen-mai/CancelRegButton";
 import StaffRegisterForm from "./StaffRegisterForm";
+import ExtendRegForm from "./ExtendRegForm";
+import { todayVn } from "@/lib/format";
 
 export const metadata = { title: "Đăng ký khuyến mãi – Moana Beauty" };
 
@@ -32,6 +34,8 @@ type Reg = {
   handled_at: string | null;
   invoice_id: string | null;
   branch_id: string | null;
+  extended_until: string | null;
+  extend_reason: string | null;
   customers: { id: string; full_name: string; phone: string | null } | null;
   promotions: { id: string; name: string; end_date: string | null; redeem_until: string | null; branch_id: string | null } | null;
   handler: { full_name: string | null } | null;
@@ -74,7 +78,7 @@ export default async function PromotionRegistrationsPage({ searchParams }: { sea
   let q = supabase
     .from("promotion_registrations")
     .select(
-      "id, status, source, note, staff_note, cancel_reason, preferred_at, created_at, handled_at, invoice_id, branch_id, customers(id, full_name, phone), promotions(id, name, end_date, redeem_until, branch_id), handler:profiles!promotion_registrations_handled_by_fkey(full_name)",
+      "id, status, source, note, staff_note, cancel_reason, preferred_at, created_at, handled_at, invoice_id, branch_id, extended_until, extend_reason, customers(id, full_name, phone), promotions(id, name, end_date, redeem_until, branch_id), handler:profiles!promotion_registrations_handled_by_fkey(full_name)",
     )
     .eq("status", status)
     .order(status === "pending" ? "created_at" : "handled_at", { ascending: status === "pending", nullsFirst: false })
@@ -91,7 +95,11 @@ export default async function PromotionRegistrationsPage({ searchParams }: { sea
     counts.set(t, count ?? 0);
   }
 
-  const openPromos = ((promoData ?? []) as unknown as Promotion[]).filter((p) => isOpen(p));
+  // chủ / quản lý: đăng ký hộ được cả chương trình đã hết thời gian đăng ký
+  const today = todayVn();
+  const openPromos = ((promoData ?? []) as unknown as Promotion[]).filter(
+    (p) => isOpen(p) || (isAdmin && p.is_active && !!p.end_date && p.end_date < today),
+  );
   const link = (patch: { tt?: string; cn?: string }) => {
     const p = new URLSearchParams();
     p.set("tt", patch.tt ?? status);
@@ -122,6 +130,7 @@ export default async function PromotionRegistrationsPage({ searchParams }: { sea
             show_online: p.show_online,
             left: p.max_slots === null ? null : Math.max(0, p.max_slots - (taken.get(p.id) ?? 0)),
             summary: sortedItems(p).map((i) => i.label).join(", "),
+            ended: !!p.end_date && p.end_date < today,
           }))}
           branches={branchList}
           defaultBranchId={branchId || profile?.branch_id || branchList[0]?.id || ""}
@@ -155,7 +164,8 @@ export default async function PromotionRegistrationsPage({ searchParams }: { sea
       {regs.length === 0 && <p className="card text-sm text-ink/60">Không có đăng ký nào.</p>}
 
       {regs.map((r) => {
-        const expired = r.promotions && r.status === "confirmed" && !canRedeem(r.promotions);
+        const expired = !!r.promotions && r.status === "confirmed" && !canRedeem(r.promotions, today, r.extended_until);
+        const deadline = r.promotions ? regDeadline(r.promotions, r.extended_until) : null;
         return (
           <div key={r.id} className={`card p-4 text-sm ${r.status === "pending" ? "border-l-4 border-l-[#E0A526]" : ""}`}>
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -191,8 +201,12 @@ export default async function PromotionRegistrationsPage({ searchParams }: { sea
                 {r.handled_at ? ` · ${shortDt(r.handled_at)}` : ""}
               </p>
             )}
-            {r.status === "confirmed" && r.promotions && redeemDeadline(r.promotions) && (
-              <p className={`mt-1 text-xs ${expired ? "text-[#8A2323]" : "text-ink/60"}`}>Hạn dùng ưu đãi: {dmy(redeemDeadline(r.promotions))}</p>
+            {r.status === "confirmed" && deadline && (
+              <p className={`mt-1 text-xs ${expired ? "text-[#8A2323]" : "text-ink/60"}`}>
+                Hạn dùng ưu đãi: {dmy(deadline)}
+                {r.extended_until && ` (đã gia hạn: ${r.extend_reason})`}
+                {expired && (isAdmin ? " – bấm Gia hạn nếu đồng ý cho khách dùng tiếp" : " – cần chủ spa / quản lý gia hạn")}
+              </p>
             )}
 
             {r.status === "pending" && (
@@ -210,6 +224,7 @@ export default async function PromotionRegistrationsPage({ searchParams }: { sea
                 {r.customers.phone && (
                   <Link href={`/quan-ly/tao-lich?sdt=${r.customers.phone}`} className="btn-ghost py-1.5">Tạo lịch hẹn</Link>
                 )}
+                {isAdmin && <ExtendRegForm id={r.id} expired={expired} />}
                 {!expired && (
                   <Link href={`/quan-ly/thu-tien?kh=${r.customers.id}`} className="btn-primary py-1.5">Thu tiền</Link>
                 )}

@@ -107,8 +107,8 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       .order("name"),
     supabase
       .from("packages")
-      .select("id, name, price, validity_days, package_items(label, quantity, sort_order)")
-      .eq("is_active", true)
+      .select("id, name, price, validity_days, is_active, package_items(label, quantity, sort_order)")
+      .order("is_active", { ascending: false })
       .order("name"),
     supabase.from("card_topup_tiers").select("id, topup_amount, bonus_amount").eq("is_active", true).order("topup_amount"),
     fetchSellers(supabase),

@@ -74,9 +74,14 @@ export function redeemDeadline(p: Pick<Promotion, "redeem_until" | "end_date">):
   return p.redeem_until ?? p.end_date;
 }
 
-export function canRedeem(p: Pick<Promotion, "redeem_until" | "end_date">, today = todayVn()): boolean {
-  const d = redeemDeadline(p);
+export function canRedeem(p: Pick<Promotion, "redeem_until" | "end_date">, today = todayVn(), extendedUntil?: string | null): boolean {
+  const d = extendedUntil ?? redeemDeadline(p);
   return !d || today <= d;
+}
+
+/** Hạn dùng của 1 đăng ký: ngày chủ / quản lý gia hạn, nếu không thì hạn của chương trình */
+export function regDeadline(p: Pick<Promotion, "redeem_until" | "end_date">, extendedUntil: string | null): string | null {
+  return extendedUntil ?? redeemDeadline(p);
 }
 
 /** "2026-11-30" -> "30/11/2026" */
@@ -118,6 +123,7 @@ export type CustomerPromo = {
   name: string;
   branch_id: string | null;
   deadline: string | null;
+  expired: boolean; // hết hạn dùng: cần chủ / quản lý gia hạn
   items: PromoItem[];
 };
 
@@ -125,23 +131,25 @@ export async function fetchCustomerPromos(supabase: Db, customerId: string): Pro
   const { data } = await supabase
     .from("promotion_registrations")
     .select(
-      "id, promotions(id, name, branch_id, end_date, redeem_until, promotion_items(id, item_type, service_id, package_id, product_id, label, list_price, promo_price, quantity, sort_order))",
+      "id, extended_until, promotions(id, name, branch_id, end_date, redeem_until, promotion_items(id, item_type, service_id, package_id, product_id, label, list_price, promo_price, quantity, sort_order))",
     )
     .eq("customer_id", customerId)
     .eq("status", "confirmed")
     .order("created_at");
   type R = {
     id: string;
+    extended_until: string | null;
     promotions: { id: string; name: string; branch_id: string | null; end_date: string | null; redeem_until: string | null; promotion_items: PromoItem[] } | null;
   };
   return ((data ?? []) as unknown as R[])
-    .filter((r) => r.promotions && canRedeem(r.promotions))
+    .filter((r) => r.promotions)
     .map((r) => ({
       regId: r.id,
       promotionId: r.promotions!.id,
       name: r.promotions!.name,
       branch_id: r.promotions!.branch_id,
-      deadline: redeemDeadline(r.promotions!),
+      deadline: regDeadline(r.promotions!, r.extended_until),
+      expired: !canRedeem(r.promotions!, todayVn(), r.extended_until),
       items: sortedItems(r.promotions!),
     }));
 }

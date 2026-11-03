@@ -4,7 +4,8 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { STATUS_LABEL, STATUS_STYLE, formatDate, formatTime, formatVnd } from "@/lib/format";
 import CancelButton from "./CancelButton";
 import { cardBalance, fetchWallet, isPackageUsable, itemLeft, itemText, type Wallet } from "@/lib/billing";
-import { REG_STATUS_LABEL, REG_STATUS_STYLE, canRedeem, dmy, redeemDeadline, sortedItems, type PromoItem } from "@/lib/promotions";
+import { REG_STATUS_LABEL, REG_STATUS_STYLE, canRedeem, dmy, regDeadline, sortedItems, type PromoItem } from "@/lib/promotions";
+import { todayVn } from "@/lib/format";
 import CancelRegButton from "../khuyen-mai/CancelRegButton";
 
 type MyReg = {
@@ -13,6 +14,7 @@ type MyReg = {
   preferred_at: string | null;
   created_at: string;
   cancel_reason: string | null;
+  extended_until: string | null;
   branches: { name: string } | null;
   promotions: { name: string; end_date: string | null; redeem_until: string | null; promotion_items: PromoItem[] } | null;
 };
@@ -48,7 +50,7 @@ export default async function MyAppointmentsPage() {
   const { data: regData } = customer
     ? await supabase
         .from("promotion_registrations")
-        .select("id, status, preferred_at, created_at, cancel_reason, branches(name), promotions(name, end_date, redeem_until, promotion_items(id, item_type, service_id, package_id, product_id, label, list_price, promo_price, quantity, sort_order))")
+        .select("id, status, preferred_at, created_at, cancel_reason, extended_until, branches(name), promotions(name, end_date, redeem_until, promotion_items(id, item_type, service_id, package_id, product_id, label, list_price, promo_price, quantity, sort_order))")
         .eq("customer_id", customer.id)
         .order("created_at", { ascending: false })
         .limit(20)
@@ -104,7 +106,8 @@ export default async function MyAppointmentsPage() {
             <Link href="/khuyen-mai" className="text-sm font-semibold text-navy underline">Xem khuyến mãi</Link>
           </div>
           {regs.map((r) => {
-            const expired = r.promotions && r.status === "confirmed" && !canRedeem(r.promotions);
+            const expired = r.promotions && r.status === "confirmed" && !canRedeem(r.promotions, todayVn(), r.extended_until);
+            const deadline = r.promotions ? regDeadline(r.promotions, r.extended_until) : null;
             return (
               <div key={r.id} className="card p-4 text-sm">
                 <div className="flex items-start justify-between gap-3">
@@ -127,9 +130,10 @@ export default async function MyAppointmentsPage() {
                   </p>
                 )}
                 {r.status === "pending" && <p className="mt-1 text-xs text-ink/60">Moana sẽ gọi cho bạn để xác nhận.</p>}
-                {r.status === "confirmed" && r.promotions && redeemDeadline(r.promotions) && !expired && (
-                  <p className="mt-1 text-xs text-ink/60">Dùng ưu đãi đến hết {dmy(redeemDeadline(r.promotions))}, báo lễ tân khi thanh toán.</p>
+                {r.status === "confirmed" && deadline && !expired && (
+                  <p className="mt-1 text-xs text-ink/60">Dùng ưu đãi đến hết {dmy(deadline)}, báo lễ tân khi thanh toán.</p>
                 )}
+                {expired && <p className="mt-1 text-xs text-ink/60">Ưu đãi đã hết hạn dùng. Liên hệ Moana nếu bạn muốn được gia hạn.</p>}
                 {r.status === "cancelled" && r.cancel_reason && <p className="mt-1 text-xs text-ink/50">Lý do huỷ: {r.cancel_reason}</p>}
                 {(r.status === "pending" || r.status === "confirmed") && !expired && (
                   <div className="mt-2 text-right">
