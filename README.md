@@ -27,7 +27,7 @@ Báo cáo (view): `staff_monthly_commissions`, `technician_monthly_fees`, `servi
 
 ### Vai trò
 `owner` (chủ), `manager`, `receptionist`, `technician` (KTV), `warehouse` (quản lý kho), `customer`.
-Tài khoản mới đăng ký mặc định là `customer`; chủ spa đổi vai trò bằng `select set_user_role('<user id>', 'technician', '<branch id>');`
+Tài khoản mới đăng ký mặc định là `customer`; chủ spa cấp vai trò + chi nhánh ở trang **Quản lý → Nhân viên**.
 
 ## Giao diện web (giai đoạn 2)
 
@@ -40,3 +40,17 @@ Tài khoản mới đăng ký mặc định là `customer`; chủ spa đổi vai
 
 Giờ nhận đặt online, bước giờ, đặt trước tối thiểu: sửa trong `src/lib/config.ts` (đang để 9:00–19:30, 30 phút/suất, trước ≥ 60 phút).
 Đăng ký online với SĐT trùng khách cũ sẽ **không** tự nối hồ sơ (tránh mạo danh); lễ tân thấy ghi chú trên lịch hẹn để kiểm tra.
+
+## Giai đoạn 3: công cụ lễ tân và chủ spa
+
+| Trang | Ai dùng | Việc |
+|---|---|---|
+| `/quan-ly/tao-lich` | chủ, quản lý, lễ tân, KTV | Tạo lịch cho khách gọi điện (đã xác nhận) hoặc khách vãng lai (đang làm). Gõ SĐT để tìm khách, chưa có thì nhập tên để tạo hồ sơ. Chọn dịch vụ (làm lần lượt), xếp KTV cho từng dịch vụ |
+| `/quan-ly` | nhân viên | Thêm ô chọn KTV cho từng dịch vụ trong lịch; KTV đang bận hiện chữ "(bận)" |
+| `/quan-ly/nhan-vien` | chủ spa | Danh sách tài khoản (tên, email, SĐT), cấp vai trò (lễ tân, KTV, kho, quản lý) + chi nhánh, khoá / mở tài khoản |
+| `/quan-ly/dich-vu` | chủ, quản lý | Sửa thời lượng, giá, tiền dịch vụ KTV ngay trên danh sách rồi lưu một lần; mở "chi tiết" để sửa tên, nhóm, giá thành viên, chi nhánh, cho trả thẻ, tính hoa hồng, ngừng dịch vụ; thêm dịch vụ mới |
+
+Cơ sở dữ liệu (`20261103000009_front_desk_tools.sql`):
+- `create_staff_booking(...)`: tạo khách (nếu mới) + lịch + dịch vụ trong 1 bước, SĐT được chuẩn hoá (`+84 912…` → `0912…`).
+- Trigger `appointment_services_tech_check`: chỉ xếp được tài khoản KTV / quản lý / chủ đang hoạt động; trùng giờ thì báo rõ tên KTV và khung giờ bị trùng.
+- `list_accounts()`, `set_user_role()`, `set_user_active()`: chỉ chủ spa; không tự đổi vai trò / tự khoá mình, không cấp quyền chủ qua giao diện; lễ tân / KTV / kho bắt buộc có chi nhánh.

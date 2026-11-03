@@ -73,5 +73,33 @@ export function vnError(message: string | undefined): string {
   if (m.includes("rate limit")) return "Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút.";
   if (m.includes("row-level security")) return "Bạn không có quyền thực hiện thao tác này.";
   if (m.includes("no_technician_overlap")) return "Kỹ thuật viên đã có lịch trùng giờ.";
+  if (m.includes("duplicate key") && m.includes("phone")) return "Số điện thoại này đã có hồ sơ khách.";
+  if (m.includes("violates check constraint")) return "Giá trị nhập không hợp lệ (số âm hoặc thời lượng bằng 0).";
+  if (m.includes("invalid input syntax")) return "Giá trị nhập không hợp lệ.";
   return message;
+}
+
+export const ROLE_LABEL: Record<string, string> = {
+  owner: "Chủ spa",
+  manager: "Quản lý",
+  receptionist: "Lễ tân",
+  technician: "Kỹ thuật viên",
+  warehouse: "Quản lý kho",
+  customer: "Khách hàng",
+};
+
+/** "+84 912 345 678" -> "0912345678" (giống hàm normalize_phone trong cơ sở dữ liệu) */
+export function normalizePhone(p: string): string {
+  const d = p.replace(/\D/g, "");
+  if (d.startsWith("84") && d.length === 11) return "0" + d.slice(2);
+  return d;
+}
+
+/** Bỏ dấu tiếng Việt để tìm kiếm */
+export function normalizeText(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d");
 }

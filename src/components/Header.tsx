@@ -17,7 +17,7 @@ export default async function Header() {
             <>
               {staff && (
                 <Link href="/quan-ly" className="rounded-full px-3 py-1.5 hover:bg-white/10">
-                  Lịch hẹn spa
+                  Quản lý
                 </Link>
               )}
               <Link href="/dat-lich" className="rounded-full px-3 py-1.5 hover:bg-white/10">

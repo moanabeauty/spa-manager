@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import { STATUS_LABEL, STATUS_STYLE, formatDate, formatTime, formatVnd, todayVn, vnDateTime } from "@/lib/format";
 import StatusActions from "./StatusActions";
+import TechnicianPicker from "./TechnicianPicker";
+import { fetchBusy, fetchTechnicians } from "@/lib/staff";
 
 export const metadata = { title: "Lịch hẹn spa – Moana Beauty" };
 
@@ -14,7 +16,14 @@ type Row = {
   source: string;
   note: string | null;
   customers: { full_name: string; phone: string | null; note: string | null } | null;
-  appointment_services: { id: string; start_at: string; price: number | null; services: { name: string } | null }[];
+  appointment_services: {
+    id: string;
+    start_at: string;
+    end_at: string;
+    price: number | null;
+    technician_id: string | null;
+    services: { name: string } | null;
+  }[];
 };
 
 const SOURCE_LABEL: Record<string, string> = { online: "Online", walk_in: "Khách vãng lai", phone: "Điện thoại", staff: "Nhân viên" };
@@ -51,15 +60,16 @@ export default async function StaffAppointmentsPage({
   let q = supabase
     .from("appointments")
     .select(
-      "id, start_at, end_at, status, source, note, customers(full_name, phone, note), appointment_services(id, start_at, price, services(name))",
+      "id, start_at, end_at, status, source, note, customers(full_name, phone, note), appointment_services(id, start_at, end_at, price, technician_id, services(name))",
     )
     .eq("branch_id", branchId)
     .gte("start_at", from)
     .lt("start_at", to)
     .order("start_at");
   if (filter === "active") q = q.not("status", "in", "(cancelled,no_show)");
-  const { data, error } = await q;
+  const [{ data, error }, technicians, busy] = await Promise.all([q, fetchTechnicians(supabase), fetchBusy(supabase, from, to)]);
   const rows = (data ?? []) as unknown as Row[];
+  const canAssign = profile?.role !== "customer";
 
   const link = (p: { ngay?: string; cn?: string; tt?: string }) => {
     const params = new URLSearchParams({ ngay: p.ngay ?? date, cn: p.cn ?? branchId, tt: p.tt ?? filter });
@@ -135,11 +145,25 @@ export default async function StaffAppointmentsPage({
               </div>
               <ul className="mt-3 space-y-1 border-t border-beige pt-3 text-sm">
                 {items.map((s) => (
-                  <li key={s.id} className="flex justify-between gap-3">
-                    <span>
-                      <span className="text-ink/50">{formatTime(s.start_at)}</span> {s.services?.name}
-                    </span>
-                    <span className="text-ink/60">{formatVnd(s.price)}</span>
+                  <li key={s.id} className="py-1">
+                    <div className="flex justify-between gap-3">
+                      <span>
+                        <span className="text-ink/50">{formatTime(s.start_at)}</span> {s.services?.name}
+                      </span>
+                      <span className="shrink-0 text-ink/60">{formatVnd(s.price)}</span>
+                    </div>
+                    {canAssign && (
+                      <TechnicianPicker
+                        serviceRowId={s.id}
+                        current={s.technician_id}
+                        start={s.start_at}
+                        end={s.end_at}
+                        locked={r.status === "cancelled" || r.status === "no_show" || r.status === "completed"}
+                        technicians={technicians}
+                        busy={busy}
+                        branches={branches ?? []}
+                      />
+                    )}
                   </li>
                 ))}
                 {items.length > 1 && (
