@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { STATUS_LABEL, STATUS_STYLE, formatDate, formatTime, formatVnd } from "@/lib/format";
 import CancelButton from "./CancelButton";
+import { cardBalance, fetchWallet, isPackageUsable, type Wallet } from "@/lib/billing";
 
 export const metadata = { title: "Lịch của tôi – Moana Beauty" };
 
@@ -30,6 +31,8 @@ export default async function MyAppointmentsPage() {
         .limit(50)
     : { data: [] };
   const appts = (data ?? []) as unknown as Appt[];
+  const wallet: Wallet = customer ? await fetchWallet(supabase, customer.id) : { cards: [], packages: [] };
+  const myPackages = wallet.packages.filter((p) => isPackageUsable(p) && p.services.some((s) => s.used_qty < s.total_qty));
 
   const now = Date.now();
   const upcoming = appts.filter((a) => new Date(a.start_at).getTime() >= now - 3 * 3600000 && !["cancelled", "no_show", "completed"].includes(a.status)).reverse();
@@ -44,6 +47,29 @@ export default async function MyAppointmentsPage() {
         </div>
         <Link href="/dat-lich" className="btn-primary">+ Đặt lịch</Link>
       </div>
+
+      {(wallet.cards.length > 0 || myPackages.length > 0) && (
+        <section className="card space-y-2">
+          {wallet.cards.length > 0 && (
+            <p className="flex justify-between text-sm">
+              <span>Số dư thẻ tài khoản</span>
+              <b className="text-lg text-navy">{formatVnd(cardBalance(wallet))}</b>
+            </p>
+          )}
+          {myPackages.map((p) => (
+            <div key={p.id} className="border-t border-beige pt-2 text-sm">
+              <p className="font-semibold">{p.name}</p>
+              {p.services.map((s) => (
+                <p key={s.service_id} className="flex justify-between text-ink/80">
+                  <span>{s.name}</span>
+                  <span>còn {s.total_qty - s.used_qty}/{s.total_qty} buổi</span>
+                </p>
+              ))}
+              {p.expires_at && <p className="text-xs text-ink/50">Hạn dùng đến {formatDate(p.expires_at)}</p>}
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-brown">Sắp tới</h2>

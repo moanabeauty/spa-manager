@@ -54,3 +54,22 @@ Cơ sở dữ liệu (`20261103000009_front_desk_tools.sql`):
 - `create_staff_booking(...)`: tạo khách (nếu mới) + lịch + dịch vụ trong 1 bước, SĐT được chuẩn hoá (`+84 912…` → `0912…`).
 - Trigger `appointment_services_tech_check`: chỉ xếp được tài khoản KTV / quản lý / chủ đang hoạt động; trùng giờ thì báo rõ tên KTV và khung giờ bị trùng.
 - `list_accounts()`, `set_user_role()`, `set_user_active()`: chỉ chủ spa; không tự đổi vai trò / tự khoá mình, không cấp quyền chủ qua giao diện; lễ tân / KTV / kho bắt buộc có chi nhánh.
+
+## Giai đoạn 4: thu tiền tại quầy
+
+| Trang | Ai dùng | Việc |
+|---|---|---|
+| `/quan-ly` → nút **Thu tiền** | lễ tân, quản lý, chủ | Mở hoá đơn từ dịch vụ trong lịch; lịch đã thu hiện "✓ Đã thanh toán" + mã hoá đơn |
+| `/quan-ly/thu-tien` | lễ tân, quản lý, chủ | Từng dòng: giá thường / giá thành viên, giảm giá, trả bằng thẻ tài khoản, **trừ buổi gói**, chia doanh số (%) cho 1 hay nhiều nhân viên. Giảm cả hoá đơn (đ hoặc %). Thu kết hợp tiền mặt + chuyển khoản + POS + thẻ; tính tiền thừa trả khách. Thêm dịch vụ khách làm thêm (chọn KTV), bỏ dịch vụ khách không làm. Không theo lịch: bán gói combo, nạp thẻ, thu lẻ |
+| `/quan-ly/hoa-don` | lễ tân, quản lý, chủ | Hoá đơn trong ngày theo chi nhánh, tổng theo hình thức thu; mở từng hoá đơn để in. Chủ spa **huỷ hoá đơn** (ghi lý do) |
+| `/quan-ly/khach-hang` | nhân viên | Tìm theo SĐT / tên: số dư thẻ, lịch sử thẻ, gói còn bao nhiêu buổi, hoá đơn gần đây |
+| `/quan-ly/goi-combo` | chủ, quản lý | Tạo / sửa gói: tên, giá, hạn dùng, dịch vụ + số buổi, đang bán / ngừng |
+| `/quan-ly/doanh-so` | mọi nhân viên | Doanh số, hoa hồng (3% / 5%) và tiền dịch vụ KTV theo tháng; KTV chỉ thấy của mình |
+| `/lich-hen` | khách | Thêm số dư thẻ và số buổi gói còn lại |
+
+Cơ sở dữ liệu (`20261103000010_checkout.sql`):
+- `checkout_invoice(...)`: tạo hoá đơn + dòng + chia doanh số + thanh toán + chốt + hoàn thành lịch trong **1 bước** (lỗi thì không lưu gì). Giá lấy từ menu (chỉ nhập tay cho dịch vụ "báo giá"); tiền trừ thẻ = tổng các dòng đánh dấu trả thẻ; giảm cả hoá đơn được chia theo tỉ lệ vào từng dòng nên hoa hồng tính trên tiền thực thu.
+- Trừ buổi: dòng "trừ gói" gắn gói vào dịch vụ trong lịch, buổi bị trừ khi lịch hoàn thành; không trừ quá số buổi; mỗi lịch chỉ thu 1 lần; lịch đã thu không mở lại được.
+- `void_invoice(id, lý do)`: chỉ chủ spa. Hoàn tiền đã trừ thẻ, trả buổi gói, thu hồi tiền nạp + tiền tặng, huỷ gói đã bán (nếu chưa dùng), lịch về "đang làm" để thu lại. Tiền mặt / CK / POS chủ spa tự hoàn cho khách.
+- `save_package(...)`: chủ / quản lý tạo, sửa gói; gói khách đã mua giữ nguyên số buổi lúc mua.
+- Tiền vừa nạp chỉ dùng được ở hoá đơn sau (thu nạp thẻ riêng trước, rồi thu lịch).

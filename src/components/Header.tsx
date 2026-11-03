@@ -6,7 +6,7 @@ export default async function Header() {
   const staff = isStaffRole(profile?.role);
 
   return (
-    <header className="sticky top-0 z-20 bg-navy text-white shadow">
+    <header className="sticky top-0 z-20 print:hidden bg-navy text-white shadow">
       <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
         <Link href="/" className="flex flex-col leading-tight">
           <span className="text-lg font-bold tracking-[0.2em]">MOANA</span>

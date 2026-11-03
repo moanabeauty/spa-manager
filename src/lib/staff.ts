@@ -45,3 +45,22 @@ export function techLabel(t: Technician, branches: { id: string; name: string }[
   const extra = t.role === "owner" ? "chủ" : t.role === "manager" ? "quản lý" : branches.find((b) => b.id === t.branch_id)?.name.replace("Moana ", "");
   return `${t.full_name ?? "(chưa có tên)"}${extra ? ` · ${extra}` : ""}`;
 }
+
+export type Seller = { id: string; full_name: string | null; role: string; branch_id: string | null };
+
+/** Nhân viên được chia doanh số (KTV, lễ tân, quản lý, chủ) */
+export async function fetchSellers(supabase: Db): Promise<Seller[]> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, full_name, role, branch_id")
+    .in("role", ["technician", "receptionist", "manager", "owner"])
+    .eq("is_active", true)
+    .order("full_name");
+  const order: Record<string, number> = { technician: 0, receptionist: 1, manager: 2, owner: 3 };
+  return ((data ?? []) as Seller[]).sort((a, b) => order[a.role] - order[b.role]);
+}
+
+/** Vai trò được thu tiền (khớp hàm checkout_invoice) */
+export function canCheckout(role: string | null | undefined): boolean {
+  return role === "owner" || role === "manager" || role === "receptionist";
+}

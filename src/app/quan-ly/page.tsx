@@ -4,7 +4,7 @@ import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import { STATUS_LABEL, STATUS_STYLE, formatDate, formatTime, formatVnd, todayVn, vnDateTime } from "@/lib/format";
 import StatusActions from "./StatusActions";
 import TechnicianPicker from "./TechnicianPicker";
-import { fetchBusy, fetchTechnicians } from "@/lib/staff";
+import { canCheckout, fetchBusy, fetchTechnicians } from "@/lib/staff";
 
 export const metadata = { title: "Lịch hẹn spa – Moana Beauty" };
 
@@ -70,6 +70,15 @@ export default async function StaffAppointmentsPage({
   const [{ data, error }, technicians, busy] = await Promise.all([q, fetchTechnicians(supabase), fetchBusy(supabase, from, to)]);
   const rows = (data ?? []) as unknown as Row[];
   const canAssign = profile?.role !== "customer";
+  const cashier = canCheckout(profile?.role);
+  const { data: invs } = rows.length
+    ? await supabase
+        .from("invoices")
+        .select("id, code, appointment_id")
+        .in("appointment_id", rows.map((r) => r.id))
+        .neq("status", "cancelled")
+    : { data: [] };
+  const invoiceOf = new Map(((invs ?? []) as { id: string; code: string; appointment_id: string }[]).map((i) => [i.appointment_id, i]));
 
   const link = (p: { ngay?: string; cn?: string; tt?: string }) => {
     const params = new URLSearchParams({ ngay: p.ngay ?? date, cn: p.cn ?? branchId, tt: p.tt ?? filter });
@@ -175,7 +184,23 @@ export default async function StaffAppointmentsPage({
               </ul>
               {r.note && <p className="mt-2 rounded-lg bg-cream px-3 py-2 text-sm">Khách ghi chú: {r.note}</p>}
               {r.customers?.note && <p className="mt-2 rounded-lg bg-[#FFE8BA]/60 px-3 py-2 text-xs">Hồ sơ khách: {r.customers.note}</p>}
-              <StatusActions id={r.id} status={r.status} />
+              {invoiceOf.get(r.id) ? (
+                <p className="mt-3 flex items-center justify-between border-t border-beige pt-3 text-sm">
+                  <span className="font-semibold text-[#22612A]">✓ Đã thanh toán</span>
+                  <Link href={`/quan-ly/hoa-don/${invoiceOf.get(r.id)!.id}`} className="text-navy underline">{invoiceOf.get(r.id)!.code}</Link>
+                </p>
+              ) : (
+                <>
+                  <StatusActions id={r.id} status={r.status} />
+                  {cashier && ["confirmed", "in_progress", "completed"].includes(r.status) && (
+                    <div className="mt-2 flex justify-end">
+                      <Link href={`/quan-ly/thu-tien?lich=${r.id}`} className="btn-primary bg-brown py-2 hover:bg-[#87704f]">
+                        Thu tiền
+                      </Link>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           );
         })}

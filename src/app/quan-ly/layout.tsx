@@ -23,12 +23,16 @@ export default async function ManagerLayout({ children }: { children: React.Reac
   const tabs = [
     { href: "/quan-ly", label: "Lịch hẹn" },
     { href: "/quan-ly/tao-lich", label: "+ Tạo lịch" },
+    { href: "/quan-ly/khach-hang", label: "Khách hàng" },
+    ...(role !== "technician" ? [{ href: "/quan-ly/hoa-don", label: "Hoá đơn" }] : []),
+    { href: "/quan-ly/doanh-so", label: role === "owner" || role === "manager" ? "Doanh số" : "Doanh số của tôi" },
+    ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/goi-combo", label: "Gói combo" }] : []),
     ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/dich-vu", label: "Menu dịch vụ" }] : []),
     ...(role === "owner" ? [{ href: "/quan-ly/nhan-vien", label: "Nhân viên" }] : []),
   ];
   return (
     <div className="space-y-4">
-      <ManagerTabs tabs={tabs} />
+      <div className="print:hidden"><ManagerTabs tabs={tabs} /></div>
       {children}
     </div>
   );
