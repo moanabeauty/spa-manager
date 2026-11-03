@@ -2,7 +2,13 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { fetchSellers, canCheckout } from "@/lib/staff";
 import { fetchWallet, type Wallet } from "@/lib/billing";
-import CheckoutForm, { type CheckoutService, type CheckoutPackage, type ApptInfo, type CustomerInfo } from "./CheckoutForm";
+import CheckoutForm, {
+  type ApptInfo,
+  type CheckoutPackage,
+  type CheckoutService,
+  type CustomerInfo,
+  type DiscountRequest,
+} from "./CheckoutForm";
 
 export const metadata = { title: "Thu tiền – Moana Beauty" };
 
@@ -63,6 +69,16 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
     customer = (data as CustomerInfo) ?? null;
   }
 
+  // yêu cầu giảm giá gần nhất (chưa dùng) của lịch / khách này
+  let dq = supabase
+    .from("discount_requests")
+    .select("id, amount, reason, status, review_note")
+    .neq("status", "used")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  dq = appt ? dq.eq("appointment_id", appt.id) : customer ? dq.eq("customer_id", customer.id).is("appointment_id", null) : dq.eq("id", "00000000-0000-0000-0000-000000000000");
+  const { data: lastRequest } = await dq.maybeSingle();
+
   const [{ data: branches }, { data: services }, { data: packages }, { data: tiers }, sellers, wallet] = await Promise.all([
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
     supabase
@@ -90,6 +106,8 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       packages={(packages ?? []) as unknown as CheckoutPackage[]}
       tiers={(tiers ?? []) as { id: string; topup_amount: number; bonus_amount: number }[]}
       sellers={sellers}
+      canDiscount={profile?.role === "owner" || profile?.role === "manager"}
+      initialRequest={(lastRequest as DiscountRequest | null) ?? null}
     />
   );
 }

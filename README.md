@@ -75,3 +75,7 @@ Cơ sở dữ liệu (`20261103000010_checkout.sql`, `20261103000011_seed_combos
 - `void_invoice(id, lý do)`: chỉ chủ spa. Hoàn tiền đã trừ thẻ, trả buổi gói, thu hồi tiền nạp + tặng, huỷ gói đã bán (nếu chưa dùng), lịch về "đang làm" để thu lại.
 - **Huỷ gói / thẻ đang dùng dở** (`refund_quote`, `refund_customer_asset`, bảng `refunds`): chỉ quản lý / chủ. Thẻ: hoàn = mệnh giá đã nạp − giá niêm yết các dịch vụ đã trả bằng thẻ (tiền tặng không hoàn). Gói: hoàn = giá gói − số buổi đã dùng × giá lẻ / buổi. Sửa được số tiền, bắt buộc ghi lý do; thẻ / gói bị khoá. Tiền hoàn **trừ vào doanh số người bán** (`refund_seller_deductions`) trong tháng hoàn.
 - KTV chỉ xem hoá đơn mình được chia doanh số hoặc mình thu (`can_see_invoice`).
+
+### Cập nhật sau giai đoạn 4
+- `20261103000013_menu_member_prices.sql`: đồng bộ giá niêm yết, giá thành viên, tiền dịch vụ KTV theo sheet Menu (73 dịch vụ có giá thành viên). Cắt đáy sẹo: sheet ghi tiền KTV 120.000.000đ (nghi gõ nhầm) nên giữ 100.000đ.
+- `20261103000014_discount_approval.sql`: **giảm giá** chỉ chủ / quản lý tự làm và phải ghi lý do. Lễ tân / KTV bấm "Gửi chủ spa duyệt" (số tiền + lý do) → chủ spa duyệt ở trang **Duyệt giảm giá** (được duyệt số thấp hơn) → người thu bấm "Kiểm tra lại" rồi thu với số đã duyệt. Mỗi yêu cầu dùng 1 lần, đúng lịch / khách đã xin; huỷ hoá đơn thì yêu cầu trả về "đã duyệt". Giao diện gọi `checkout_invoice_v2`.

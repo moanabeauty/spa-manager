@@ -37,6 +37,13 @@ export type CheckoutPackage = {
   package_items: { label: string; quantity: number | null; sort_order: number }[];
 };
 export type CustomerInfo = { id: string; full_name: string; phone: string | null; note: string | null };
+export type DiscountRequest = {
+  id: string;
+  amount: number;
+  reason: string;
+  status: "pending" | "approved" | "rejected" | "used";
+  review_note: string | null;
+};
 export type ApptInfo = {
   id: string;
   branch_id: string;
@@ -74,6 +81,8 @@ export default function CheckoutForm({
   packages,
   tiers,
   sellers,
+  canDiscount,
+  initialRequest,
 }: {
   appt: ApptInfo | null;
   initialCustomer: CustomerInfo | null;
@@ -84,6 +93,8 @@ export default function CheckoutForm({
   packages: CheckoutPackage[];
   tiers: Tier[];
   sellers: Seller[];
+  canDiscount: boolean; // chủ / quản lý: tự giảm (ghi lý do); người khác: xin chủ spa duyệt
+  initialRequest: DiscountRequest | null;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -118,6 +129,12 @@ export default function CheckoutForm({
 
   const [discountMode, setDiscountMode] = useState<"vnd" | "pct">("vnd");
   const [discountInput, setDiscountInput] = useState(0);
+  const [discountReason, setDiscountReason] = useState("");
+  const [request, setRequest] = useState<DiscountRequest | null>(initialRequest);
+  const [reqAmount, setReqAmount] = useState(0);
+  const [reqReason, setReqReason] = useState("");
+  const [reqBusy, setReqBusy] = useState(false);
+  const [reqError, setReqError] = useState<string | null>(null);
   const [cash, setCash] = useState(0);
   const [bank, setBank] = useState(0);
   const [pos, setPos] = useState(0);
@@ -185,14 +202,20 @@ export default function CheckoutForm({
   const rows = lines.map((l) => {
     const unit = unitPrice(l);
     const gross = unit * l.qty;
-    const disc = l.pkgId || l.type === "card_topup" ? 0 : Math.min(l.discount, gross);
+    const disc = !canDiscount || l.pkgId || l.type === "card_topup" ? 0 : Math.min(l.discount, gross);
     return { unit, gross, disc, net: gross - disc };
   });
   const eligibleSum = rows.reduce((a, r, i) => a + (lines[i].type !== "card_topup" ? r.net : 0), 0);
+  const approved = !canDiscount && request?.status === "approved" ? Number(request.amount) : 0;
   const overall = Math.min(
     eligibleSum,
-    discountMode === "pct" ? Math.round((eligibleSum * Math.min(discountInput, 100)) / 100) : discountInput,
+    canDiscount
+      ? discountMode === "pct"
+        ? Math.round((eligibleSum * Math.min(discountInput, 100)) / 100)
+        : discountInput
+      : approved,
   );
+  const totalDiscount = overall + rows.reduce((a, r) => a + r.disc, 0);
   const alloc = allocateDiscount(
     rows.map((r, i) => ({ amount: r.net, eligible: lines[i].type !== "card_topup" })),
     overall,
@@ -277,6 +300,7 @@ export default function CheckoutForm({
     if (l.type === "card_topup" && rows[i].unit <= 0) problems.push("Nhập số tiền nạp thẻ.");
   });
   if (!customer && lines.some((l) => l.type !== "service")) problems.push("Bán gói / nạp thẻ cần chọn khách hàng.");
+  if (canDiscount && totalDiscount > 0 && !discountReason.trim()) problems.push("Ghi lý do giảm giá.");
   if (cardTotal > balance) problems.push(`Số dư thẻ không đủ (còn ${formatVnd(balance)}).`);
   if (lines.some((l) => l.card) && lines.some((l) => l.type === "card_topup"))
     problems.push("Tiền vừa nạp chỉ dùng được ở hoá đơn sau: hãy thu nạp thẻ riêng trước.");
@@ -296,7 +320,7 @@ export default function CheckoutForm({
       technician_id: l.technicianId ?? null,
       unit_price: l.customPrice,
       quantity: l.qty,
-      discount: l.pkgId || l.type === "card_topup" ? 0 : l.discount,
+      discount: !canDiscount || l.pkgId || l.type === "card_topup" ? 0 : l.discount,
       paid_with_card: l.card,
       customer_package_item_id: l.pkgId || null,
       sellers: l.sellers.filter((s) => s.staffId && s.share > 0).map((s) => ({ staff_id: s.staffId, share: s.share })),
@@ -306,7 +330,9 @@ export default function CheckoutForm({
       { method: "bank_transfer", amount: bank },
       { method: "pos", amount: pos },
     ].filter((p) => p.amount > 0);
-    const { data, error } = await supabase.rpc("checkout_invoice", {
+    const { data, error } = await supabase.rpc("checkout_invoice_v2", {
+      p_discount_reason: canDiscount ? discountReason : null,
+      p_discount_request_id: approved > 0 ? request!.id : null,
       p_branch_id: branchId,
       p_customer_id: customer?.id ?? null,
       p_appointment_id: appt?.id ?? null,
@@ -320,6 +346,32 @@ export default function CheckoutForm({
       return setError(vnError(error.message));
     }
     router.push(`/quan-ly/hoa-don/${data}?moi=1`);
+  }
+
+  async function sendRequest() {
+    setReqBusy(true);
+    setReqError(null);
+    const { data, error } = await supabase.rpc("request_discount", {
+      p_branch_id: branchId,
+      p_appointment_id: appt?.id ?? null,
+      p_customer_id: customer?.id ?? null,
+      p_amount: reqAmount,
+      p_reason: reqReason,
+    });
+    setReqBusy(false);
+    if (error) return setReqError(vnError(error.message));
+    setRequest({ id: data as string, amount: reqAmount, reason: reqReason, status: "pending", review_note: null });
+  }
+  async function refreshRequest() {
+    if (!request) return;
+    setReqBusy(true);
+    const { data } = await supabase
+      .from("discount_requests")
+      .select("id, amount, reason, status, review_note")
+      .eq("id", request.id)
+      .maybeSingle();
+    setReqBusy(false);
+    if (data) setRequest(data as DiscountRequest);
   }
 
   function fillRemaining(method: "cash" | "bank" | "pos") {
@@ -429,6 +481,7 @@ export default function CheckoutForm({
             sellers={sellers}
             sellerById={sellerById}
             branches={branches}
+            canDiscount={canDiscount}
             onChange={(p) => update(l.key, p)}
             onRemove={() => removeLine(l)}
           />
@@ -511,37 +564,92 @@ export default function CheckoutForm({
           <span>Tạm tính</span>
           <span>{formatVnd(rows.reduce((a, r) => a + r.net, 0))}</span>
         </div>
-        <div className="flex items-center justify-between gap-2 text-sm">
-          <span className="flex items-center gap-2">
-            Giảm cả hoá đơn
-            <select
-              className="rounded-lg border border-beige-dark px-1 py-1 text-xs"
-              value={discountMode}
-              onChange={(e) => {
-                setDiscountMode(e.target.value as "vnd" | "pct");
-                setDiscountInput(0);
-              }}
-            >
-              <option value="vnd">đ</option>
-              <option value="pct">%</option>
-            </select>
-          </span>
-          <span className="flex items-center gap-2">
-            {discountMode === "pct" ? (
+        {canDiscount ? (
+          <>
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <span className="flex items-center gap-2">
+                Giảm cả hoá đơn
+                <select
+                  className="rounded-lg border border-beige-dark px-1 py-1 text-xs"
+                  value={discountMode}
+                  onChange={(e) => {
+                    setDiscountMode(e.target.value as "vnd" | "pct");
+                    setDiscountInput(0);
+                  }}
+                >
+                  <option value="vnd">đ</option>
+                  <option value="pct">%</option>
+                </select>
+              </span>
+              <span className="flex items-center gap-2">
+                {discountMode === "pct" ? (
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    className="w-20 rounded-lg border border-beige-dark px-2 py-1.5 text-right text-sm"
+                    value={discountInput || ""}
+                    onChange={(e) => setDiscountInput(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                  />
+                ) : (
+                  <MoneyInput value={discountInput} onChange={setDiscountInput} className="w-32" ariaLabel="Giảm cả hoá đơn" />
+                )}
+                {overall > 0 && <span className="text-[#8A2323]">−{formatVnd(overall)}</span>}
+              </span>
+            </div>
+            {totalDiscount > 0 && (
               <input
-                type="number"
-                min={0}
-                max={100}
-                className="w-20 rounded-lg border border-beige-dark px-2 py-1.5 text-right text-sm"
-                value={discountInput || ""}
-                onChange={(e) => setDiscountInput(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                className={`input py-2 text-sm ${discountReason.trim() ? "" : "border-[#E0A526]"}`}
+                placeholder="Lý do giảm giá (bắt buộc)"
+                value={discountReason}
+                onChange={(e) => setDiscountReason(e.target.value)}
               />
-            ) : (
-              <MoneyInput value={discountInput} onChange={setDiscountInput} className="w-32" ariaLabel="Giảm cả hoá đơn" />
             )}
-            {overall > 0 && <span className="text-[#8A2323]">−{formatVnd(overall)}</span>}
-          </span>
-        </div>
+          </>
+        ) : (
+          <div className="rounded-xl border border-beige-dark p-3 text-sm">
+            <p className="font-medium">Giảm giá (cần chủ spa duyệt)</p>
+            {request?.status === "approved" && (
+              <p className="mt-1 text-[#22612A]">
+                ✓ Chủ spa đã duyệt giảm <b>{formatVnd(Number(request.amount))}</b> – {request.reason}
+                {request.review_note && <span className="text-ink/60"> ({request.review_note})</span>}
+              </p>
+            )}
+            {request?.status === "pending" && (
+              <p className="mt-1 text-[#7A5600]">
+                Đang chờ chủ spa duyệt giảm {formatVnd(Number(request.amount))} – {request.reason}.{" "}
+                <button className="font-semibold text-navy underline" disabled={reqBusy} onClick={refreshRequest}>
+                  {reqBusy ? "…" : "Kiểm tra lại"}
+                </button>
+              </p>
+            )}
+            {request?.status === "rejected" && (
+              <p className="mt-1 text-[#8A2323]">
+                Chủ spa không duyệt yêu cầu giảm {formatVnd(Number(request.amount))}
+                {request.review_note ? `: ${request.review_note}` : ""}.
+              </p>
+            )}
+            {request?.status !== "approved" && request?.status !== "pending" && (
+              <div className="mt-2 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-20 shrink-0 text-xs text-ink/60">Xin giảm</span>
+                  <MoneyInput value={reqAmount} onChange={setReqAmount} className="flex-1" ariaLabel="Số tiền xin giảm" />
+                </div>
+                <input className="input py-2 text-sm" placeholder="Lý do (bắt buộc)" value={reqReason} onChange={(e) => setReqReason(e.target.value)} />
+                {reqError && <p className="text-xs text-[#8A2323]">{reqError}</p>}
+                <button className="btn-outline w-full py-2" disabled={reqBusy || reqAmount <= 0 || !reqReason.trim()} onClick={sendRequest}>
+                  {reqBusy ? "Đang gửi…" : "Gửi chủ spa duyệt"}
+                </button>
+              </div>
+            )}
+            {overall > 0 && (
+              <p className="mt-2 flex justify-between">
+                <span>Giảm cả hoá đơn</span>
+                <span className="text-[#8A2323]">−{formatVnd(overall)}</span>
+              </p>
+            )}
+          </div>
+        )}
         <div className="flex items-center justify-between border-t border-beige pt-3 text-lg font-bold text-navy">
           <span>Tổng cần thu</span>
           <span>{formatVnd(total)}</span>
@@ -626,6 +734,7 @@ function LineRow({
   sellers,
   sellerById,
   branches,
+  canDiscount,
   onChange,
   onRemove,
 }: {
@@ -642,6 +751,7 @@ function LineRow({
   sellers: Seller[];
   sellerById: Map<string, Seller>;
   branches: { id: string; name: string }[];
+  canDiscount: boolean;
   onChange: (p: Partial<Line>) => void;
   onRemove: () => void;
 }) {
@@ -743,7 +853,7 @@ function LineRow({
               />
             </label>
           )}
-          {l.type !== "card_topup" && (
+          {l.type !== "card_topup" && canDiscount && (
             <label className="flex items-center gap-1">
               Giảm
               <MoneyInput value={l.discount} onChange={(n) => onChange({ discount: n })} className="w-28" ariaLabel="Giảm giá dòng" />

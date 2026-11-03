@@ -15,6 +15,7 @@ type Inv = {
   created_at: string;
   note: string | null;
   void_reason: string | null;
+  discount_reason: string | null;
   voided_at: string | null;
   appointment_id: string | null;
   branches: { name: string; address: string } | null;
@@ -48,7 +49,7 @@ export default async function InvoicePage({
   const { data } = await supabase
     .from("invoices")
     .select(
-      `id, code, status, paid_at, created_at, note, void_reason, voided_at, appointment_id,
+      `id, code, status, paid_at, created_at, note, void_reason, discount_reason, voided_at, appointment_id,
        branches(name, address), customers(id, full_name, phone), creator:profiles!invoices_created_by_fkey(full_name),
        invoice_items(id, item_type, description, quantity, unit_price, discount, amount, paid_with_card, customer_package_id,
          invoice_item_sellers(amount, profiles(full_name))),
@@ -128,6 +129,7 @@ export default async function InvoicePage({
             <>
               <p className="flex justify-between"><span>Tổng tiền</span><span>{formatVnd(gross)}</span></p>
               <p className="flex justify-between"><span>Giảm giá</span><span>−{formatVnd(discount)}</span></p>
+              {inv.discount_reason && <p className="text-xs text-ink/60 print:hidden">Lý do giảm: {inv.discount_reason}</p>}
             </>
           )}
           <p className="flex justify-between text-base font-bold text-navy"><span>Thanh toán</span><span>{formatVnd(total)}</span></p>

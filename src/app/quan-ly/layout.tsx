@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
+import { createClient, getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import ManagerTabs from "./ManagerTabs";
 
 export default async function ManagerLayout({ children }: { children: React.ReactNode }) {
@@ -20,12 +20,24 @@ export default async function ManagerLayout({ children }: { children: React.Reac
     );
   }
   const role = profile!.role;
+  let pendingDiscounts = 0;
+  if (role === "owner" || role === "manager") {
+    const supabase = await createClient();
+    const { count } = await supabase
+      .from("discount_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
+    pendingDiscounts = count ?? 0;
+  }
   const tabs = [
     { href: "/quan-ly", label: "Lịch hẹn" },
     { href: "/quan-ly/tao-lich", label: "+ Tạo lịch" },
     { href: "/quan-ly/khach-hang", label: "Khách hàng" },
     { href: "/quan-ly/hoa-don", label: "Hoá đơn" },
     { href: "/quan-ly/doanh-so", label: role === "owner" || role === "manager" ? "Doanh số" : "Doanh số của tôi" },
+    ...(role === "owner" || role === "manager"
+      ? [{ href: "/quan-ly/duyet-giam-gia", label: pendingDiscounts ? `Duyệt giảm giá (${pendingDiscounts})` : "Duyệt giảm giá" }]
+      : []),
     ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/goi-combo", label: "Gói combo" }] : []),
     ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/dich-vu", label: "Menu dịch vụ" }] : []),
     ...(role === "owner" ? [{ href: "/quan-ly/nhan-vien", label: "Nhân viên" }] : []),
