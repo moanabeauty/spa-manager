@@ -49,6 +49,12 @@ export default async function ManagerLayout({ children }: { children: React.Reac
       .eq("status", "pending");
     pendingPromo = count ?? 0;
   }
+  let pendingAttendance = 0;
+  if (role === "owner") {
+    const supabase = await createClient();
+    const { count } = await supabase.from("staff_attendance").select("staff_id", { count: "exact", head: true }).eq("approval_status", "pending");
+    pendingAttendance = count ?? 0;
+  }
   const kho = { href: "/quan-ly/kho", label: pendingStock ? `Kho (${pendingStock})` : "Kho" };
   const tabs =
     role === "warehouse"
@@ -67,7 +73,7 @@ export default async function ManagerLayout({ children }: { children: React.Reac
           ...(role === "owner" || role === "manager"
             ? [
                 { href: "/quan-ly/bao-cao", label: "Báo cáo" },
-                { href: "/quan-ly/bang-luong", label: role === "owner" ? "Bảng lương" : "Chấm công" },
+                { href: "/quan-ly/bang-luong", label: role === "owner" ? (pendingAttendance ? `Bảng lương (${pendingAttendance} chờ duyệt)` : "Bảng lương") : "Chấm công" },
               ]
             : []),
           ...(role === "owner" ? [{ href: "/quan-ly/thu-chi", label: "Thu chi" }] : []),
@@ -75,12 +81,12 @@ export default async function ManagerLayout({ children }: { children: React.Reac
           ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/dich-vu", label: "Menu dịch vụ" }] : []),
           ...(role === "owner" ? [{ href: "/quan-ly/nhan-vien", label: "Nhân viên" }] : []),
         ];
-  let attendance: { check_in: string; check_out: string | null } | null = null;
+  let attendance: { check_in: string; check_out: string | null; approval_status: string; approval_reason: string | null } | null = null;
   if (role !== "owner") {
     const supabase = await createClient();
     const { data } = await supabase
       .from("staff_attendance")
-      .select("check_in, check_out")
+      .select("check_in, check_out, approval_status, approval_reason")
       .eq("staff_id", profile!.id)
       .eq("work_date", todayVn())
       .maybeSingle();

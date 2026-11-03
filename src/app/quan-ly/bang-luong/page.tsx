@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { todayVn } from "@/lib/format";
 import { isMonth, shiftMonth, shortLabel } from "@/lib/reports";
 import ReportNav from "../bao-cao/ReportNav";
-import PayrollEditor, { type AttDay, type AttSum, type Entry, type PaySetting, type Penalty, type PayrollRow, type PayrollConfig, type Staff } from "./PayrollEditor";
+import PayrollEditor, { type AttDay, type AttSum, type Branch, type Entry, type PaySetting, type Penalty, type PayrollRow, type PayrollConfig, type Staff } from "./PayrollEditor";
 
 export const metadata = { title: "Bảng lương – Moana Beauty" };
 
@@ -23,7 +23,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       .select("id, full_name, role, branch_id, is_active")
       .in("role", ["owner", "manager", "receptionist", "technician", "warehouse"])
       .order("full_name"),
-    supabase.from("branches").select("id, name").order("name"),
+    supabase.from("branches").select("id, name, latitude, longitude").order("name"),
     supabase.from("payroll_entries").select("staff_id, work_days, overtime_hours, other_allowance, other_deduction, note").eq("month", m1),
     supabase
       .from("staff_penalties")
@@ -72,7 +72,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         month={month}
         isOwner={isOwner}
         staff={(staff ?? []) as Staff[]}
-        branches={(branches ?? []) as { id: string; name: string }[]}
+        branches={(branches ?? []) as Branch[]}
         entries={(entries ?? []) as Entry[]}
         penalties={(penalties ?? []) as Penalty[]}
         rows={rows}

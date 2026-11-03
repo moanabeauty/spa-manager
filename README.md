@@ -146,3 +146,8 @@ Cơ sở dữ liệu (`20261103000022_reports_payroll_cashbook.sql`, `…23_repo
 - Bảng lương → tab **Check-in / out**: quản lý / chủ xem từng ngày, sửa giờ, thêm hoặc xoá ngày (`save_attendance`, có ghi chú). Tab **Chấm công** hiện cột "Theo check-in" + nút "Điền từ check-in / out"; người chưa lưu tay thì bảng lương tự dùng số check-in.
 - Ngày công chuẩn chung 27 (KTV), sửa riêng từng người ở tab Mức lương. Đơn giá giờ thêm = lương cơ bản ÷ công chuẩn ÷ 8 × 150%.
 - Chủ spa: thẻ **Bật thông báo** hiện ở đầu trang Quản lý cho đến khi bật trên máy đó.
+
+### Vị trí + chủ spa duyệt chấm công (`20261103000025_attendance_geo_approval.sql`)
+- Check-in / out gửi vị trí điện thoại; cách chi nhánh gần nhất quá 100m hoặc không lấy được vị trí → **chờ chủ spa duyệt**. Vị trí chi nhánh: chủ spa đứng tại chi nhánh, vào Bảng lương → Cài đặt → "Tôi đang ở đây – lưu vị trí".
+- Quên check-in / check-out: quản lý bổ sung giờ (bắt buộc lý do) → chờ chủ spa duyệt; chủ spa sửa thì duyệt luôn (`review_attendance`). Ngày chờ duyệt / không duyệt không tính công.
+- Tăng ca: check-out từ 18:30 mới tính, tính từ 18:00 theo từng nửa tiếng.

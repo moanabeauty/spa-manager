@@ -5,7 +5,19 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, vnError } from "@/lib/format";
 
-type Att = { check_in: string; check_out: string | null } | null;
+type Att = { check_in: string; check_out: string | null; approval_status?: string; approval_reason?: string | null } | null;
+
+/** Lấy vị trí điện thoại (tối đa 12 giây); không lấy được thì trả null -> chủ spa duyệt */
+function getPosition(): Promise<{ lat: number; lng: number } | null> {
+  return new Promise((resolve) => {
+    if (!("geolocation" in navigator)) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+    );
+  });
+}
 
 /** Nhân viên bấm check-in khi đến, check-out khi về (giờ lấy theo máy chủ) */
 export default function CheckInBar({ today }: { today: Att }) {
@@ -18,7 +30,8 @@ export default function CheckInBar({ today }: { today: Att }) {
     if (fn === "check_out" && att?.check_out && !confirm(`Bạn đã check-out lúc ${formatTime(att.check_out)}. Check-out lại bằng giờ hiện tại?`)) return;
     setBusy(true);
     setError(null);
-    const { data, error } = await createClient().rpc(fn);
+    const pos = await getPosition();
+    const { data, error } = await createClient().rpc(fn, { p_lat: pos?.lat ?? null, p_lng: pos?.lng ?? null });
     setBusy(false);
     if (error) return setError(vnError(error.message));
     setAtt(data as Att);
@@ -33,6 +46,10 @@ export default function CheckInBar({ today }: { today: Att }) {
         <span>
           vào {formatTime(att.check_in)}
           {att.check_out ? ` · về ${formatTime(att.check_out)}` : ""}
+          {att.approval_status === "pending" && (
+            <span className="block text-xs text-[#7A5600]">⏳ Chờ chủ spa duyệt: {att.approval_reason}</span>
+          )}
+          {att.approval_status === "rejected" && <span className="block text-xs text-[#8A2323]">Chủ spa không duyệt ngày công này</span>}
         </span>
       )}
       <span className="flex-1" />
@@ -43,6 +60,7 @@ export default function CheckInBar({ today }: { today: Att }) {
           {att.check_out ? "Check-out lại" : "Check-out"}
         </button>
       )}
+      {busy && <span className="w-full text-xs text-ink/60">Đang lấy vị trí… (cho phép trình duyệt dùng vị trí nếu được hỏi)</span>}
       {error && <span className="w-full text-xs text-[#8A2323]">{error}</span>}
     </div>
   );

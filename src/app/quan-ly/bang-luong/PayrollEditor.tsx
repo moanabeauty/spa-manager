@@ -14,15 +14,18 @@ export type PaySetting = {
   staff_id: string; base_salary: number; responsibility_pay: number; insurance_salary: number;
   meal_per_day: number | null; standard_days: number | null; on_payroll: boolean; note: string | null;
 };
-export type AttSum = { staff_id: string; days: number; ot_hours: number; records: number; missing_out: number };
+export type AttSum = { staff_id: string; days: number; ot_hours: number; records: number; missing_out: number; pending: number };
+export type Branch = { id: string; name: string; latitude: number | null; longitude: number | null };
 export type AttDay = {
   staff_id: string; work_date: string; check_in: string; check_out: string | null; net_hours: number; days: number;
-  ot_hours: number; note: string | null; edited: boolean;
+  ot_hours: number; note: string | null; edited: boolean; approval_status: string; approval_reason: string | null;
+  in_distance_m: number | null; out_distance_m: number | null;
 };
 export type PayrollConfig = {
   standard_days: number; hours_per_day: number; overtime_rate: number; meal_per_day: number;
   bhxh_employee_pct: number; bhxh_employer_pct: number;
-  shift_start?: string; shift_end?: string; lunch_minutes?: number; full_day_hours?: number; half_day_hours?: number;
+  shift_start?: string; shift_end?: string; ot_start?: string; lunch_minutes?: number; full_day_hours?: number; half_day_hours?: number;
+  geo_radius_m?: number;
 };
 export type PayrollRow = {
   staff_id: string; full_name: string | null; role: string; branch_id: string | null; has_entry: boolean;
@@ -37,16 +40,17 @@ type Tab = "cham-cong" | "checkin" | "phat" | "luong" | "muc-luong" | "cai-dat";
 const n = (v: unknown) => Number(v ?? 0);
 
 export default function PayrollEditor(props: {
-  month: string; isOwner: boolean; staff: Staff[]; branches: { id: string; name: string }[];
+  month: string; isOwner: boolean; staff: Staff[]; branches: Branch[];
   entries: Entry[]; penalties: Penalty[]; rows: PayrollRow[]; settings: PaySetting[]; config: PayrollConfig | null; posted: boolean;
   attSum: AttSum[]; attDays: AttDay[];
 }) {
   const { month, isOwner } = props;
+  const pendingAtt = props.attDays.filter((d) => d.approval_status === "pending").length;
   const [tab, setTab] = useState<Tab>(isOwner ? "luong" : "cham-cong");
   const tabs: { key: Tab; label: string }[] = [
     ...(isOwner ? [{ key: "luong" as Tab, label: "Bảng lương" }] : []),
     { key: "cham-cong", label: "Chấm công" },
-    { key: "checkin", label: "Check-in / out" },
+    { key: "checkin", label: `Check-in / out${pendingAtt ? ` (${pendingAtt} chờ duyệt)` : ""}` },
     { key: "phat", label: `Phạt nội quy${props.penalties.length ? ` (${props.penalties.length})` : ""}` },
     ...(isOwner ? [{ key: "muc-luong" as Tab, label: "Mức lương" }, { key: "cai-dat" as Tab, label: "Cài đặt" }] : []),
   ];
@@ -72,10 +76,10 @@ export default function PayrollEditor(props: {
       </div>
       {tab === "luong" && isOwner && <Sheet {...props} branchName={branchName} />}
       {tab === "cham-cong" && <Attendance month={month} people={people} entries={props.entries} attSum={props.attSum} branchName={branchName} />}
-      {tab === "checkin" && <CheckinLog month={month} people={people} days={props.attDays} />}
+      {tab === "checkin" && <CheckinLog month={month} people={people} days={props.attDays} isOwner={isOwner} />}
       {tab === "phat" && <Penalties month={month} people={people} penalties={props.penalties} />}
       {tab === "muc-luong" && isOwner && <Salaries people={people} allStaff={props.staff} settings={props.settings} config={props.config} branchName={branchName} />}
-      {tab === "cai-dat" && isOwner && props.config && <Settings config={props.config} />}
+      {tab === "cai-dat" && isOwner && props.config && <Settings config={props.config} branches={props.branches} />}
     </div>
   );
 }
@@ -334,6 +338,7 @@ function Attendance({ month, people, entries, attSum, branchName }: {
                       {n(att(p.id)!.missing_out) > 0 && (
                         <span className="block text-[#8A2323]">{n(att(p.id)!.missing_out)} ngày quên check-out</span>
                       )}
+                      {n(att(p.id)!.pending) > 0 && <span className="block text-[#7A5600]">{n(att(p.id)!.pending)} ngày chờ chủ duyệt</span>}
                     </>
                   ) : (
                     <span className="text-ink/40">chưa có</span>
@@ -375,7 +380,13 @@ function Attendance({ month, people, entries, attSum, branchName }: {
 // ============ CHECK-IN / OUT ============
 const hhmm = (iso: string | null) => (iso ? formatTime(iso) : "");
 
-function CheckinLog({ month, people, days }: { month: string; people: Staff[]; days: AttDay[] }) {
+const STATUS_TXT: Record<string, { t: string; c: string }> = {
+  pending: { t: "Chờ chủ duyệt", c: "bg-[#FFE8BA] text-[#7A5600]" },
+  approved: { t: "Đã duyệt", c: "bg-[#D6EDD8] text-[#22612A]" },
+  rejected: { t: "Không duyệt", c: "bg-[#F6D5D5] text-[#8A2323]" },
+};
+
+function CheckinLog({ month, people, days, isOwner }: { month: string; people: Staff[]; days: AttDay[]; isOwner: boolean }) {
   const router = useRouter();
   const today = todayVn();
   const [edit, setEdit] = useState<{ staff: string; date: string; inT: string; outT: string; note: string; isNew: boolean } | null>(null);
@@ -385,6 +396,19 @@ function CheckinLog({ month, people, days }: { month: string; people: Staff[]; d
   const name = (id: string) => people.find((p) => p.id === id)?.full_name ?? "?";
   const list = days.filter((d) => !who || d.staff_id === who);
   const dates = [...new Set(list.map((d) => d.work_date))];
+  const pending = days.filter((d) => d.approval_status === "pending");
+
+  async function review(x: AttDay, approve: boolean) {
+    setBusy(true);
+    const { error } = await createClient().rpc("review_attendance", { p_staff: x.staff_id, p_date: x.work_date, p_approve: approve });
+    setBusy(false);
+    if (error) return alert(vnError(error.message));
+    router.refresh();
+  }
+  const distTxt = (x: AttDay) =>
+    [x.in_distance_m != null ? `vào cách ${x.in_distance_m}m` : null, x.out_distance_m != null ? `về cách ${x.out_distance_m}m` : null]
+      .filter(Boolean)
+      .join(", ");
 
   async function save(remove = false) {
     if (!edit) return;
@@ -392,6 +416,7 @@ function CheckinLog({ month, people, days }: { month: string; people: Staff[]; d
     if (!remove && !edit.staff) return setError("Chọn nhân viên");
     if (!remove && !edit.inT) return setError("Nhập giờ vào");
     if (!edit.date.startsWith(month)) return setError(`Ngày phải trong tháng ${shortLabel(month)}`);
+    if (!remove && !isOwner && !edit.note.trim()) return setError("Ghi lý do sửa (vd quên check-out)");
     setBusy(true);
     const { error } = await createClient().rpc("save_attendance", {
       p_staff: edit.staff,
@@ -461,6 +486,34 @@ function CheckinLog({ month, people, days }: { month: string; people: Staff[]; d
         </button>
       </div>
       {form}
+      {pending.length > 0 && (
+        <div className="card border-l-4 border-l-[#E0A526] p-0">
+          <p className="px-4 pt-3 text-sm font-semibold text-navy">Chờ chủ spa duyệt ({pending.length})</p>
+          <ul className="divide-y divide-beige text-sm">
+            {pending.map((x) => (
+              <li key={x.staff_id + x.work_date} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
+                <span className="min-w-0">
+                  <span className="font-medium">{name(x.staff_id)}</span> · {shortLabel(x.work_date)} · {hhmm(x.check_in)} →{" "}
+                  {x.check_out ? hhmm(x.check_out) : "chưa check-out"}
+                  <span className="block text-xs text-[#7A5600]">
+                    {x.approval_reason}
+                    {distTxt(x) && ` (${distTxt(x)})`}
+                    {x.note && ` · ${x.note}`}
+                  </span>
+                </span>
+                {isOwner ? (
+                  <span className="flex gap-2">
+                    <button className="btn-primary py-1.5 text-xs" disabled={busy} onClick={() => review(x, true)}>Duyệt</button>
+                    <button className="btn-ghost py-1.5 text-xs text-[#8A2323]" disabled={busy} onClick={() => review(x, false)}>Không duyệt</button>
+                  </span>
+                ) : (
+                  <span className="text-xs text-ink/60">Chờ chủ spa</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {dates.length === 0 && <p className="card text-sm text-ink/60">Chưa có ai check-in trong tháng này.</p>}
       {dates.map((d) => (
         <div key={d} className="card p-0">
@@ -477,7 +530,13 @@ function CheckinLog({ month, people, days }: { month: string; people: Staff[]; d
                     {x.check_out && ` · ${n(x.net_hours)} giờ`}
                     {x.edited && " · đã sửa"}
                     {x.note && ` · ${x.note}`}
+                    {distTxt(x) && ` · ${distTxt(x)}`}
                   </span>
+                  {STATUS_TXT[x.approval_status] && (
+                    <span className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[11px] ${STATUS_TXT[x.approval_status].c}`}>
+                      {STATUS_TXT[x.approval_status].t}
+                    </span>
+                  )}
                 </span>
                 <span className="flex shrink-0 items-center gap-3">
                   <span className="text-right">
@@ -497,9 +556,10 @@ function CheckinLog({ month, people, days }: { month: string; people: Staff[]; d
         </div>
       ))}
       <p className="text-xs text-ink/60">
-        Nhân viên bấm Check-in khi đến và Check-out khi về ở đầu trang Quản lý (giờ lấy theo máy chủ, không chỉnh được trên điện thoại).
-        Làm ≥ 6 giờ (đã trừ 1 tiếng nghỉ trưa) = 1 công, 3 – 6 giờ = 0,5 công. Về sau 18:00 thì tính thêm giờ theo từng nửa tiếng. Quên
-        check-out thì ngày đó 0 công đến khi quản lý sửa. Các mức này đổi được ở tab Cài đặt (chủ spa).
+        Nhân viên bấm Check-in khi đến và Check-out khi về ở đầu trang Quản lý; giờ lấy theo máy chủ, vị trí lấy từ điện thoại. Cách
+        chi nhánh quá 100m hoặc không lấy được vị trí thì ngày đó chờ chủ spa duyệt. Quên check-in / check-out: quản lý bổ sung giờ (ghi
+        lý do), chủ spa duyệt mới tính công. Tăng ca: check-out từ 18:30 trở đi mới tính, tính từ 18:00 theo từng nửa tiếng. Ngày chờ
+        duyệt / không duyệt không tính công.
       </p>
     </div>
   );
@@ -702,7 +762,7 @@ function Salaries({ people, allStaff, settings, config, branchName }: {
 }
 
 // ============ CÀI ĐẶT CHUNG ============
-function Settings({ config }: { config: PayrollConfig }) {
+function Settings({ config, branches }: { config: PayrollConfig; branches: Branch[] }) {
   const router = useRouter();
   const [c, setC] = useState<PayrollConfig>({ ...config });
   const [busy, setBusy] = useState(false);
@@ -751,10 +811,16 @@ function Settings({ config }: { config: PayrollConfig }) {
           Giờ hết ca (sau giờ này tính thêm giờ)
           <input type="time" className="input mt-1 py-2 text-sm" value={c.shift_end ?? "18:00"} onChange={(e) => { setC({ ...c, shift_end: e.target.value }); setMsg(null); }} />
         </label>
+        <label className="text-xs">
+          Check-out từ giờ này mới tính tăng ca
+          <input type="time" className="input mt-1 py-2 text-sm" value={c.ot_start ?? "18:30"} onChange={(e) => { setC({ ...c, ot_start: e.target.value }); setMsg(null); }} />
+        </label>
         {field("lunch_minutes", "Nghỉ trưa (phút)", "5")}
+        {field("geo_radius_m", "Cách chi nhánh quá … mét thì cần duyệt", "10")}
         {field("full_day_hours", "Làm từ … giờ = 1 công", "0.5")}
         {field("half_day_hours", "Làm từ … giờ = 0,5 công", "0.5")}
       </div>
+      <BranchLocations branches={branches} />
       <div className="flex items-center gap-2">
         <button className="btn-primary" disabled={busy} onClick={save}>Lưu cài đặt</button>
         {msg && <span className="text-sm">{msg}</span>}
@@ -762,6 +828,57 @@ function Settings({ config }: { config: PayrollConfig }) {
       <p className="text-xs text-ink/60">
         Mức BHXH 2026 theo luật: nhân viên đóng 10,5% (8% BHXH + 1,5% BHYT + 1% BHTN), doanh nghiệp đóng 21,5% (17,5% BHXH + 3% BHYT + 1%
         BHTN), tính trên lương đóng bảo hiểm. Bảng lương các tháng luôn tính theo cài đặt hiện tại; tháng đã ghi sổ chi thì bấm “Cập nhật lại vào sổ chi” nếu muốn đổi số.
+      </p>
+    </div>
+  );
+}
+
+function BranchLocations({ branches }: { branches: Branch[] }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  function setHere(b: Branch) {
+    if (!("geolocation" in navigator)) return setMsg("Máy này không lấy được vị trí");
+    if (!confirm(`Bạn đang đứng tại ${b.name}? Vị trí hiện tại của điện thoại sẽ được lưu làm vị trí chi nhánh.`)) return;
+    setBusy(b.id);
+    setMsg(null);
+    navigator.geolocation.getCurrentPosition(
+      async (p) => {
+        const { error } = await createClient().rpc("set_branch_location", { p_branch: b.id, p_lat: p.coords.latitude, p_lng: p.coords.longitude });
+        setBusy(null);
+        if (error) return setMsg(vnError(error.message));
+        setMsg(`Đã lưu vị trí ${b.name} (sai số khoảng ${Math.round(p.coords.accuracy)}m).`);
+        router.refresh();
+      },
+      () => { setBusy(null); setMsg("Không lấy được vị trí: hãy cho phép trình duyệt dùng vị trí rồi thử lại."); },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  }
+  return (
+    <div className="space-y-2 rounded-xl bg-cream p-3">
+      <p className="text-xs font-semibold text-navy">Vị trí chi nhánh (để kiểm tra check-in)</p>
+      {branches.map((b) => (
+        <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span>
+            {b.name}
+            <span className="block text-xs text-ink/60">
+              {b.latitude != null ? (
+                <a className="underline" target="_blank" rel="noreferrer" href={`https://maps.google.com/?q=${b.latitude},${b.longitude}`}>
+                  Đã lưu – xem trên bản đồ
+                </a>
+              ) : (
+                "Chưa lưu vị trí"
+              )}
+            </span>
+          </span>
+          <button className="btn-outline py-1.5 text-xs" disabled={busy !== null} onClick={() => setHere(b)}>
+            {busy === b.id ? "Đang lấy vị trí…" : "Tôi đang ở đây – lưu vị trí"}
+          </button>
+        </div>
+      ))}
+      {msg && <p className="text-xs">{msg}</p>}
+      <p className="text-[11px] text-ink/60">
+        Đứng trong chi nhánh, bấm nút của chi nhánh đó. Khi chưa lưu vị trí chi nhánh nào thì check-in không kiểm tra vị trí.
       </p>
     </div>
   );
