@@ -114,7 +114,7 @@ function DiscountSetting({ value }: { value: number }) {
     <div className="card space-y-2 p-4 text-sm">
       <p className="font-semibold text-navy">Giảm tối đa khi KTV / lễ tân bán lẻ</p>
       <p className="text-xs text-ink/60">
-        Giá bán thấp nhất = giá niêm yết × (100% − mức này). Bán trong khoảng này không cần chủ spa duyệt. Sản phẩm nào cần mức riêng thì sửa trong sản phẩm đó.
+        KTV / lễ tân chỉ được giảm tối đa mức này, không giảm sâu hơn (giá bán thấp nhất = giá niêm yết × (100% − mức này)). Sản phẩm nào cần mức riêng thì sửa trong sản phẩm đó; đặt 0% = không được giảm.
       </p>
       <div className="flex items-center gap-2">
         <input

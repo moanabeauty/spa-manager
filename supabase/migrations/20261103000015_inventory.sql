@@ -59,7 +59,7 @@ create table public.app_settings (
 );
 alter table public.app_settings enable row level security;
 create policy "staff read" on public.app_settings for select to authenticated using ((select public.is_staff()));
-insert into public.app_settings (key, value) values ('retail_staff_max_discount_pct', '0');
+insert into public.app_settings (key, value) values ('retail_staff_max_discount_pct', '30');
 
 create or replace function public.set_retail_max_discount(p_pct numeric)
 returns void language plpgsql security definer set search_path = '' as $$
@@ -268,13 +268,12 @@ grant execute on function public.cancel_stock_request(uuid) to authenticated;
 
 -- KTV xem được tồn kho + phiếu của mình; quản lý kho xem mọi phiếu (policy cũ giữ nguyên)
 -- quản lý kho duyệt qua hàm, không sửa trực tiếp
-drop policy if exists "stock review" on public.stock_requests;
+alter policy "stock review" on public.stock_requests using (false) with check (false);
 
 -- tồn kho kèm thông tin sản phẩm (giao diện dùng)
-drop view if exists public.stock_levels;
-create view public.stock_levels with (security_invoker = true) as
+create or replace view public.stock_levels with (security_invoker = true) as
 select m.warehouse_id, w.branch_id, w.type as warehouse_type, m.product_id, p.name as product_name, p.unit,
-       sum(m.quantity)::int as quantity
+       sum(m.quantity) as quantity
   from public.stock_movements m
   join public.warehouses w on w.id = m.warehouse_id
   join public.products p on p.id = m.product_id

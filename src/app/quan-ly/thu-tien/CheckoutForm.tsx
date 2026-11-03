@@ -233,7 +233,9 @@ export default function CheckoutForm({
     const disc = !canDiscount || l.pkgId || l.type === "card_topup" ? 0 : Math.min(l.discount, gross);
     return { unit, gross, disc, net: gross - disc };
   });
-  const eligibleSum = rows.reduce((a, r, i) => a + (lines[i].type !== "card_topup" ? r.net : 0), 0);
+  // giảm cả hoá đơn không áp dụng cho nạp thẻ và sản phẩm bán lẻ (sản phẩm chỉ giảm trong mức % cho phép)
+  const commonOk = (l: Line) => l.type !== "card_topup" && l.type !== "product";
+  const eligibleSum = rows.reduce((a, r, i) => a + (commonOk(lines[i]) ? r.net : 0), 0);
   const approved = !canDiscount && request?.status === "approved" ? Number(request.amount) : 0;
   const overall = Math.min(
     eligibleSum,
@@ -245,7 +247,7 @@ export default function CheckoutForm({
   );
   const totalDiscount = overall + rows.reduce((a, r) => a + r.disc, 0);
   const alloc = allocateDiscount(
-    rows.map((r, i) => ({ amount: r.net, eligible: lines[i].type !== "card_topup" })),
+    rows.map((r, i) => ({ amount: r.net, eligible: commonOk(lines[i]) })),
     overall,
   );
   const finals = rows.map((r, i) => r.net - alloc[i]);

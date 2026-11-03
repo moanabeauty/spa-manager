@@ -1,6 +1,7 @@
 -- Bán sản phẩm lẻ trên màn hình Thu tiền.
 -- Dòng "product": giá bán do người thu nhập, từ giá thấp nhất (giá niêm yết × (100% − % giảm tối đa)) đến giá niêm yết.
--- Bán trong khoảng này KHÔNG tính là giảm giá (không cần chủ spa duyệt). Giảm thêm vẫn theo quy tắc giảm giá cũ.
+-- Bán trong khoảng này KHÔNG tính là giảm giá. Nhân viên không giảm sâu hơn được: giảm cả hoá đơn không chia vào sản phẩm,
+-- giảm riêng dòng sản phẩm chỉ chủ / quản lý (ghi lý do).
 -- Kho bán lẻ của chi nhánh tự trừ khi chốt hoá đơn; huỷ hoá đơn thì nhập lại kho (đã có từ giai đoạn 4).
 
 create or replace function public.checkout_invoice(
@@ -186,6 +187,9 @@ begin
         raise exception 'Giá bán "%" thấp nhất là %đ (giảm tối đa theo quy định)', v_rec.name, v_min;
       end if;
       v_desc := concat_ws(' ', v_rec.name, v_rec.capacity);
+      if v_disc > 0 and not public.has_role('owner','manager') then
+        raise exception 'Nhân viên chỉ bán sản phẩm từ giá thấp nhất được phép, không giảm thêm';
+      end if;
 
     else
       raise exception 'Loại dòng hoá đơn không hợp lệ: %', v_type;
@@ -220,13 +224,13 @@ begin
   if coalesce(p_discount, 0) > 0 then
     p_discount := round(p_discount);
     select coalesce(sum(amount), 0), count(*) into v_eligible, v_n from public.invoice_items
-     where invoice_id = v_inv and item_type <> 'card_topup' and amount > 0;
-    if p_discount > v_eligible then raise exception 'Giảm giá lớn hơn tổng tiền dịch vụ / gói / sản phẩm'; end if;
+     where invoice_id = v_inv and item_type not in ('card_topup','product') and amount > 0;
+    if p_discount > v_eligible then raise exception 'Giảm giá lớn hơn tổng tiền dịch vụ / gói (sản phẩm bán lẻ không áp dụng giảm chung)'; end if;
     v_left := p_discount; v_k := 0;
     for v_rec in select ii.id, ii.amount
                    from jsonb_array_elements(v_lines) with ordinality l(v, ord)
                    join public.invoice_items ii on ii.id = (l.v->>'id')::uuid
-                  where ii.item_type <> 'card_topup' and ii.amount > 0
+                  where ii.item_type not in ('card_topup','product') and ii.amount > 0
                   order by l.ord loop
       v_k := v_k + 1;
       v_amount := case when v_k = v_n then v_left else least(v_rec.amount, round(p_discount * v_rec.amount / v_eligible)) end;

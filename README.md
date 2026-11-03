@@ -91,7 +91,7 @@ Mỗi chi nhánh 2 kho: **kho liệu trình** (hàng KTV dùng làm dịch vụ)
 | `/quan-ly/kho/xin-xuat` | KTV gửi, quản lý kho duyệt | KTV chọn hàng trong kho liệu trình (thấy số còn), ghi dùng cho khách / liệu trình nào → phiếu XK… chờ duyệt. Quản lý kho **Duyệt & xuất kho** (tự trừ kho) hoặc **Từ chối** (bắt buộc lý do). KTV huỷ được phiếu đang chờ |
 | `/quan-ly/kho/lich-su` | mọi nhân viên | 200 lần nhập / xuất gần nhất theo kho |
 | `/quan-ly/kho/san-pham` | quản lý kho, quản lý, chủ | Danh mục sản phẩm: nhãn hàng, tên, dung tích, đơn vị đếm, mã vạch, giá niêm yết, giá nhập, hàng liệu trình / bán lẻ, mức báo sắp hết. Chủ spa đặt **% giảm tối đa khi bán lẻ** |
-| `/quan-ly/thu-tien` | lễ tân, KTV, quản lý, chủ | **Bán sản phẩm lẻ**: gõ tên hoặc quét mã vạch, thấy tồn kho bán lẻ của chi nhánh. Giá bán từ *giá niêm yết × (100% − % giảm tối đa)* đến giá niêm yết, không cần chủ spa duyệt. Chốt hoá đơn thì trừ kho bán lẻ; huỷ hoá đơn thì nhập lại |
+| `/quan-ly/thu-tien` | lễ tân, KTV, quản lý, chủ | **Bán sản phẩm lẻ**: gõ tên hoặc quét mã vạch, thấy tồn kho bán lẻ của chi nhánh. Giá bán từ *giá niêm yết × (100% − % giảm tối đa)* đến giá niêm yết (mặc định giảm tối đa 30%; sản phẩm đặt 0% = không giảm). Không giảm sâu hơn được: giảm cả hoá đơn không chia vào sản phẩm, giảm riêng dòng sản phẩm chỉ chủ / quản lý. Chốt hoá đơn thì trừ kho bán lẻ; huỷ hoá đơn thì nhập lại |
 
 Cơ sở dữ liệu (`20261103000015_inventory.sql`, `…16_retail_checkout.sql`, `…17_seed_treatment_products.sql`):
 - `products` thêm nhãn hàng, dung tích, mã vạch (không trùng), nhóm, dùng trong liệu trình, giá nhập (KTV / lễ tân không đọc được – hàm `product_costs()`), hàng liệu trình / bán lẻ, `% giảm tối đa riêng`, mức sắp hết.
