@@ -165,3 +165,21 @@ Cơ sở dữ liệu (`20261103000022_reports_payroll_cashbook.sql`, `…23_repo
 - Ngày lễ: hưởng lương cơ bản (cộng 9 giờ) nhưng **không** có phụ cấp ăn (phụ cấp ăn chỉ tính ngày đi làm).
 - Tiền dịch vụ KTV: dịch vụ có cờ `fee_once_per_visit` (Meso chấm nốt mụn) chỉ tính 1 lần / lượt khách dù làm nhiều điểm (`20261103000028_fee_once_per_visit.sql`); bật / tắt ở Menu dịch vụ → chi tiết.
 - Ngày lễ chọn được người nghỉ (`holiday_assignments`, `20261103000029_holiday_staff.sql`): tất cả hoặc từng nhân viên. Đi làm ngày lễ của mình → giờ làm hôm đó trả 300% (1 ngày đủ = 3 ngày lương), ngoài lương nghỉ lễ.
+
+## Giai đoạn 8: CRM khách hàng + menu phân cấp
+
+| Trang | Ai dùng | Việc |
+|---|---|---|
+| `/quan-ly/khach-hang` | lễ tân, KTV, quản lý, chủ | Danh sách khách lọc theo **nhóm tự động** (khách mới, quay lại, đã mua gói / thẻ, VIP, còn buổi / số dư, lâu chưa quay lại, sinh nhật tháng này), **nhóm tự tạo**, chi nhánh; tìm tên / SĐT. Mỗi dòng: số lần đến, lần cuối, chi tiêu 12 tháng, buổi còn, số dư thẻ |
+| `/quan-ly/khach-hang?id=…` | như trên | **Hồ sơ khách**: liên hệ, ngày sinh, giới tính, chi nhánh hay đến, địa chỉ, nguồn khách, loại da, tình trạng da, lưu ý sức khoẻ / dị ứng (hiện nổi bật), ghi chú nội bộ (khách không thấy); gắn / bỏ nhóm. Thống kê lần đến, chi tiêu. **Lịch sử dịch vụ** (ngày, chi nhánh, dịch vụ, KTV, trừ gói), lịch sử mua gói / nạp thẻ, gói, thẻ, hoàn tiền, hoá đơn. **Nhắc chăm sóc** của khách + hẹn nhắc / ghi lại cuộc gọi |
+| `/quan-ly/cham-soc` | như trên | **Chăm sóc lại**: nhắc đến hạn / quá hạn, sắp tới, đã xử lý; lọc chi nhánh, loại. Bấm SĐT gọi khách → **Đã liên hệ** (ghi kết quả, hẹn gọi lại sau N ngày) hoặc **Bỏ qua** (lý do); tạo lịch hẹn. Số nhắc đến hạn hiện trên tab |
+| `/quan-ly/khach-hang/nhom` | quản lý, chủ | Tạo / sửa / xoá nhóm khách (màu). Chủ spa: mức chi tiêu VIP, số ngày "lâu chưa quay lại", nhắc gói hết hạn, nhắc sinh nhật, thẻ nạp sẵn có mở toàn bộ menu không |
+| `/menu` | mọi người | **Menu giới thiệu dịch vụ**: khách mới / chưa đăng nhập chỉ thấy dịch vụ 👁; khách đã mua gói thấy toàn bộ. Nhóm có dịch vụ ẩn hiện "+N 🔒" |
+| `/quan-ly/dich-vu` | quản lý, chủ | Nhãn 👁 / 🔒 từng dịch vụ (bấm để đổi, hoặc đổi cả nhóm); lọc theo cấp; chi tiết: số ngày **hỏi thăm sau làm**, **mời quay lại** |
+
+Cơ sở dữ liệu (`20261103000030_crm_menu_tiers.sql`):
+- `customer_crm` (hồ sơ da, nguồn khách, ghi chú nội bộ, `menu_unlocked`) – chỉ nhân viên đọc / sửa; chỉ chủ / quản lý đổi `menu_unlocked` (`set_customer_menu_unlock`).
+- `customer_groups`, `customer_group_members`; hàm `crm_customers(...)` tính thống kê + nhóm tự động (chi tiêu = tiền thực thu, không tính trừ thẻ, trừ tiền hoàn). Cài đặt `app_settings.crm` (`crm_settings`, `save_crm_settings`).
+- `care_reminders`: lịch hoàn thành → tự tạo "hỏi thăm" (theo `services.followup_days`, mặc định 1 ngày cho peel, laser, meso, phi kim, RF, HIFU, tiêm, filler, botox, triệt lông) và "mời quay lại" (theo `services.recall_days`); khách quay lại làm thì nhắc "mời quay lại / lâu chưa đến" cũ tự đóng; lịch bị mở lại thì xoá nhắc chưa xử lý. `refresh_care_reminders()` (chạy khi mở trang Chăm sóc, không tạo trùng): gói sắp hết hạn còn buổi, khách còn buổi / số dư mà quá N ngày chưa đến, sinh nhật sắp tới. `add_care_reminder`, `complete_care_reminder`.
+- **Menu phân cấp**: `services.menu_tier` (`public` = khách mới thấy, `members` = chỉ khách đã mua gói). Quyền đọc bảng `services` lọc theo cấp ngay trong cơ sở dữ liệu: nhân viên thấy hết; khách thấy hết khi đã mua gói combo (kể cả gói khuyến mãi, gói đã huỷ / hết hạn), có thẻ nạp sẵn (nếu bật) hoặc được mở thủ công; dịch vụ đã có trong lịch của chính khách luôn hiện tên. Khách tự đặt online không đặt được dịch vụ 🔒 (`appointment_services_tier_check`). `menu_locked_summary()` đếm dịch vụ đang ẩn.
+- Mặc định 👁: Basic Treatment (2 nhóm), Biologique Recherche, Chemical Peel, Light Therapy, Laser, Body, Hair & Scalp, Triệt lông, Thermo + RF vùng mắt. 🔒: Meso, phi kim, MNRF, MPT / HIFU, Acne Scar, BAP, Filler, Botox, các dịch vụ mắt còn lại.

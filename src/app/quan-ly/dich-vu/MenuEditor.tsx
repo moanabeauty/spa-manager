@@ -19,6 +19,9 @@ export type MenuService = {
   fee_once_per_visit: boolean;
   is_active: boolean;
   branch_id: string | null;
+  menu_tier: "public" | "members";
+  followup_days: number | null;
+  recall_days: number | null;
 };
 type Category = { id: string; name: string; sort_order: number };
 type Draft = Partial<Omit<MenuService, "id">>;
@@ -26,6 +29,7 @@ type Draft = Partial<Omit<MenuService, "id">>;
 const FIELDS: (keyof Draft)[] = [
   "category_id", "name", "name_en", "duration_minutes", "price", "member_price",
   "technician_fee", "card_allowed", "commission_eligible", "fee_once_per_visit", "is_active", "branch_id",
+  "menu_tier", "followup_days", "recall_days",
 ];
 
 /** "1.200.000" -> 1200000; "" -> null */
@@ -51,6 +55,7 @@ export default function MenuEditor({
   const [query, setQuery] = useState("");
   const [showHidden, setShowHidden] = useState(false);
   const [onlyMissing, setOnlyMissing] = useState(false);
+  const [tierFilter, setTierFilter] = useState<"" | "public" | "members">("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -88,13 +93,14 @@ export default function MenuEditor({
       (s) =>
         (showHidden || s.is_active) &&
         (!onlyMissing || s.technician_fee === 0) &&
+        (!tierFilter || s.menu_tier === tierFilter) &&
         (!q || normalizeText(`${s.name} ${s.name_en ?? ""}`).includes(q)),
     );
     const g = categories.map((c) => ({ id: c.id, name: c.name, items: list.filter((s) => s.category_id === c.id) }));
     const none = list.filter((s) => !s.category_id || !categories.some((c) => c.id === s.category_id));
     if (none.length) g.push({ id: "none", name: "Chưa có nhóm", items: none });
     return g.filter((x) => x.items.length);
-  }, [services, categories, query, showHidden, onlyMissing]);
+  }, [services, categories, query, showHidden, onlyMissing, tierFilter]);
 
   async function saveAll() {
     setMsg(null);
@@ -135,6 +141,15 @@ export default function MenuEditor({
             <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} />
             Hiện dịch vụ đã ngừng
           </label>
+          <select
+            className="rounded-lg border border-beige-dark bg-white px-2 py-1.5"
+            value={tierFilter}
+            onChange={(e) => setTierFilter(e.target.value as "" | "public" | "members")}
+          >
+            <option value="">Mọi cấp menu</option>
+            <option value="public">Khách mới thấy</option>
+            <option value="members">Chỉ khách đã mua gói</option>
+          </select>
           <button className="btn-outline ml-auto py-2" onClick={() => setAdding((v) => !v)}>
             {adding ? "Đóng" : "+ Thêm dịch vụ"}
           </button>
@@ -147,9 +162,20 @@ export default function MenuEditor({
 
       {groups.map((g) => (
         <section key={g.id} className="card p-0">
-          <h2 className="rounded-t-2xl bg-cream px-4 py-2.5 text-sm font-semibold text-navy">
-            {g.name} <span className="font-normal text-ink/50">({g.items.length})</span>
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-t-2xl bg-cream px-4 py-2.5">
+            <h2 className="text-sm font-semibold text-navy">
+              {g.name} <span className="font-normal text-ink/50">({g.items.length})</span>
+            </h2>
+            <span className="flex gap-1 text-[11px]">
+              <span className="self-center text-ink/50">Cả nhóm:</span>
+              <button type="button" className="rounded-full bg-white px-2 py-1 font-semibold text-[#22612A] ring-1 ring-beige-dark" onClick={() => g.items.forEach((s) => edit(s.id, { menu_tier: "public" }))}>
+                khách mới thấy
+              </button>
+              <button type="button" className="rounded-full bg-white px-2 py-1 font-semibold text-navy ring-1 ring-beige-dark" onClick={() => g.items.forEach((s) => edit(s.id, { menu_tier: "members" }))}>
+                chỉ khách có gói
+              </button>
+            </span>
+          </div>
           <div className="hidden grid-cols-[1fr_5.5rem_7.5rem_7rem] gap-2 px-4 pt-2 text-[11px] uppercase tracking-wide text-ink/50 sm:grid">
             <span>Dịch vụ</span>
             <span>Phút</span>
@@ -191,6 +217,16 @@ export default function MenuEditor({
                     />
                   </div>
 
+                  <button
+                    type="button"
+                    title="Bấm để đổi: khách mới thấy / chỉ khách đã mua gói"
+                    onClick={() => edit(s.id, { menu_tier: val(s, "menu_tier") === "public" ? "members" : "public" })}
+                    className={`mt-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      val(s, "menu_tier") === "public" ? "bg-[#D6EDD8] text-[#22612A]" : "bg-[#DCE3F5] text-navy"
+                    }`}
+                  >
+                    {val(s, "menu_tier") === "public" ? "👁 Khách mới thấy" : "🔒 Chỉ khách đã mua gói"}
+                  </button>
                   {open && (
                     <div className="mt-3 grid gap-3 rounded-xl bg-cream p-3 sm:grid-cols-2">
                       <label className="text-sm">
@@ -228,6 +264,26 @@ export default function MenuEditor({
                             <option key={b.id} value={b.id}>Chỉ {b.name}</option>
                           ))}
                         </select>
+                      </label>
+                      <label className="text-sm">
+                        <span className="label">Hỏi thăm khách sau khi làm (ngày)</span>
+                        <input
+                          className="input py-2"
+                          inputMode="numeric"
+                          placeholder="Không nhắc"
+                          value={val(s, "followup_days") ?? ""}
+                          onChange={(e) => edit(s.id, { followup_days: e.target.value.replace(/\D/g, "") === "" ? null : Math.min(60, Number(e.target.value.replace(/\D/g, ""))) })}
+                        />
+                      </label>
+                      <label className="text-sm">
+                        <span className="label">Mời khách quay lại sau (ngày)</span>
+                        <input
+                          className="input py-2"
+                          inputMode="numeric"
+                          placeholder="Không nhắc"
+                          value={val(s, "recall_days") ?? ""}
+                          onChange={(e) => edit(s.id, { recall_days: e.target.value.replace(/\D/g, "") === "" ? null : Math.min(730, Math.max(1, Number(e.target.value.replace(/\D/g, "")))) })}
+                        />
                       </label>
                       <div className="space-y-2 text-sm">
                         <label className="flex items-center gap-2">

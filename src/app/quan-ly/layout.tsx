@@ -71,6 +71,14 @@ export default async function ManagerLayout({ children }: { children: React.Reac
       pendingOt = oc ?? 0;
     }
   }
+  let dueCare = 0;
+  if (role !== "warehouse") {
+    const supabase = await createClient();
+    let q = supabase.from("care_reminders").select("id", { count: "exact", head: true }).eq("status", "open").lte("due_date", todayVn());
+    if (role !== "owner" && role !== "manager" && profile!.branch_id) q = q.or(`branch_id.eq.${profile!.branch_id},branch_id.is.null`);
+    const { count } = await q;
+    dueCare = count ?? 0;
+  }
   const kho = { href: "/quan-ly/kho", label: pendingStock ? `Kho (${pendingStock})` : "Kho" };
   const tabs =
     role === "warehouse"
@@ -79,6 +87,7 @@ export default async function ManagerLayout({ children }: { children: React.Reac
           { href: "/quan-ly", label: "Lịch hẹn" },
           { href: "/quan-ly/tao-lich", label: "+ Tạo lịch" },
           { href: "/quan-ly/khach-hang", label: "Khách hàng" },
+          { href: "/quan-ly/cham-soc", label: dueCare ? `Chăm sóc lại (${dueCare})` : "Chăm sóc lại" },
           { href: "/quan-ly/hoa-don", label: "Hoá đơn" },
           { href: "/quan-ly/khuyen-mai", label: pendingPromo ? `Khuyến mãi (${pendingPromo})` : "Khuyến mãi" },
           { href: "/quan-ly/doanh-so", label: role === "owner" || role === "manager" ? "Doanh số" : "Doanh số của tôi" },

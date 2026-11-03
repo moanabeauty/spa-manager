@@ -12,7 +12,7 @@ export default async function ServiceMenuPage() {
     supabase.from("service_categories").select("id, name, sort_order").order("sort_order"),
     supabase
       .from("services")
-      .select("id, category_id, name, name_en, duration_minutes, price, member_price, card_allowed, commission_eligible, fee_once_per_visit, is_active, branch_id")
+      .select("id, category_id, name, name_en, duration_minutes, price, member_price, card_allowed, commission_eligible, fee_once_per_visit, is_active, branch_id, menu_tier, followup_days, recall_days")
       .order("name"),
     supabase.rpc("service_internal_costs"),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
@@ -30,6 +30,10 @@ export default async function ServiceMenuPage() {
         <p className="mt-1 text-sm text-ink/70">
           Sửa trực tiếp thời lượng, giá và tiền dịch vụ KTV rồi bấm <b>Lưu</b> ở cuối trang. Bỏ trống giá = &quot;báo giá tại
           spa&quot;. Thay đổi chỉ áp dụng cho lịch hẹn tạo sau đó, lịch cũ giữ nguyên giá lúc đặt.
+        </p>
+        <p className="mt-1 text-sm text-ink/70">
+          <b>Menu phân cấp:</b> nhãn 👁 = khách mới (chưa mua gói) thấy trên web và tự đặt lịch được; 🔒 = chỉ khách đã mua gói thấy.
+          Bấm nhãn để đổi. Mở “chi tiết” để đặt số ngày <b>hỏi thăm</b> và <b>mời quay lại</b> (trang Chăm sóc lại tự nhắc).
         </p>
       </div>
       <MenuEditor categories={categories ?? []} services={rows} branches={branches ?? []} />

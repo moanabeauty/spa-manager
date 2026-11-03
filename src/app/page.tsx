@@ -17,6 +17,9 @@ export default async function Home() {
           <Link href="/dat-lich" className="btn-primary">
             Đặt lịch ngay
           </Link>
+          <Link href="/menu" className="btn-outline">
+            Menu dịch vụ
+          </Link>
           <Link href="/khuyen-mai" className="btn-outline">
             Xem khuyến mãi
           </Link>

@@ -13,6 +13,9 @@ export default async function Header() {
           <span className="text-[10px] uppercase tracking-[0.3em] text-beige">Beauty · Spa</span>
         </Link>
         <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto text-sm">
+          <Link href="/menu" className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 hover:bg-white/10">
+            Menu
+          </Link>
           <Link href="/khuyen-mai" className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 hover:bg-white/10">
             Khuyến mãi
           </Link>
