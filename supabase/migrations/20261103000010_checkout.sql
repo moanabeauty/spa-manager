@@ -420,7 +420,8 @@ begin
       else
         v_ref := (v_item->>'service_id')::uuid;
       end if;
-      select * into v_svc from public.services where id = v_ref;
+      select id, name, price, member_price, card_allowed, is_active, duration_minutes
+        into v_svc from public.services where id = v_ref;   -- không đọc cột ẩn (giá vốn, tiền KTV)
       if not found then raise exception 'Dịch vụ không tồn tại'; end if;
       if v_aps_id is null and not v_svc.is_active then raise exception 'Dịch vụ "%" đã ngừng', v_svc.name; end if;
 
@@ -596,8 +597,10 @@ begin
 
   update public.invoices set status = 'paid' where id = v_inv;
 
-  if p_appointment_id is not null and v_appt.status <> 'completed' then
-    update public.appointments set status = 'completed' where id = p_appointment_id;
+  if p_appointment_id is not null then
+    if v_appt.status <> 'completed' then
+      update public.appointments set status = 'completed' where id = p_appointment_id;
+    end if;
   end if;
   return v_inv;
 end $$;
@@ -948,3 +951,20 @@ create policy "visible invoice read" on public.invoice_items for select to authe
 drop policy "own or staff read" on public.payments;
 create policy "visible invoice read" on public.payments for select to authenticated
   using ((select public.has_role('owner','manager','receptionist')) or public.can_see_invoice(invoice_id));
+
+-- ============ 9. HOÁ ĐƠN ĐÃ CHỐT: chỉ cho gỡ liên kết dịch vụ trong lịch (khi dịch vụ đó bị bỏ khỏi lịch) ============
+create or replace function public.ensure_invoice_draft()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare v_status public.invoice_status;
+begin
+  if tg_op = 'UPDATE' and tg_table_name = 'invoice_items'
+     and (to_jsonb(new) - 'appointment_service_id' - 'amount') = (to_jsonb(old) - 'appointment_service_id' - 'amount') then
+    return new;
+  end if;
+  select status into v_status from public.invoices
+   where id = case when tg_op = 'DELETE' then old.invoice_id else new.invoice_id end;
+  if v_status is not null and v_status <> 'draft' then
+    raise exception 'Hoá đơn đã chốt, không sửa được';
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end $$;
