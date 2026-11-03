@@ -64,10 +64,7 @@ export default async function MyAppointmentsPage() {
               </p>
               {p.items.map((i) => (
                 <p key={i.id} className="flex justify-between gap-3 text-ink/80">
-                  <span>
-                    {i.label}
-                    {i.services.length > 1 && <span className="block text-xs text-ink/50">{i.services.map((x) => x.name).join(", ")}</span>}
-                  </span>
+                  <span>{i.label}</span>
                   <span className="shrink-0">{itemText(i)}</span>
                 </p>
               ))}

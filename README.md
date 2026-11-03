@@ -68,7 +68,7 @@ Cơ sở dữ liệu (`20261103000009_front_desk_tools.sql`):
 | `/lich-hen` | khách | Thêm số dư thẻ và số buổi gói còn lại |
 
 Cơ sở dữ liệu (`20261103000010_checkout.sql`, `20261103000011_seed_combos.sql`):
-- **Gói combo theo phần** (`package_items` + `package_item_services`): mỗi phần có số buổi (bỏ trống = không giới hạn), giá lẻ / buổi và các dịch vụ được dùng linh hoạt. Khách mua thì chép sang `customer_package_items`. 34 gói nhập từ sheet COMBO (thêm 7 dịch vụ còn thiếu trong menu, ghi chú "cần chủ spa kiểm tra lại").
+- **Gói combo theo phần** (`package_items` + `package_item_services`): mỗi phần có số buổi (bỏ trống = không giới hạn), giá lẻ / buổi và các dịch vụ được dùng linh hoạt. Khách mua thì chép sang `customer_package_items`. 32 gói nhập từ sheet COMBO (đã bỏ Light Only, HIFU x3). Phần có Peel dùng được mọi Peel giá 1.900k, phần có Micro Needling dùng mọi MN giá 1.900k; khách chỉ thấy tên phần + số buổi, KTV / lễ tân chọn dịch vụ cụ thể. Menu: thêm BAP Biocomplex (8tr), Hydrating MN đổi tên Glow MN.
 - `checkout_invoice(...)`: tạo hoá đơn + dòng + chia doanh số + thanh toán + chốt + hoàn thành lịch trong **1 bước** (lỗi thì không lưu gì). Giảm cả hoá đơn chia theo tỉ lệ vào từng dòng nên hoa hồng tính trên tiền thực thu. Lễ tân, KTV, quản lý, chủ đều thu được.
 - **Thẻ nạp sẵn** (chỉ 3 mức 5tr / 10tr / 20tr): chỉ trả được dịch vụ có giá thành viên, trừ theo giá thành viên; dịch vụ không có giá thành viên phải thanh toán ngoài. Số dư không đủ thì dịch vụ tính giá niêm yết, trả ngoài. Tiền vừa nạp dùng từ hoá đơn sau.
 - Trừ buổi: dịch vụ gắn vào 1 phần của gói, trừ khi lịch hoàn thành; không trừ quá số buổi; mỗi lịch chỉ thu 1 lần; lịch đã thu không mở lại được.
