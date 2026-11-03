@@ -122,3 +122,20 @@ Cơ sở dữ liệu (`20261103000018_promotion_status.sql`, `…19_promotions.s
 - Ưu đãi là **gói combo**: khách mua gói theo giá KM, nhận đủ buổi và dùng dần như combo thường; hoàn tiền tính theo số tiền thực trả.
 - **Hết hạn**: hết thời gian đăng ký thì khách không tự đăng ký được, chủ / quản lý vẫn đăng ký hộ. Hết hạn dùng thì lễ tân không áp được; chủ / quản lý bấm **Gia hạn** (ngày + lý do) ở trang Khuyến mãi (`extend_promotion_registration`).
 - **Gói combo ngừng bán**: ngoài khuyến mãi, chỉ chủ / quản lý bán được (hiện trong ô "Bán gói combo" với chữ "ngừng bán").
+
+## Giai đoạn 7: báo cáo cho chủ spa
+
+| Trang | Ai dùng | Việc |
+|---|---|---|
+| `/quan-ly/bao-cao` | chủ, quản lý | **Doanh thu** theo ngày / tháng, lọc chi nhánh và khoảng ngày (nút nhanh: hôm nay, tháng này, tháng trước, cả năm). Tiền thực thu (tiền mặt + CK + POS), tiền trừ thẻ, hoàn tiền; tiền đến từ dịch vụ lẻ / gói combo – liệu trình / sản phẩm / nạp thẻ; so sánh 2 chi nhánh; dịch vụ, gói, sản phẩm bán nhiều nhất |
+| `/quan-ly/bao-cao/goi-the` | chủ, quản lý | Gói và thẻ **đã bán** trong tháng; **số buổi còn nợ** khách mua combo (từng phần của gói) + giá trị còn nợ; thẻ còn số dư + **tiền thực nợ** = số dư × mệnh giá / (mệnh giá + tiền tặng). Tìm theo tên / SĐT |
+| `/quan-ly/bang-luong` | chủ (đủ), quản lý (chấm công + phạt) | **Bảng lương**: lương cơ bản theo ngày công (÷ 26 công), lương trách nhiệm, phụ cấp ăn 30k / công, thêm giờ ×150%, hoa hồng, tiền dịch vụ KTV, cộng khác − phạt nội quy − BHXH (10,5%) − trừ khác = thực nhận; tiền BHXH Moana đóng (21,5%). Phiếu lương từng người, in, **ghi vào sổ chi**. Tab Chấm công, Phạt nội quy, Mức lương (từng người), Cài đặt (số ngày công chuẩn, %, mức phụ cấp) |
+| `/quan-ly/doanh-so` | nhân viên | Thêm **phiếu lương tạm tính** của mình |
+| `/quan-ly/thu-chi` | chủ | **Dòng tiền**: nhập mọi khoản thu / chi (danh mục, chi nhánh hoặc chung, hình thức), tự cộng tiền bán hàng thực thu và trừ tiền hoàn khách. Bảng 12 tháng: thu, chi, lợi nhuận, **% lợi nhuận**; cả năm; chi theo danh mục |
+| `/quan-ly/duyet-giam-gia` | chủ | Nút **Bật thông báo** trên điện thoại: lễ tân / KTV gửi yêu cầu giảm giá là điện thoại chủ spa báo ngay (bấm vào mở trang duyệt). iPhone cần "Thêm vào MH chính" trước |
+
+Cơ sở dữ liệu (`20261103000022_reports_payroll_cashbook.sql`, `…23_report_number_format.sql`):
+- Hàm báo cáo `revenue_report`, `sales_by_item`, `card_liabilities`, `package_liabilities` (chủ / quản lý), `cashflow_report` (chủ).
+- Lương: `staff_pay_settings` (chỉ chủ), `payroll_entries` + `staff_penalties` (chủ / quản lý ghi, nhân viên xem của mình), cài đặt `app_settings.payroll`; `payroll_sheet` (chủ), `my_payslip` (nhân viên), `post_payroll_to_cashbook` (ghi 2 khoản chi: lương thực nhận + BHXH cả 2 phần, bấm lại thì cập nhật).
+- Thu chi: `cashbook_categories`, `cashbook_entries` (chỉ chủ).
+- Thông báo: `push_subscriptions`, `save_push_subscription`, `discount_push_targets` (mỗi yêu cầu báo 1 lần). Gửi bằng Web Push (`src/lib/webpush.ts`, không cần thư viện), khoá đặt ở biến môi trường Vercel `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.

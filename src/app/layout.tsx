@@ -13,6 +13,9 @@ const font = Be_Vietnam_Pro({
 export const metadata: Metadata = {
   title: "Moana Beauty – Đặt lịch",
   description: "Đặt lịch chăm sóc da tại Moana Beauty: 67 Lưu Quang Vũ và 109 Nguyễn Sơn, Hà Nội",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Moana", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

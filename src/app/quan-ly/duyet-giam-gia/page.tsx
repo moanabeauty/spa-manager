@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatTime, formatVnd } from "@/lib/format";
 import ReviewButtons from "./ReviewButtons";
+import PushToggle from "@/components/PushToggle";
 
 export const metadata = { title: "Duyệt giảm giá – Moana Beauty" };
 
@@ -41,6 +42,7 @@ export default async function DiscountApprovalPage() {
   const pending = rows.filter((r) => r.status === "pending");
   const done = rows.filter((r) => r.status !== "pending");
   const isOwner = profile?.role === "owner";
+  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? process.env.VAPID_PUBLIC_KEY ?? "";
 
   return (
     <div className="space-y-4">
@@ -48,6 +50,7 @@ export default async function DiscountApprovalPage() {
         <h1 className="text-2xl font-bold text-navy">Duyệt giảm giá</h1>
         <p className="text-sm text-ink/70">Lễ tân / KTV xin giảm giá cho khách, chủ spa duyệt rồi mới thu được.</p>
       </div>
+      {isOwner && vapidKey && <PushToggle publicKey={vapidKey} />}
       {pending.length === 0 && <p className="card text-sm text-ink/60">Không có yêu cầu nào đang chờ.</p>}
       {pending.map((r) => (
         <div key={r.id} className="card border-l-4 border-l-[#E0A526] p-4 text-sm">

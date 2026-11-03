@@ -61,6 +61,13 @@ export default async function ManagerLayout({ children }: { children: React.Reac
           ...(role === "owner" || role === "manager"
             ? [{ href: "/quan-ly/duyet-giam-gia", label: pendingDiscounts ? `Duyệt giảm giá (${pendingDiscounts})` : "Duyệt giảm giá" }]
             : []),
+          ...(role === "owner" || role === "manager"
+            ? [
+                { href: "/quan-ly/bao-cao", label: "Báo cáo" },
+                { href: "/quan-ly/bang-luong", label: role === "owner" ? "Bảng lương" : "Chấm công" },
+              ]
+            : []),
+          ...(role === "owner" ? [{ href: "/quan-ly/thu-chi", label: "Thu chi" }] : []),
           ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/goi-combo", label: "Gói combo" }] : []),
           ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/dich-vu", label: "Menu dịch vụ" }] : []),
           ...(role === "owner" ? [{ href: "/quan-ly/nhan-vien", label: "Nhân viên" }] : []),

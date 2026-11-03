@@ -25,11 +25,14 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
     cq = cq.eq("staff_id", profile!.id);
     fq = fq.eq("technician_id", profile!.id);
   }
-  const [{ data: comm }, { data: fees }, { data: tiers }] = await Promise.all([
+  const [{ data: comm }, { data: fees }, { data: tiers }, { data: slip }] = await Promise.all([
     cq,
     fq,
     supabase.from("commission_tiers").select("min_monthly_sales, rate").order("min_monthly_sales"),
+    profile?.role === "owner" ? Promise.resolve({ data: null }) : supabase.rpc("my_payslip", { p_month: `${month}-01` }),
   ]);
+  const p = (slip ?? null) as Record<string, number | string | null> | null;
+  const num = (k: string) => Number(p?.[k] ?? 0);
 
   const rows = new Map<string, { name: string; sales: number; rate: number; commission: number; done: number; fee: number }>();
   ((comm ?? []) as Comm[]).forEach((c) =>
@@ -96,6 +99,34 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {p && (num("base_salary") > 0 || num("work_days") > 0) && (
+        <div className="card p-4 text-sm">
+          <p className="mb-2 font-semibold text-navy">Phiếu lương tạm tính của tôi</p>
+          {[
+            ["Lương cơ bản", num("base_pay"), `${num("work_days")}/${num("standard_days")} công`],
+            ["Lương trách nhiệm", num("responsibility_pay"), ""],
+            ["Phụ cấp ăn", num("meal_allowance"), ""],
+            ["Làm thêm giờ", num("overtime_pay"), num("overtime_hours") ? `${num("overtime_hours")} giờ` : ""],
+            ["Hoa hồng", num("commission"), ""],
+            ["Tiền dịch vụ", num("service_fee"), ""],
+            ["Cộng khác", num("other_allowance"), ""],
+            ["Phạt nội quy", -num("penalties"), num("penalty_count") ? `${num("penalty_count")} lần` : ""],
+            ["BHXH, BHYT, BHTN", -num("insurance_employee"), ""],
+            ["Trừ khác", -num("other_deduction"), ""],
+          ]
+            .filter(([, v]) => v !== 0)
+            .map(([label, v, note]) => (
+              <div key={label as string} className="flex justify-between py-0.5">
+                <span>{label} {note && <span className="text-xs text-ink/50">({note})</span>}</span>
+                <span className={(v as number) < 0 ? "text-[#8A2323]" : ""}>{formatVnd(v as number)}</span>
+              </div>
+            ))}
+          <div className="mt-1 flex justify-between border-t border-beige pt-1 text-base font-bold text-navy">
+            <span>Thực nhận</span><span>{formatVnd(num("net_pay"))}</span>
+          </div>
+          <p className="mt-1 text-xs text-ink/50">Số tạm tính theo chấm công hiện tại, chủ spa chốt khi trả lương.</p>
         </div>
       )}
       <p className="text-xs text-ink/60">
