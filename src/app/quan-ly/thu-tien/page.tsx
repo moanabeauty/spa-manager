@@ -9,7 +9,7 @@ export const metadata = { title: "Thu tiền – Moana Beauty" };
 export default async function CheckoutPage({ searchParams }: { searchParams: Promise<{ lich?: string; kh?: string }> }) {
   const { supabase, profile } = await getCurrentUser();
   if (!canCheckout(profile?.role)) {
-    return <p className="card text-sm">Chỉ lễ tân, quản lý và chủ spa được thu tiền.</p>;
+    return <p className="card text-sm">Tài khoản của bạn chưa được phép thu tiền.</p>;
   }
   const sp = await searchParams;
 

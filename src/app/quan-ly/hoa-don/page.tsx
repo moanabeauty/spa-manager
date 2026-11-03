@@ -24,7 +24,7 @@ function shiftDate(d: string, days: number) {
 
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<{ ngay?: string; cn?: string }> }) {
   const { supabase, profile } = await getCurrentUser();
-  if (!canCheckout(profile?.role)) return <p className="card text-sm">Trang dành cho lễ tân, quản lý và chủ spa.</p>;
+  if (!canCheckout(profile?.role)) return <p className="card text-sm">Trang dành cho nhân viên thu ngân.</p>;
   const sp = await searchParams;
   const date = sp.ngay && /^\d{4}-\d{2}-\d{2}$/.test(sp.ngay) ? sp.ngay : todayVn();
   const { data: branches } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
@@ -41,6 +41,18 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
     .lt("created_at", to)
     .order("created_at", { ascending: false });
   const rows = (data ?? []) as unknown as Row[];
+  const { data: refundData } = await supabase
+    .from("refunds")
+    .select("id, kind, refund_amount, method, reason, created_at, customers(id, full_name)")
+    .eq("branch_id", branchId)
+    .gte("created_at", from)
+    .lt("created_at", to)
+    .order("created_at", { ascending: false });
+  const refunds = (refundData ?? []) as unknown as {
+    id: string; kind: string; refund_amount: number; method: string; reason: string; created_at: string;
+    customers: { id: string; full_name: string } | null;
+  }[];
+  const refundTotal = refunds.reduce((a, r) => a + Number(r.refund_amount), 0);
   const paid = rows.filter((r) => r.status === "paid");
 
   const byMethod: Record<string, number> = {};
@@ -94,9 +106,25 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
           <span className="text-ink/70">Tiền thực thu (mặt + CK + POS): </span>
           <b className="text-navy">{formatVnd(realMoney)}</b>
           <span className="text-ink/60"> · {paid.length} hoá đơn</span>
+          {refundTotal > 0 && (
+            <span className="block text-[#8A2323]">Đã hoàn khách (huỷ gói / thẻ): −{formatVnd(refundTotal)}</span>
+          )}
         </div>
       </div>
 
+      {refunds.length > 0 && (
+        <div className="card space-y-1 p-4 text-sm">
+          <p className="font-semibold text-[#8A2323]">Hoàn tiền trong ngày</p>
+          {refunds.map((r) => (
+            <p key={r.id} className="flex justify-between gap-3">
+              <Link href={`/quan-ly/khach-hang?id=${r.customers?.id ?? ""}`} className="min-w-0 truncate">
+                {formatTime(r.created_at)} {r.customers?.full_name} · huỷ {r.kind === "card" ? "thẻ" : "gói"} · {r.reason}
+              </Link>
+              <span className="shrink-0">−{formatVnd(Number(r.refund_amount))} ({METHOD_LABEL[r.method]})</span>
+            </p>
+          ))}
+        </div>
+      )}
       {rows.length === 0 && <p className="card text-sm text-ink/60">Chưa có hoá đơn nào trong ngày này.</p>}
       <div className="space-y-2">
         {rows.map((r) => {

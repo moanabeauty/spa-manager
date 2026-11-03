@@ -59,10 +59,10 @@ Cơ sở dữ liệu (`20261103000009_front_desk_tools.sql`):
 
 | Trang | Ai dùng | Việc |
 |---|---|---|
-| `/quan-ly` → nút **Thu tiền** | lễ tân, quản lý, chủ | Mở hoá đơn từ dịch vụ trong lịch; lịch đã thu hiện "✓ Đã thanh toán" + mã hoá đơn |
-| `/quan-ly/thu-tien` | lễ tân, quản lý, chủ | Từng dòng: giá thường / giá thành viên, giảm giá, trả bằng thẻ tài khoản, **trừ buổi gói**, chia doanh số (%) cho 1 hay nhiều nhân viên. Giảm cả hoá đơn (đ hoặc %). Thu kết hợp tiền mặt + chuyển khoản + POS + thẻ; tính tiền thừa trả khách. Thêm dịch vụ khách làm thêm (chọn KTV), bỏ dịch vụ khách không làm. Không theo lịch: bán gói combo, nạp thẻ, thu lẻ |
-| `/quan-ly/hoa-don` | lễ tân, quản lý, chủ | Hoá đơn trong ngày theo chi nhánh, tổng theo hình thức thu; mở từng hoá đơn để in. Chủ spa **huỷ hoá đơn** (ghi lý do) |
-| `/quan-ly/khach-hang` | nhân viên | Tìm theo SĐT / tên: số dư thẻ, lịch sử thẻ, gói còn bao nhiêu buổi, hoá đơn gần đây |
+| `/quan-ly` → nút **Thu tiền** | lễ tân, KTV, quản lý, chủ | Mở hoá đơn từ dịch vụ trong lịch; lịch đã thu hiện "✓ Đã thanh toán" + mã hoá đơn |
+| `/quan-ly/thu-tien` | lễ tân, KTV, quản lý, chủ | Từng dòng: giảm giá, trừ thẻ nạp sẵn (tự tính **giá thành viên**; khách còn số dư thì mặc định trừ thẻ), **trừ buổi gói**, chia doanh số (%) cho 1 hay nhiều nhân viên. Giảm cả hoá đơn (đ hoặc %). Thu kết hợp tiền mặt + chuyển khoản + POS + thẻ; tính tiền thừa trả khách. Thêm dịch vụ khách làm thêm (chọn KTV), bỏ dịch vụ khách không làm. Không theo lịch: bán gói combo, nạp thẻ (chỉ 3 mức 5tr / 10tr / 20tr kèm tiền tặng), thu lẻ |
+| `/quan-ly/hoa-don` | thu ngân | Hoá đơn + tiền hoàn trong ngày theo chi nhánh, tổng theo hình thức thu; mở từng hoá đơn để in. Chủ spa **huỷ hoá đơn** (ghi lý do) |
+| `/quan-ly/khach-hang` | nhân viên | Tìm theo SĐT / tên: số dư thẻ, lịch sử thẻ, gói còn bao nhiêu buổi, hoá đơn gần đây. Quản lý / chủ: **Huỷ & hoàn tiền** thẻ hoặc gói đang dùng dở |
 | `/quan-ly/goi-combo` | chủ, quản lý | Tạo / sửa gói: tên, giá, hạn dùng, dịch vụ + số buổi, đang bán / ngừng |
 | `/quan-ly/doanh-so` | mọi nhân viên | Doanh số, hoa hồng (3% / 5%) và tiền dịch vụ KTV theo tháng; KTV chỉ thấy của mình |
 | `/lich-hen` | khách | Thêm số dư thẻ và số buổi gói còn lại |
@@ -72,4 +72,6 @@ Cơ sở dữ liệu (`20261103000010_checkout.sql`):
 - Trừ buổi: dòng "trừ gói" gắn gói vào dịch vụ trong lịch, buổi bị trừ khi lịch hoàn thành; không trừ quá số buổi; mỗi lịch chỉ thu 1 lần; lịch đã thu không mở lại được.
 - `void_invoice(id, lý do)`: chỉ chủ spa. Hoàn tiền đã trừ thẻ, trả buổi gói, thu hồi tiền nạp + tiền tặng, huỷ gói đã bán (nếu chưa dùng), lịch về "đang làm" để thu lại. Tiền mặt / CK / POS chủ spa tự hoàn cho khách.
 - `save_package(...)`: chủ / quản lý tạo, sửa gói; gói khách đã mua giữ nguyên số buổi lúc mua.
+- Giá thành viên: dòng dịch vụ trừ thẻ nạp sẵn tự lấy `member_price` (dịch vụ không có giá thành viên thì giữ giá niêm yết).
+- `refund_quote()` + `refund_customer_asset()` (bảng `refunds`): chỉ quản lý / chủ. Thẻ: hoàn = số dư − tiền tặng (tiền tặng không hoàn), thẻ bị khoá. Gói: hoàn = tiền mua × phần buổi chưa dùng (tính theo giá lẻ từng dịch vụ), gói bị khoá; không huỷ khi gói đang gắn vào lịch chưa xong. Quản lý sửa được số tiền hoàn (không quá số dư / giá mua), bắt buộc ghi lý do.
 - Tiền vừa nạp chỉ dùng được ở hoá đơn sau (thu nạp thẻ riêng trước, rồi thu lịch).

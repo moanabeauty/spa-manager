@@ -62,5 +62,5 @@ export async function fetchSellers(supabase: Db): Promise<Seller[]> {
 
 /** Vai trò được thu tiền (khớp hàm checkout_invoice) */
 export function canCheckout(role: string | null | undefined): boolean {
-  return role === "owner" || role === "manager" || role === "receptionist";
+  return role === "owner" || role === "manager" || role === "receptionist" || role === "technician";
 }

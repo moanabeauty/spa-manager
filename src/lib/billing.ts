@@ -47,8 +47,9 @@ export function isPackageUsable(p: WalletPackage, at = new Date()): boolean {
 }
 
 export async function fetchWallet(supabase: Db, customerId: string): Promise<Wallet> {
-  const [{ data: cards }, { data: pkgs }] = await Promise.all([
+  const [{ data: cards }, { data: active }, { data: pkgs }] = await Promise.all([
     supabase.from("service_card_balances").select("card_id, code, balance").eq("customer_id", customerId),
+    supabase.from("service_cards").select("id").eq("customer_id", customerId).eq("is_active", true),
     supabase
       .from("customer_packages")
       .select(
@@ -66,7 +67,9 @@ export async function fetchWallet(supabase: Db, customerId: string): Promise<Wal
     customer_package_services: { service_id: string; total_qty: number; used_qty: number; services: { name: string } | null }[];
   };
   return {
-    cards: ((cards ?? []) as Wallet["cards"]).map((c) => ({ ...c, balance: Number(c.balance) })),
+    cards: ((cards ?? []) as Wallet["cards"])
+      .filter((c) => ((active ?? []) as { id: string }[]).some((x) => x.id === c.card_id))
+      .map((c) => ({ ...c, balance: Number(c.balance) })),
     packages: ((pkgs ?? []) as P[]).map((p) => ({
       id: p.id,
       name: p.packages?.name ?? "Gói",

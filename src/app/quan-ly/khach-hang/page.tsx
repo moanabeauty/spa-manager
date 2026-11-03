@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatTime, formatVnd, normalizePhone } from "@/lib/format";
-import { CARD_TXN_LABEL, cardBalance, fetchWallet, isPackageUsable } from "@/lib/billing";
+import { CARD_TXN_LABEL, METHOD_LABEL, cardBalance, fetchWallet, isPackageUsable } from "@/lib/billing";
 import { canCheckout } from "@/lib/staff";
+import RefundButton from "./RefundButton";
 
 export const metadata = { title: "Khách hàng – Moana Beauty" };
 
@@ -19,6 +20,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const checkout = canCheckout(profile?.role);
+  const manager = profile?.role === "owner" || profile?.role === "manager";
 
   let list: Customer[] = [];
   if (q && !sp.id) {
@@ -38,7 +40,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     } else {
       const wallet = await fetchWallet(supabase, c.id);
       const cardIds = wallet.cards.map((x) => x.card_id);
-      const [{ data: txns }, { data: invs }] = await Promise.all([
+      const [{ data: txns }, { data: invs }, { data: refunds }] = await Promise.all([
         cardIds.length
           ? supabase.from("card_transactions").select("id, txn_type, amount, note, created_at").in("card_id", cardIds).order("created_at", { ascending: false }).limit(30)
           : Promise.resolve({ data: [] }),
@@ -49,6 +51,11 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           .neq("status", "draft")
           .order("created_at", { ascending: false })
           .limit(20),
+        supabase
+          .from("refunds")
+          .select("id, kind, refund_amount, computed_amount, method, reason, created_at")
+          .eq("customer_id", c.id)
+          .order("created_at", { ascending: false }),
       ]);
       const balance = cardBalance(wallet);
       detail = (
@@ -65,6 +72,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 <p className="text-xs text-ink/60">Số dư thẻ tài khoản</p>
                 <p className="text-2xl font-bold text-navy">{wallet.cards.length ? formatVnd(balance) : "Chưa có thẻ"}</p>
                 {wallet.cards.length > 0 && <p className="text-xs text-ink/50">Mã thẻ {wallet.cards.map((x) => x.code).join(", ")}</p>}
+                {manager && wallet.cards.map((x) => <RefundButton key={x.card_id} kind="card" id={x.card_id} label={`thẻ ${x.code}`} />)}
               </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-2 border-t border-beige pt-3">
@@ -100,6 +108,11 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                         </li>
                       ))}
                     </ul>
+                    {manager && p.is_active && left > 0 && (
+                      <div className="mt-2 text-right">
+                        <RefundButton kind="package" id={p.id} label={`gói ${p.name}`} />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -120,6 +133,23 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                       {Number(t.amount) > 0 ? "+" : ""}
                       {formatVnd(Number(t.amount))}
                     </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {(refunds ?? []).length > 0 && (
+            <div className="card">
+              <h3 className="mb-2 font-semibold text-navy">Đã huỷ & hoàn tiền</h3>
+              <ul className="divide-y divide-beige text-sm">
+                {((refunds ?? []) as { id: string; kind: string; refund_amount: number; method: string; reason: string; created_at: string }[]).map((r) => (
+                  <li key={r.id} className="flex justify-between gap-3 py-1.5">
+                    <span>
+                      <span className="text-ink/50">{shortDate(r.created_at)}</span> Huỷ {r.kind === "card" ? "thẻ nạp sẵn" : "gói combo"}
+                      <span className="text-xs text-ink/50"> · {r.reason}</span>
+                    </span>
+                    <span className="shrink-0 font-medium text-[#8A2323]">−{formatVnd(Number(r.refund_amount))} ({METHOD_LABEL[r.method]})</span>
                   </li>
                 ))}
               </ul>

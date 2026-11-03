@@ -32,7 +32,7 @@ export default async function MyAppointmentsPage() {
     : { data: [] };
   const appts = (data ?? []) as unknown as Appt[];
   const wallet: Wallet = customer ? await fetchWallet(supabase, customer.id) : { cards: [], packages: [] };
-  const myPackages = wallet.packages.filter((p) => isPackageUsable(p) && p.services.some((s) => s.used_qty < s.total_qty));
+  const myPackages = wallet.packages.filter((p) => p.is_active);
 
   const now = Date.now();
   const upcoming = appts.filter((a) => new Date(a.start_at).getTime() >= now - 3 * 3600000 && !["cancelled", "no_show", "completed"].includes(a.status)).reverse();
@@ -58,7 +58,10 @@ export default async function MyAppointmentsPage() {
           )}
           {myPackages.map((p) => (
             <div key={p.id} className="border-t border-beige pt-2 text-sm">
-              <p className="font-semibold">{p.name}</p>
+              <p className="font-semibold">
+                {p.name}
+                {!isPackageUsable(p) ? <span className="text-xs font-normal text-ink/50"> (hết hạn)</span> : p.services.every((s) => s.used_qty >= s.total_qty) ? <span className="text-xs font-normal text-ink/50"> (đã dùng hết)</span> : null}
+              </p>
               {p.services.map((s) => (
                 <p key={s.service_id} className="flex justify-between text-ink/80">
                   <span>{s.name}</span>

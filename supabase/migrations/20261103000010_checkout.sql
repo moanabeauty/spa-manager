@@ -138,10 +138,11 @@ revoke execute on function public.invoices_before_status() from public, anon, au
 -- ============ 3. THU TIỀN ============
 -- p_items: mảng các dòng
 --   {"type":"service", "appointment_service_id": "...", "service_id": "...", "technician_id": "...",
---    "price_mode": "member", "unit_price": 0, "discount": 0, "paid_with_card": false,
+--    "unit_price": 0 (chỉ cho dịch vụ báo giá), "discount": 0, "paid_with_card": false,
 --    "customer_package_id": "...", "sellers": [{"staff_id": "...", "share": 1}]}
 --   {"type":"package", "package_id": "...", "quantity": 1, "discount": 0, "sellers": [...]}
---   {"type":"card_topup", "topup_tier_id": "..." | null, "unit_price": 7000000, "sellers": [...]}
+--   {"type":"card_topup", "topup_tier_id": "...", "sellers": [...]}   (chỉ nạp theo mức có sẵn)
+--   Dòng dịch vụ trả bằng thẻ nạp sẵn tự lấy giá thành viên (nếu dịch vụ có giá thành viên).
 -- p_payments: [{"method": "cash" | "bank_transfer" | "pos", "amount": 100000}]
 --   tiền trả bằng thẻ tài khoản tự tính = tổng các dòng paid_with_card
 -- p_discount: giảm cả hoá đơn (đ), tự chia theo tỉ lệ vào các dòng (trừ nạp thẻ)
@@ -192,8 +193,8 @@ declare
   v_card uuid;
   v_total numeric;
 begin
-  if not public.has_role('owner','manager','receptionist') then
-    raise exception 'Chỉ lễ tân, quản lý, chủ spa được thu tiền';
+  if not public.has_role('owner','manager','receptionist','technician') then
+    raise exception 'Bạn không có quyền thu tiền';
   end if;
   if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
     raise exception 'Hoá đơn chưa có dòng nào';
@@ -276,12 +277,12 @@ begin
         if v_svc.price is null then
           v_unit := round(coalesce((v_item->>'unit_price')::numeric, -1));
           if v_unit < 0 then raise exception 'Chưa nhập giá cho dịch vụ "%"', v_svc.name; end if;
-        elsif v_item->>'price_mode' = 'member' and v_svc.member_price is not null then
-          v_unit := v_svc.member_price;
+        elsif v_card_line and v_svc.member_price is not null then
+          v_unit := v_svc.member_price;   -- trả bằng thẻ nạp sẵn -> giá thành viên
         else
           v_unit := v_svc.price;
         end if;
-        v_desc := v_svc.name || case when v_item->>'price_mode' = 'member' and v_svc.member_price is not null
+        v_desc := v_svc.name || case when v_card_line and v_svc.member_price is not null
                                      then ' (giá thành viên)' else '' end;
       end if;
 
@@ -296,14 +297,9 @@ begin
       if v_card_line then raise exception 'Không dùng thẻ tài khoản để nạp thẻ'; end if;
       if v_disc <> 0 then raise exception 'Nạp thẻ không áp dụng giảm giá'; end if;
       v_tier := nullif(v_item->>'topup_tier_id', '')::uuid;
-      if v_tier is not null then
-        select topup_amount into v_unit from public.card_topup_tiers where id = v_tier and is_active;
-        if v_unit is null then raise exception 'Mức nạp không tồn tại'; end if;
-      else
-        v_unit := round(coalesce((v_item->>'unit_price')::numeric, 0));
-        if v_unit <= 0 then raise exception 'Chưa nhập số tiền nạp'; end if;
-        select id into v_tier from public.card_topup_tiers where topup_amount = v_unit and is_active;
-      end if;
+      v_unit := null;
+      select topup_amount into v_unit from public.card_topup_tiers where id = v_tier and is_active;
+      if v_unit is null then raise exception 'Vui lòng chọn mức nạp thẻ'; end if;
       v_desc := 'Nạp thẻ tài khoản';
 
     else
@@ -524,3 +520,124 @@ begin
 end $$;
 revoke execute on function public.save_package(uuid, text, numeric, int, text, boolean, jsonb) from public, anon;
 grant execute on function public.save_package(uuid, text, numeric, int, text, boolean, jsonb) to authenticated;
+
+
+-- ============ 6. HUỶ GÓI / THẺ ĐANG DÙNG DỞ, HOÀN TIỀN (chủ, quản lý) ============
+-- Thẻ: trả lại = số dư − tiền tặng (tức tiền khách đã nạp − tiền đã dùng); tiền tặng không hoàn.
+-- Gói: trả lại = tiền mua gói × phần buổi chưa dùng (tính theo giá lẻ từng dịch vụ trong gói).
+create type public.refund_kind as enum ('card', 'package');
+
+create table public.refunds (
+  id uuid primary key default gen_random_uuid(),
+  kind public.refund_kind not null,
+  customer_id uuid not null references public.customers(id),
+  branch_id uuid references public.branches(id),
+  service_card_id uuid references public.service_cards(id),
+  customer_package_id uuid references public.customer_packages(id),
+  computed_amount numeric(12,0) not null,
+  refund_amount numeric(12,0) not null check (refund_amount >= 0),
+  method public.payment_method not null check (method in ('cash','bank_transfer','pos')),
+  reason text not null,
+  created_by uuid references public.profiles(id) default auth.uid(),
+  created_at timestamptz not null default now()
+);
+create index on public.refunds (customer_id);
+create index on public.refunds (branch_id, created_at);
+alter table public.refunds enable row level security;
+create policy "own or staff read" on public.refunds for select to authenticated
+  using (customer_id = (select public.my_customer_id()) or (select public.is_staff()));
+-- chỉ tạo qua refund_customer_asset()
+
+create or replace function public.refund_quote(p_kind public.refund_kind, p_id uuid)
+returns table (customer_id uuid, paid numeric, balance numeric, bonus numeric, remaining_sessions int,
+               total_sessions int, refund numeric, max_refund numeric)
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  v_cust uuid;
+  v_paid numeric := 0;
+  v_bal numeric := 0;
+  v_bonus numeric := 0;
+  v_rem int := 0;
+  v_tot int := 0;
+  v_w_tot numeric;
+  v_w_rem numeric;
+begin
+  if not public.has_role('owner','manager') then raise exception 'Chỉ quản lý / chủ spa được huỷ gói, thẻ'; end if;
+  if p_kind = 'card' then
+    select c.customer_id into v_cust from public.service_cards c where c.id = p_id and c.is_active;
+    if v_cust is null then raise exception 'Thẻ không tồn tại hoặc đã huỷ'; end if;
+    select coalesce(sum(t.amount), 0) into v_bal from public.card_transactions t where t.card_id = p_id;
+    select coalesce(sum(t.amount) filter (where t.txn_type = 'topup'), 0),
+           coalesce(sum(t.amount) filter (where t.txn_type = 'bonus'), 0)
+      into v_paid, v_bonus
+      from public.card_transactions t left join public.invoices i on i.id = t.invoice_id
+     where t.card_id = p_id and (i.id is null or i.status = 'paid');
+    return query select v_cust, v_paid, v_bal, v_bonus, null::int, null::int,
+                        greatest(0, least(v_bal, v_bal - v_bonus)), greatest(0, v_bal);
+  else
+    select cp.customer_id, coalesce(ii.amount / ii.quantity, 0)
+      into v_cust, v_paid
+      from public.customer_packages cp left join public.invoice_items ii on ii.id = cp.invoice_item_id
+     where cp.id = p_id and cp.is_active;
+    if v_cust is null then raise exception 'Gói không tồn tại hoặc đã huỷ'; end if;
+    select coalesce(sum(cps.total_qty), 0), coalesce(sum(cps.total_qty - cps.used_qty), 0),
+           sum(cps.total_qty * coalesce(s.price, 0)), sum((cps.total_qty - cps.used_qty) * coalesce(s.price, 0))
+      into v_tot, v_rem, v_w_tot, v_w_rem
+      from public.customer_package_services cps join public.services s on s.id = cps.service_id
+     where cps.customer_package_id = p_id;
+    if coalesce(v_w_tot, 0) = 0 then v_w_tot := v_tot; v_w_rem := v_rem; end if;
+    return query select v_cust, v_paid, null::numeric, null::numeric, v_rem, v_tot,
+                        case when v_w_tot > 0 then round(v_paid * v_w_rem / v_w_tot) else 0 end, v_paid;
+  end if;
+end $$;
+revoke execute on function public.refund_quote(public.refund_kind, uuid) from public, anon;
+grant execute on function public.refund_quote(public.refund_kind, uuid) to authenticated;
+
+create or replace function public.refund_customer_asset(
+  p_kind public.refund_kind, p_id uuid, p_amount numeric, p_method public.payment_method, p_reason text,
+  p_branch_id uuid default null
+)
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare
+  q record;
+  v_id uuid;
+begin
+  if not public.has_role('owner','manager') then raise exception 'Chỉ quản lý / chủ spa được huỷ gói, thẻ'; end if;
+  if nullif(trim(p_reason), '') is null then raise exception 'Vui lòng ghi lý do huỷ'; end if;
+  if p_method not in ('cash','bank_transfer','pos') then raise exception 'Hình thức hoàn tiền không hợp lệ'; end if;
+  if p_kind = 'card' then
+    perform 1 from public.service_cards where id = p_id for update;
+  else
+    perform 1 from public.customer_packages where id = p_id for update;
+  end if;
+  select * into q from public.refund_quote(p_kind, p_id);
+  p_amount := round(coalesce(p_amount, q.refund));
+  if p_amount < 0 or p_amount > q.max_refund then
+    raise exception 'Số tiền hoàn phải từ 0 đến %', q.max_refund;
+  end if;
+
+  if p_kind = 'card' then
+    if q.balance <> 0 then
+      insert into public.card_transactions (card_id, txn_type, amount, note)
+      values (p_id, 'adjustment', -q.balance, 'Huỷ thẻ, hoàn khách ' || p_amount || 'đ: ' || trim(p_reason));
+    end if;
+    update public.service_cards set is_active = false where id = p_id;
+  else
+    if exists (select 1 from public.appointment_services aps join public.appointments a on a.id = aps.appointment_id
+                where aps.customer_package_id = p_id and a.status in ('pending','confirmed','in_progress')) then
+      raise exception 'Gói đang được dùng cho lịch hẹn chưa hoàn thành, hãy đổi lịch đó trước';
+    end if;
+    update public.customer_packages set is_active = false where id = p_id;
+  end if;
+
+  insert into public.refunds (kind, customer_id, branch_id, service_card_id, customer_package_id,
+                              computed_amount, refund_amount, method, reason)
+  values (p_kind, q.customer_id,
+          coalesce(p_branch_id, (select branch_id from public.profiles where id = (select auth.uid()))),
+          case when p_kind = 'card' then p_id end, case when p_kind = 'package' then p_id end,
+          q.refund, p_amount, p_method, trim(p_reason))
+  returning id into v_id;
+  return v_id;
+end $$;
+revoke execute on function public.refund_customer_asset(public.refund_kind, uuid, numeric, public.payment_method, text, uuid) from public, anon;
+grant execute on function public.refund_customer_asset(public.refund_kind, uuid, numeric, public.payment_method, text, uuid) to authenticated;

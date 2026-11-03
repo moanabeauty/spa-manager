@@ -113,7 +113,6 @@ export default function CheckoutForm({
     })),
   );
   const [query, setQuery] = useState("");
-  const [customTopup, setCustomTopup] = useState(0);
 
   const [discountMode, setDiscountMode] = useState<"vnd" | "pct">("vnd");
   const [discountInput, setDiscountInput] = useState(0);
@@ -126,6 +125,28 @@ export default function CheckoutForm({
   const [error, setError] = useState<string | null>(null);
 
   const balance = cardBalance(wallet);
+
+  /** Khách còn số dư thẻ nạp sẵn: mặc định trừ thẻ (giá thành viên) cho dịch vụ dùng được thẻ, khi số dư còn đủ */
+  function withCardDefaults(ls: Line[], w: Wallet): Line[] {
+    let left = cardBalance(w);
+    if (left <= 0) return ls;
+    return ls.map((l) => {
+      if (l.type !== "service" || l.pkgId) return l;
+      const s = svcById.get(l.serviceId!);
+      if (!s || !s.card_allowed || s.price === null) return l;
+      const price = Number(s.member_price ?? s.price);
+      if (price > left) return l;
+      left -= price;
+      return { ...l, card: true };
+    });
+  }
+  const [cardDefaultsDone, setCardDefaultsDone] = useState(false);
+  useEffect(() => {
+    if (cardDefaultsDone) return;
+    setCardDefaultsDone(true);
+    setLines((ls) => withCardDefaults(ls, wallet));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const hasCard = wallet.cards.length > 0;
 
   function update(key: number, patch: Partial<Line>) {
@@ -147,12 +168,12 @@ export default function CheckoutForm({
       if (!s) return 0;
       if (l.pkgId) return 0;
       if (s.price === null) return l.customPrice;
-      if (l.member && s.member_price !== null) return Number(s.member_price);
+      if (l.card && s.member_price !== null) return Number(s.member_price); // trả thẻ nạp sẵn = giá thành viên
       return Number(s.price);
     }
     if (l.type === "package") return Number(pkgById.get(l.packageId!)?.price ?? 0);
     if (l.tierId) return Number(tierById.get(l.tierId)?.topup_amount ?? 0);
-    return l.customPrice;
+    return 0;
   }
   const rows = lines.map((l) => {
     const unit = unitPrice(l);
@@ -219,8 +240,9 @@ export default function CheckoutForm({
     setCustomer(c);
     setPhone("");
     setMatches(null);
-    setLines((ls) => ls.map((l) => ({ ...l, card: false, pkgId: "" })));
-    setWallet(c ? await fetchWallet(supabase, c.id) : { cards: [], packages: [] });
+    const w = c ? await fetchWallet(supabase, c.id) : { cards: [], packages: [] };
+    setWallet(w);
+    setLines((ls) => withCardDefaults(ls.map((l) => ({ ...l, card: false, pkgId: "" })), w));
   }
 
   const filtered = useMemo(() => {
@@ -260,7 +282,6 @@ export default function CheckoutForm({
       package_id: l.packageId ?? null,
       topup_tier_id: l.tierId ?? null,
       technician_id: l.technicianId ?? null,
-      price_mode: l.member ? "member" : "normal",
       unit_price: l.customPrice,
       quantity: l.qty,
       discount: l.pkgId || l.type === "card_topup" ? 0 : l.discount,
@@ -416,6 +437,7 @@ export default function CheckoutForm({
                   <button
                     className="flex w-full justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-cream"
                     onClick={() => {
+                      const p = Number(s.member_price ?? s.price ?? 0);
                       addLine({
                         type: "service",
                         serviceId: s.id,
@@ -423,7 +445,7 @@ export default function CheckoutForm({
                         customPrice: 0,
                         qty: 1,
                         discount: 0,
-                        card: false,
+                        card: hasCard && s.card_allowed && s.price !== null && balance - cardTotal >= p,
                         pkgId: "",
                         sellers: [],
                       });
@@ -467,19 +489,6 @@ export default function CheckoutForm({
                 {t.bonus_amount > 0 && <span className="text-brown"> +{formatVnd(t.bonus_amount)}</span>}
               </button>
             ))}
-            <span className="flex items-center gap-1">
-              <MoneyInput value={customTopup} onChange={setCustomTopup} className="w-28" placeholder="số khác" ariaLabel="Số tiền nạp khác" />
-              <button
-                className="btn-ghost px-2 py-1.5 text-xs"
-                disabled={customTopup <= 0}
-                onClick={() => {
-                  addLine({ type: "card_topup", member: false, customPrice: customTopup, qty: 1, discount: 0, card: false, pkgId: "", sellers: [] });
-                  setCustomTopup(0);
-                }}
-              >
-                Thêm
-              </button>
-            </span>
           </div>
         </div>
       </div>
@@ -649,7 +658,7 @@ function LineRow({
           )}
           {l.type === "card_topup" && (
             <p className="text-xs text-ink/60">
-              {tier && tier.bonus_amount > 0 ? `Tặng thêm ${formatVnd(tier.bonus_amount)} vào thẻ` : "Không có tiền tặng (không đúng mức nạp)"}
+              {tier && tier.bonus_amount > 0 ? `Tặng thêm ${formatVnd(tier.bonus_amount)} vào thẻ` : ""}
             </p>
           )}
         </div>
@@ -706,12 +715,6 @@ function LineRow({
               <MoneyInput value={l.customPrice} onChange={(n) => onChange({ customPrice: n })} className="w-32" ariaLabel="Giá dịch vụ" />
             </label>
           )}
-          {l.type === "service" && svc?.member_price != null && (
-            <label className="flex items-center gap-1">
-              <input type="checkbox" checked={l.member} onChange={(e) => onChange({ member: e.target.checked })} />
-              Giá thành viên {formatVnd(svc.member_price)}
-            </label>
-          )}
           {l.type === "package" && (
             <label className="flex items-center gap-1">
               SL
@@ -739,7 +742,12 @@ function LineRow({
                 disabled={!!cardBlocked}
                 onChange={(e) => onChange({ card: e.target.checked })}
               />
-              Trả bằng thẻ tài khoản{cardBlocked ? " (dịch vụ này không dùng thẻ)" : ""}
+              Trừ thẻ nạp sẵn
+              {cardBlocked
+                ? " (dịch vụ này không dùng thẻ)"
+                : svc?.member_price != null
+                  ? ` · giá thành viên ${formatVnd(svc.member_price)}`
+                  : ""}
             </label>
           )}
         </div>
