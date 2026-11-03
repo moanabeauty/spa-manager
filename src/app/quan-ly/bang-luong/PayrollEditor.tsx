@@ -50,7 +50,7 @@ const n = (v: unknown) => Number(v ?? 0);
 export default function PayrollEditor(props: {
   month: string; isOwner: boolean; staff: Staff[]; branches: Branch[];
   entries: Entry[]; penalties: Penalty[]; rows: PayrollRow[]; settings: PaySetting[]; config: PayrollConfig | null; posted: boolean;
-  attSum: AttSum[]; attDays: AttDay[];
+  attSum: AttSum[]; attDays: AttDay[]; holidays: { holiday_date: string; name: string }[];
 }) {
   const { month, isOwner } = props;
   const pendingAtt = props.attDays.filter((d) => d.approval_status === "pending" || d.ot_status === "pending").length;
@@ -87,7 +87,7 @@ export default function PayrollEditor(props: {
       {tab === "checkin" && <CheckinLog month={month} people={people} days={props.attDays} isOwner={isOwner} />}
       {tab === "phat" && <Penalties month={month} people={people} penalties={props.penalties} />}
       {tab === "muc-luong" && isOwner && <Salaries people={people} allStaff={props.staff} settings={props.settings} config={props.config} branchName={branchName} />}
-      {tab === "cai-dat" && isOwner && props.config && <Settings config={props.config} branches={props.branches} />}
+      {tab === "cai-dat" && isOwner && props.config && <Settings config={props.config} branches={props.branches} holidays={props.holidays} />}
     </div>
   );
 }
@@ -824,7 +824,7 @@ function Salaries({ people, allStaff, settings, config, branchName }: {
 }
 
 // ============ CÀI ĐẶT CHUNG ============
-function Settings({ config, branches }: { config: PayrollConfig; branches: Branch[] }) {
+function Settings({ config, branches, holidays }: { config: PayrollConfig; branches: Branch[]; holidays: { holiday_date: string; name: string }[] }) {
   const router = useRouter();
   const [c, setC] = useState<PayrollConfig>({ ...config });
   const [busy, setBusy] = useState(false);
@@ -882,6 +882,7 @@ function Settings({ config, branches }: { config: PayrollConfig; branches: Branc
 
       </div>
       <BranchLocations branches={branches} />
+      <Holidays holidays={holidays} />
       <div className="flex items-center gap-2">
         <button className="btn-primary" disabled={busy} onClick={save}>Lưu cài đặt</button>
         {msg && <span className="text-sm">{msg}</span>}
@@ -889,6 +890,54 @@ function Settings({ config, branches }: { config: PayrollConfig; branches: Branc
       <p className="text-xs text-ink/60">
         Mức BHXH 2026 theo luật: nhân viên đóng 10,5% (8% BHXH + 1,5% BHYT + 1% BHTN), doanh nghiệp đóng 21,5% (17,5% BHXH + 3% BHYT + 1%
         BHTN), tính trên lương đóng bảo hiểm. Bảng lương các tháng luôn tính theo cài đặt hiện tại; tháng đã ghi sổ chi thì bấm “Cập nhật lại vào sổ chi” nếu muốn đổi số.
+      </p>
+    </div>
+  );
+}
+
+function Holidays({ holidays }: { holidays: { holiday_date: string; name: string }[] }) {
+  const router = useRouter();
+  const [date, setDate] = useState("");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  async function add() {
+    if (!date || !name.trim()) return setMsg("Nhập ngày và tên ngày lễ");
+    setBusy(true);
+    const { error } = await createClient().from("public_holidays").upsert({ holiday_date: date, name: name.trim() });
+    setBusy(false);
+    if (error) return setMsg(vnError(error.message));
+    setDate(""); setName(""); setMsg(null);
+    router.refresh();
+  }
+  async function remove(d: string) {
+    if (!confirm("Xoá ngày lễ này?")) return;
+    const { error } = await createClient().from("public_holidays").delete().eq("holiday_date", d);
+    if (error) return alert(vnError(error.message));
+    router.refresh();
+  }
+  return (
+    <div className="space-y-2 rounded-xl bg-cream p-3">
+      <p className="text-xs font-semibold text-navy">Ngày lễ, Tết (nghỉ hưởng nguyên lương)</p>
+      <div className="flex flex-wrap gap-2">
+        <input type="date" className="input w-auto py-2 text-sm" value={date} onChange={(e) => setDate(e.target.value)} />
+        <input className="input min-w-40 flex-1 py-2 text-sm" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tết Dương lịch, mùng 1 Tết…" />
+        <button className="btn-outline py-2" disabled={busy} onClick={add}>Thêm</button>
+      </div>
+      {msg && <p className="text-xs text-[#8A2323]">{msg}</p>}
+      {holidays.length > 0 && (
+        <ul className="divide-y divide-beige-dark/50 text-sm">
+          {holidays.map((h) => (
+            <li key={h.holiday_date} className="flex justify-between py-1">
+              <span>{shortLabel(h.holiday_date)}/{h.holiday_date.slice(0, 4)} · {h.name}</span>
+              <button className="text-xs text-ink/50 underline" onClick={() => remove(h.holiday_date)}>Xoá</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-[11px] text-ink/60">
+        Mỗi ngày lễ được cộng 9 giờ vào lương của mọi nhân viên (nghỉ vẫn đủ lương), ngoài số ngày nghỉ định mức của tháng. Tết Âm lịch
+        nhập từng ngày được nghỉ.
       </p>
     </div>
   );

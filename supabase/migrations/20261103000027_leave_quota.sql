@@ -2,6 +2,19 @@
 -- Nhân viên tự đăng ký các ngày nghỉ này, vẫn đủ lương nếu làm đủ 27 công (243 giờ) -> ngày nghỉ KHÔNG cộng giờ.
 -- Đăng ký vượt định mức -> "nghỉ thêm, không lương". Nghỉ không đăng ký (quản lý ghi) -> trừ thêm 1 ngày lương.
 -- Làm nửa ngày: ca sáng 9:00 – 13:30 hoặc ca chiều 13:30 – 18:00 (tính 0,5 ngày nghỉ).
+-- Ngày lễ, Tết (chủ spa nhập): nghỉ hưởng nguyên lương -> mỗi ngày lễ cộng 9 giờ cho mọi nhân viên.
+
+create table public.public_holidays (
+  holiday_date date primary key,
+  name text not null,
+  created_by uuid references public.profiles(id) default auth.uid(),
+  created_at timestamptz not null default now()
+);
+create index on public.public_holidays (created_by);
+alter table public.public_holidays enable row level security;
+create policy "staff read" on public.public_holidays for select to authenticated using ((select public.is_staff()));
+create policy "owner write" on public.public_holidays for all to authenticated
+  using ((select public.has_role('owner'))) with check ((select public.has_role('owner')));
 
 alter table public.staff_leaves drop constraint staff_leaves_kind_check;
 update public.staff_leaves set kind = 'off' where kind = 'paid';
@@ -54,8 +67,20 @@ begin
 end $$;
 
 select pg_temp.patch_fn('public._payroll_rows(date)',
+  $o$  att as (select * from public._attendance_month(p_month)),$o$,
+  $n$  att as (select * from public._attendance_month(p_month)),
+  hol as (select count(*) as n from public.public_holidays h, m
+           where h.holiday_date >= m.m and h.holiday_date < (m.m + interval '1 month')),$n$);
+select pg_temp.patch_fn('public._payroll_rows(date)',
+  $o$      cross join cfg
+      left join public.staff_pay_settings s$o$,
+  $n$      cross join cfg
+      cross join hol
+      left join public.staff_pay_settings s$n$);
+
+select pg_temp.patch_fn('public._payroll_rows(date)',
   $o$coalesce(e.work_hours, coalesce(a.work_hours, 0) + coalesce(a.paid_leave_days, 0) * cfg.hpd) wh$o$,
-  $n$coalesce(e.work_hours, a.work_hours, 0) wh$n$);
+  $n$coalesce(e.work_hours, coalesce(a.work_hours, 0) + hol.n * cfg.hpd) wh$n$);
 
 select pg_temp.patch_fn('public._attendance_month(date)',
   $o$filter (where l.kind = 'paid') pl$o$,

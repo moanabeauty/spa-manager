@@ -35,6 +35,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     supabase.rpc("attendance_report", { p_month: m1 }),
     supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
   ]);
+  const { data: holidays } = await supabase.from("public_holidays").select("holiday_date, name").order("holiday_date", { ascending: false }).limit(60);
 
   let rows: PayrollRow[] = [];
   let settings: PaySetting[] = [];
@@ -81,6 +82,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         posted={posted}
         attSum={(attSum ?? []) as AttSum[]}
         attDays={(attDays ?? []) as AttDay[]}
+        holidays={(holidays ?? []) as { holiday_date: string; name: string }[]}
       />
     </div>
   );

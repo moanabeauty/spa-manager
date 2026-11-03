@@ -171,7 +171,7 @@ export default function LeaveTools({ me, manage, month, leaves, pending, staff, 
         Mỗi tháng làm 27 công: tháng 30 ngày được nghỉ 3 ngày, tháng 31 ngày được nghỉ 4 ngày. Tự đăng ký các ngày nghỉ này (quản lý
         duyệt), làm đủ 27 công (243 giờ) thì nhận đủ lương. Đăng ký quá số ngày được nghỉ thì thành “nghỉ thêm, không lương”. Làm nửa
         ngày: ca sáng 9:00 – 13:30 hoặc ca chiều 13:30 – 18:00 (tính nửa ngày nghỉ). <b>Nghỉ không phép</b> (không đăng ký, quản lý ghi):
-        không có lương ngày đó và bị trừ thêm 1 ngày lương.
+        không có lương ngày đó và bị trừ thêm 1 ngày lương. Ngày lễ, Tết theo quy định nhà nước được nghỉ thêm, vẫn hưởng nguyên lương.
       </p>
     </div>
   );
