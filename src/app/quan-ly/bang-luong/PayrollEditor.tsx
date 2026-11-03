@@ -8,28 +8,36 @@ import { shortLabel } from "@/lib/reports";
 import MoneyInput from "@/components/MoneyInput";
 
 export type Staff = { id: string; full_name: string | null; role: string; branch_id: string | null; is_active: boolean };
-export type Entry = { staff_id: string; work_days: number; overtime_hours: number; other_allowance: number; other_deduction: number; note: string | null };
+export type Entry = {
+  staff_id: string; work_hours: number | null; work_days: number | null; overtime_hours: number | null;
+  other_allowance: number; other_deduction: number; note: string | null;
+};
 export type Penalty = { id: string; staff_id: string; penalty_date: string; amount: number; reason: string };
 export type PaySetting = {
   staff_id: string; base_salary: number; responsibility_pay: number; insurance_salary: number;
   meal_per_day: number | null; standard_days: number | null; on_payroll: boolean; note: string | null;
 };
-export type AttSum = { staff_id: string; days: number; ot_hours: number; records: number; missing_out: number; pending: number };
+export type AttSum = {
+  staff_id: string; work_hours: number; days: number; ot_hours: number; records: number; missing_out: number; pending: number;
+  ot_pending: number; paid_leave_days: number; unpaid_leave_days: number; absences: number;
+};
 export type Branch = { id: string; name: string; latitude: number | null; longitude: number | null };
 export type AttDay = {
-  staff_id: string; work_date: string; check_in: string; check_out: string | null; net_hours: number; days: number;
-  ot_hours: number; note: string | null; edited: boolean; approval_status: string; approval_reason: string | null;
+  staff_id: string; work_date: string; check_in: string; check_out: string | null; work_hours: number; days: number;
+  ot_hours: number; ot_hours_approved: number | null; ot_status: string; ot_reason: string | null;
+  note: string | null; edited: boolean; approval_status: string; approval_reason: string | null;
   in_distance_m: number | null; out_distance_m: number | null;
 };
 export type PayrollConfig = {
-  standard_days: number; hours_per_day: number; overtime_rate: number; meal_per_day: number;
+  standard_days: number; hours_per_day: number; ot_hours_per_day?: number; overtime_rate: number; meal_per_day: number;
   bhxh_employee_pct: number; bhxh_employer_pct: number;
   shift_start?: string; shift_end?: string; ot_start?: string; lunch_minutes?: number; full_day_hours?: number; half_day_hours?: number;
   geo_radius_m?: number;
 };
 export type PayrollRow = {
   staff_id: string; full_name: string | null; role: string; branch_id: string | null; has_entry: boolean;
-  base_salary: number; standard_days: number; work_days: number; base_pay: number; responsibility_pay: number;
+  base_salary: number; standard_days: number; standard_hours: number; work_hours: number; paid_leave_days: number;
+  work_days: number; base_pay: number; responsibility_pay: number; absences: number; absence_deduction: number;
   meal_allowance: number; overtime_hours: number; overtime_pay: number; sales_amount: number; commission_rate: number;
   commission: number; services_done: number; service_fee: number; other_allowance: number; gross_pay: number;
   penalties: number; penalty_count: number; insurance_salary: number; insurance_employee: number; other_deduction: number;
@@ -45,7 +53,7 @@ export default function PayrollEditor(props: {
   attSum: AttSum[]; attDays: AttDay[];
 }) {
   const { month, isOwner } = props;
-  const pendingAtt = props.attDays.filter((d) => d.approval_status === "pending").length;
+  const pendingAtt = props.attDays.filter((d) => d.approval_status === "pending" || d.ot_status === "pending").length;
   const [tab, setTab] = useState<Tab>(isOwner ? "luong" : "cham-cong");
   const tabs: { key: Tab; label: string }[] = [
     ...(isOwner ? [{ key: "luong" as Tab, label: "Bảng lương" }] : []),
@@ -75,7 +83,7 @@ export default function PayrollEditor(props: {
         ))}
       </div>
       {tab === "luong" && isOwner && <Sheet {...props} branchName={branchName} />}
-      {tab === "cham-cong" && <Attendance month={month} people={people} entries={props.entries} attSum={props.attSum} branchName={branchName} />}
+      {tab === "cham-cong" && <Attendance month={month} people={people} entries={props.entries} attSum={props.attSum} branchName={branchName} config={props.config} />}
       {tab === "checkin" && <CheckinLog month={month} people={people} days={props.attDays} isOwner={isOwner} />}
       {tab === "phat" && <Penalties month={month} people={people} penalties={props.penalties} />}
       {tab === "muc-luong" && isOwner && <Salaries people={people} allStaff={props.staff} settings={props.settings} config={props.config} branchName={branchName} />}
@@ -126,7 +134,7 @@ function Sheet({ month, rows, posted, config, branchName }: {
           <thead className="bg-cream text-left text-xs text-ink/60">
             <tr>
               <th className="px-3 py-2">Nhân viên</th>
-              <th className="px-2 py-2 text-right">Công</th>
+              <th className="px-2 py-2 text-right">Giờ làm</th>
               <th className="px-2 py-2 text-right">Lương + phụ cấp</th>
               <th className="px-2 py-2 text-right">Hoa hồng + tiền DV</th>
               <th className="px-2 py-2 text-right">Giảm trừ</th>
@@ -137,7 +145,7 @@ function Sheet({ month, rows, posted, config, branchName }: {
             {rows.map((r) => {
               const fixed = n(r.base_pay) + n(r.responsibility_pay) + n(r.meal_allowance) + n(r.overtime_pay) + n(r.other_allowance);
               const perf = n(r.commission) + n(r.service_fee);
-              const ded = n(r.penalties) + n(r.insurance_employee) + n(r.other_deduction);
+              const ded = n(r.penalties) + n(r.absence_deduction) + n(r.insurance_employee) + n(r.other_deduction);
               const isOpen = open === r.staff_id;
               return (
                 <Fragment key={r.staff_id}>
@@ -149,8 +157,8 @@ function Sheet({ month, rows, posted, config, branchName }: {
                       </span>
                     </td>
                     <td className="px-2 py-2 text-right">
-                      {n(r.work_days)}
-                      {n(r.overtime_hours) > 0 && <span className="block text-xs text-ink/50">+{n(r.overtime_hours)}h</span>}
+                      {n(r.work_hours)}/{n(r.standard_hours)}
+                      {n(r.overtime_hours) > 0 && <span className="block text-xs text-ink/50">+{n(r.overtime_hours)}h tăng ca</span>}
                     </td>
                     <td className="px-2 py-2 text-right">{formatVnd(fixed)}</td>
                     <td className="px-2 py-2 text-right">{formatVnd(perf)}</td>
@@ -175,7 +183,7 @@ function Sheet({ month, rows, posted, config, branchName }: {
                   {formatVnd(sum("base_pay") + sum("responsibility_pay") + sum("meal_allowance") + sum("overtime_pay") + sum("other_allowance"))}
                 </td>
                 <td className="px-2 py-2 text-right">{formatVnd(sum("commission") + sum("service_fee"))}</td>
-                <td className="px-2 py-2 text-right">−{formatVnd(sum("penalties") + sum("insurance_employee") + sum("other_deduction"))}</td>
+                <td className="px-2 py-2 text-right">−{formatVnd(sum("penalties") + sum("absence_deduction") + sum("insurance_employee") + sum("other_deduction"))}</td>
                 <td className="px-3 py-2 text-right">{formatVnd(sum("net_pay"))}</td>
               </tr>
             )}
@@ -208,14 +216,15 @@ function Payslip({ r, config, month }: { r: PayrollRow; config: PayrollConfig | 
       <span className={minus ? "text-[#8A2323]" : ""}>{minus && v ? "−" : ""}{formatVnd(v)}</span>
     </div>
   );
-  const hourly = config ? Math.round(n(r.base_salary) / n(r.standard_days) / n(config.hours_per_day)) : 0;
+  const hourly = config ? Math.round(n(r.base_salary) / n(r.standard_days) / n(config.ot_hours_per_day ?? 8)) : 0;
   return (
     <div className="grid gap-4 pt-2 text-sm sm:grid-cols-2">
       <div>
         <p className="mb-1 text-xs font-semibold uppercase text-ink/50">Thu nhập tháng {shortLabel(month)}</p>
-        {line("Lương cơ bản theo ngày công", n(r.base_pay), `${formatVnd(n(r.base_salary))} × ${n(r.work_days)}/${n(r.standard_days)} công`)}
+        {line("Lương cơ bản theo giờ làm", n(r.base_pay),
+          `${formatVnd(n(r.base_salary))} × ${n(r.work_hours)}/${n(r.standard_hours)} giờ${n(r.paid_leave_days) ? ` (gồm ${n(r.paid_leave_days)} ngày phép có lương)` : ""}`)}
         {line("Lương trách nhiệm", n(r.responsibility_pay))}
-        {line("Phụ cấp ăn", n(r.meal_allowance), `${n(r.work_days)} công`)}
+        {line("Phụ cấp ăn", n(r.meal_allowance), `${n(r.work_days)} ngày đi làm`)}
         {line("Làm thêm giờ", n(r.overtime_pay), n(r.overtime_hours) ? `${n(r.overtime_hours)} giờ × ${formatVnd(hourly)} × ${config?.overtime_rate ?? 1.5}` : undefined)}
         {line("Hoa hồng", n(r.commission), n(r.sales_amount) ? `doanh số ${formatVnd(n(r.sales_amount))} × ${Math.round(n(r.commission_rate) * 1000) / 10}%` : undefined)}
         {line("Tiền dịch vụ", n(r.service_fee), n(r.services_done) ? `${n(r.services_done)} lượt` : undefined)}
@@ -227,6 +236,7 @@ function Payslip({ r, config, month }: { r: PayrollRow; config: PayrollConfig | 
       <div>
         <p className="mb-1 text-xs font-semibold uppercase text-ink/50">Giảm trừ</p>
         {line("Phạt theo nội quy", n(r.penalties), n(r.penalty_count) ? `${n(r.penalty_count)} lần` : undefined, true)}
+        {n(r.absences) > 0 && line("Nghỉ không phép", n(r.absence_deduction), `${n(r.absences)} ngày × 1 ngày lương`, true)}
         {line("BHXH, BHYT, BHTN (nhân viên đóng)", n(r.insurance_employee), n(r.insurance_salary) ? `${config?.bhxh_employee_pct ?? 10.5}% × lương đóng BH ${formatVnd(n(r.insurance_salary))}` : "không đóng BHXH", true)}
         {n(r.other_deduction) > 0 && line("Trừ khác", n(r.other_deduction), undefined, true)}
         <div className="mt-1 flex justify-between border-t border-beige pt-1 text-base font-bold text-navy">
@@ -244,18 +254,24 @@ function Payslip({ r, config, month }: { r: PayrollRow; config: PayrollConfig | 
 }
 
 // ============ CHẤM CÔNG ============
-function Attendance({ month, people, entries, attSum, branchName }: {
-  month: string; people: Staff[]; entries: Entry[]; attSum: AttSum[]; branchName: (id: string | null) => string;
+type EntryDraft = { work_hours: string; work_days: string; overtime_hours: string; other_allowance: number; other_deduction: number; note: string };
+
+function Attendance({ month, people, entries, attSum, branchName, config }: {
+  month: string; people: Staff[]; entries: Entry[]; attSum: AttSum[]; branchName: (id: string | null) => string; config: PayrollConfig | null;
 }) {
-  const att = (id: string) => attSum.find((a) => a.staff_id === id);
   const router = useRouter();
+  const hpd = n(config?.hours_per_day ?? 9);
+  const att = (id: string) => attSum.find((a) => a.staff_id === id);
+  const autoHours = (id: string) => n(att(id)?.work_hours) + n(att(id)?.paid_leave_days) * hpd;
+  const str = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(Number(v)));
   const init = useMemo(() => {
-    const m: Record<string, Entry> = {};
+    const m: Record<string, EntryDraft> = {};
     people.forEach((p) => {
       const e = entries.find((x) => x.staff_id === p.id);
-      m[p.id] = e
-        ? { ...e, work_days: n(e.work_days), overtime_hours: n(e.overtime_hours), other_allowance: n(e.other_allowance), other_deduction: n(e.other_deduction) }
-        : { staff_id: p.id, work_days: 0, overtime_hours: 0, other_allowance: 0, other_deduction: 0, note: null };
+      m[p.id] = {
+        work_hours: str(e?.work_hours), work_days: str(e?.work_days), overtime_hours: str(e?.overtime_hours),
+        other_allowance: n(e?.other_allowance), other_deduction: n(e?.other_deduction), note: e?.note ?? "",
+      };
     });
     return m;
   }, [people, entries]);
@@ -263,48 +279,37 @@ function Attendance({ month, people, entries, attSum, branchName }: {
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const set = (id: string, patch: Partial<Entry>) => {
+  const set = (id: string, patch: Partial<EntryDraft>) => {
     setRows((r) => ({ ...r, [id]: { ...r[id], ...patch } }));
     setDirty((d) => new Set(d).add(id));
     setMsg(null);
   };
-  function fillFromCheckin() {
-    const next = { ...rows };
-    const d = new Set(dirty);
-    people.forEach((p) => {
-      const a = att(p.id);
-      if (!a) return;
-      next[p.id] = { ...next[p.id], work_days: n(a.days), overtime_hours: n(a.ot_hours) };
-      d.add(p.id);
-    });
-    setRows(next);
-    setDirty(d);
-    setMsg("Đã điền theo check-in / out, kiểm tra rồi bấm Lưu.");
-  }
+  const toNum = (v: string) => (v.trim() === "" ? null : Math.max(0, Number(v.replace(",", ".")) || 0));
 
   async function save() {
     setBusy(true);
     setMsg(null);
-    const payload = [...dirty].map((id) => ({ month: `${month}-01`, ...rows[id], note: rows[id].note?.trim() || null }));
+    const payload = [...dirty].map((id) => ({
+      month: `${month}-01`, staff_id: id,
+      work_hours: toNum(rows[id].work_hours), work_days: toNum(rows[id].work_days), overtime_hours: toNum(rows[id].overtime_hours),
+      other_allowance: rows[id].other_allowance, other_deduction: rows[id].other_deduction, note: rows[id].note.trim() || null,
+    }));
     const { error } = await createClient().from("payroll_entries").upsert(payload, { onConflict: "month,staff_id" });
     setBusy(false);
     if (error) return setMsg(vnError(error.message));
     setDirty(new Set());
-    setMsg("Đã lưu chấm công.");
+    setMsg("Đã lưu.");
     router.refresh();
   }
 
-  const numInput = (id: string, k: "work_days" | "overtime_hours", step: string) => (
+  const box = (id: string, k: "work_hours" | "work_days" | "overtime_hours", auto: number) => (
     <input
-      type="number"
       inputMode="decimal"
-      min={0}
-      max={k === "work_days" ? 31 : undefined}
-      step={step}
-      className="w-16 rounded-lg border border-beige-dark bg-white px-2 py-1.5 text-right text-sm"
-      value={rows[id][k] || ""}
-      placeholder="0"
-      onChange={(e) => set(id, { [k]: Math.max(0, Number(e.target.value) || 0) } as Partial<Entry>)}
+      className="w-16 rounded-lg border border-beige-dark bg-white px-2 py-1.5 text-right text-sm placeholder:text-ink/40"
+      value={rows[id][k]}
+      placeholder={String(Math.round(auto * 100) / 100)}
+      onChange={(e) => set(id, { [k]: e.target.value } as Partial<EntryDraft>)}
+      aria-label={k}
     />
   );
 
@@ -315,63 +320,70 @@ function Attendance({ month, people, entries, attSum, branchName }: {
           <thead className="bg-cream text-left text-xs text-ink/60">
             <tr>
               <th className="px-3 py-2">Nhân viên</th>
-              <th className="px-2 py-2">Theo check-in</th>
-              <th className="px-2 py-2">Ngày công</th>
-              <th className="px-2 py-2">Giờ thêm</th>
+              <th className="px-2 py-2">Theo check-in & nghỉ phép</th>
+              <th className="px-2 py-2">Giờ làm</th>
+              <th className="px-2 py-2">Ngày ăn</th>
+              <th className="px-2 py-2">Giờ tăng ca</th>
               <th className="px-2 py-2">Cộng khác</th>
               <th className="px-2 py-2">Trừ khác</th>
               <th className="px-3 py-2">Ghi chú</th>
             </tr>
           </thead>
           <tbody>
-            {people.map((p) => (
-              <tr key={p.id} className={`border-t border-beige ${dirty.has(p.id) ? "bg-[#FFF8E6]" : ""}`}>
-                <td className="px-3 py-2">
-                  <span className="font-medium">{p.full_name ?? "?"}</span>
-                  <span className="block text-xs text-ink/50">{ROLE_LABEL[p.role]} {branchName(p.branch_id) && `· ${branchName(p.branch_id)}`}</span>
-                </td>
-                <td className="px-2 py-2 text-xs">
-                  {att(p.id) ? (
-                    <>
-                      <span className="font-semibold">{n(att(p.id)!.days)} công</span>
-                      {n(att(p.id)!.ot_hours) > 0 && <span> · {n(att(p.id)!.ot_hours)}h thêm</span>}
-                      {n(att(p.id)!.missing_out) > 0 && (
-                        <span className="block text-[#8A2323]">{n(att(p.id)!.missing_out)} ngày quên check-out</span>
-                      )}
-                      {n(att(p.id)!.pending) > 0 && <span className="block text-[#7A5600]">{n(att(p.id)!.pending)} ngày chờ chủ duyệt</span>}
-                    </>
-                  ) : (
-                    <span className="text-ink/40">chưa có</span>
-                  )}
-                </td>
-                <td className="px-2 py-2">{numInput(p.id, "work_days", "0.5")}</td>
-                <td className="px-2 py-2">{numInput(p.id, "overtime_hours", "0.5")}</td>
-                <td className="px-2 py-2"><MoneyInput value={rows[p.id].other_allowance} onChange={(v) => set(p.id, { other_allowance: v })} className="w-24" ariaLabel="Cộng khác" /></td>
-                <td className="px-2 py-2"><MoneyInput value={rows[p.id].other_deduction} onChange={(v) => set(p.id, { other_deduction: v })} className="w-24" ariaLabel="Trừ khác" /></td>
-                <td className="px-3 py-2">
-                  <input
-                    className="w-36 rounded-lg border border-beige-dark bg-white px-2 py-1.5 text-sm"
-                    value={rows[p.id].note ?? ""}
-                    placeholder="thưởng lễ, tạm ứng…"
-                    onChange={(e) => set(p.id, { note: e.target.value })}
-                  />
-                </td>
-              </tr>
-            ))}
+            {people.map((p) => {
+              const a = att(p.id);
+              return (
+                <tr key={p.id} className={`border-t border-beige ${dirty.has(p.id) ? "bg-[#FFF8E6]" : ""}`}>
+                  <td className="px-3 py-2">
+                    <span className="font-medium">{p.full_name ?? "?"}</span>
+                    <span className="block text-xs text-ink/50">{ROLE_LABEL[p.role]} {branchName(p.branch_id) && `· ${branchName(p.branch_id)}`}</span>
+                  </td>
+                  <td className="px-2 py-2 text-xs">
+                    {a ? (
+                      <>
+                        <span className="font-semibold">{Math.round(autoHours(p.id) * 100) / 100} giờ</span> · {n(a.days)} ngày
+                        {n(a.ot_hours) > 0 && <span> · {n(a.ot_hours)}h tăng ca</span>}
+                        {n(a.paid_leave_days) > 0 && <span className="block">phép có lương {n(a.paid_leave_days)} ngày</span>}
+                        {n(a.unpaid_leave_days) > 0 && <span className="block">phép không lương {n(a.unpaid_leave_days)} ngày</span>}
+                        {n(a.absences) > 0 && <span className="block text-[#8A2323]">không phép {n(a.absences)} ngày</span>}
+                        {n(a.missing_out) > 0 && <span className="block text-[#8A2323]">{n(a.missing_out)} ngày quên check-out</span>}
+                        {n(a.pending) > 0 && <span className="block text-[#7A5600]">{n(a.pending)} ngày chờ chủ duyệt</span>}
+                        {n(a.ot_pending) > 0 && <span className="block text-[#7A5600]">{n(a.ot_pending)} lần tăng ca chờ duyệt</span>}
+                      </>
+                    ) : (
+                      <span className="text-ink/40">chưa có</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-2">{box(p.id, "work_hours", autoHours(p.id))}</td>
+                  <td className="px-2 py-2">{box(p.id, "work_days", n(a?.days))}</td>
+                  <td className="px-2 py-2">{box(p.id, "overtime_hours", n(a?.ot_hours))}</td>
+                  <td className="px-2 py-2"><MoneyInput value={rows[p.id].other_allowance} onChange={(v) => set(p.id, { other_allowance: v })} className="w-24" ariaLabel="Cộng khác" /></td>
+                  <td className="px-2 py-2"><MoneyInput value={rows[p.id].other_deduction} onChange={(v) => set(p.id, { other_deduction: v })} className="w-24" ariaLabel="Trừ khác" /></td>
+                  <td className="px-3 py-2">
+                    <input
+                      className="w-36 rounded-lg border border-beige-dark bg-white px-2 py-1.5 text-sm"
+                      value={rows[p.id].note}
+                      placeholder="thưởng lễ, tạm ứng…"
+                      onChange={(e) => set(p.id, { note: e.target.value })}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <button className="btn-outline" disabled={busy || attSum.length === 0} onClick={fillFromCheckin}>Điền từ check-in / out</button>
         <button className="btn-primary" disabled={busy || dirty.size === 0} onClick={save}>
-          {busy ? "Đang lưu…" : `Lưu chấm công${dirty.size ? ` (${dirty.size} người)` : ""}`}
+          {busy ? "Đang lưu…" : `Lưu${dirty.size ? ` (${dirty.size} người)` : ""}`}
         </button>
         {msg && <span className="text-sm">{msg}</span>}
       </div>
       <p className="text-xs text-ink/60">
-        Người chưa lưu ở bảng này thì bảng lương tự lấy số “Theo check-in”. Đã lưu thì bảng lương dùng số đã lưu (bấm “Điền từ
-        check-in / out” để cập nhật lại). Ngày công nhập được nửa ngày (vd 25,5). Giờ thêm được trả 150% đơn giá giờ của lương cơ bản. “Cộng khác” (thưởng, phụ cấp khác) và
-        “Trừ khác” (tạm ứng, đền hàng…) ghi rõ ở ô ghi chú. Phạt nội quy nhập ở mục “Phạt nội quy”.
+        Ô <b>Giờ làm / Ngày ăn / Giờ tăng ca</b> để trống thì bảng lương tự lấy số mờ (tính từ check-in / out đã hợp lệ, tăng ca đã duyệt,
+        nghỉ phép có lương cộng {hpd} giờ / ngày). Chỉ gõ số khi muốn tính khác. Tháng chuẩn {config?.standard_days ?? 27} công ×{" "}
+        {hpd} giờ = {n(config?.standard_days ?? 27) * hpd} giờ; thiếu giờ thì lương cơ bản trừ theo tỉ lệ. “Cộng khác” / “Trừ khác” ghi rõ
+        ở ô ghi chú.
       </p>
     </div>
   );
@@ -397,6 +409,18 @@ function CheckinLog({ month, people, days, isOwner }: { month: string; people: S
   const list = days.filter((d) => !who || d.staff_id === who);
   const dates = [...new Set(list.map((d) => d.work_date))];
   const pending = days.filter((d) => d.approval_status === "pending");
+  const otPending = days.filter((d) => d.ot_status === "pending");
+  const [otHours, setOtHours] = useState<Record<string, string>>({});
+
+  async function reviewOt(x: AttDay, approve: boolean) {
+    const key = x.staff_id + x.work_date;
+    const h = otHours[key] ? Number(otHours[key].replace(",", ".")) : null;
+    setBusy(true);
+    const { error } = await createClient().rpc("review_overtime", { p_staff: x.staff_id, p_date: x.work_date, p_approve: approve, p_hours: h });
+    setBusy(false);
+    if (error) return alert(vnError(error.message));
+    router.refresh();
+  }
 
   async function review(x: AttDay, approve: boolean) {
     setBusy(true);
@@ -514,6 +538,40 @@ function CheckinLog({ month, people, days, isOwner }: { month: string; people: S
           </ul>
         </div>
       )}
+      {otPending.length > 0 && (
+        <div className="card border-l-4 border-l-navy p-0">
+          <p className="px-4 pt-3 text-sm font-semibold text-navy">Tăng ca chờ quản lý duyệt ({otPending.length})</p>
+          <ul className="divide-y divide-beige text-sm">
+            {otPending.map((x) => {
+              const key = x.staff_id + x.work_date;
+              return (
+                <li key={key} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
+                  <span className="min-w-0">
+                    <span className="font-medium">{name(x.staff_id)}</span> · {shortLabel(x.work_date)} · về {hhmm(x.check_out)} ·{" "}
+                    <b>{n(x.ot_hours)} giờ</b>
+                    <span className={`block text-xs ${x.ot_reason ? "text-ink/70" : "text-[#8A2323]"}`}>
+                      Lý do: {x.ot_reason || "chưa ghi lý do"}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <input
+                      inputMode="decimal"
+                      className="w-14 rounded-lg border border-beige-dark px-2 py-1 text-right text-sm"
+                      placeholder={String(n(x.ot_hours))}
+                      value={otHours[key] ?? ""}
+                      onChange={(e) => setOtHours({ ...otHours, [key]: e.target.value })}
+                      aria-label="Số giờ duyệt"
+                    />
+                    <span className="text-xs text-ink/60">giờ</span>
+                    <button className="btn-primary py-1.5 text-xs" disabled={busy} onClick={() => reviewOt(x, true)}>Duyệt</button>
+                    <button className="btn-ghost py-1.5 text-xs text-[#8A2323]" disabled={busy} onClick={() => reviewOt(x, false)}>Không duyệt</button>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       {dates.length === 0 && <p className="card text-sm text-ink/60">Chưa có ai check-in trong tháng này.</p>}
       {dates.map((d) => (
         <div key={d} className="card p-0">
@@ -527,7 +585,7 @@ function CheckinLog({ month, people, days, isOwner }: { month: string; people: S
                   <span className="font-medium">{name(x.staff_id)}</span>
                   <span className="block text-xs text-ink/60">
                     {hhmm(x.check_in)} → {x.check_out ? hhmm(x.check_out) : <span className="text-[#8A2323]">chưa check-out</span>}
-                    {x.check_out && ` · ${n(x.net_hours)} giờ`}
+                    {x.ot_reason && ` · tăng ca: ${x.ot_reason}`}
                     {x.edited && " · đã sửa"}
                     {x.note && ` · ${x.note}`}
                     {distTxt(x) && ` · ${distTxt(x)}`}
@@ -540,8 +598,12 @@ function CheckinLog({ month, people, days, isOwner }: { month: string; people: S
                 </span>
                 <span className="flex shrink-0 items-center gap-3">
                   <span className="text-right">
-                    <span className="font-semibold">{n(x.days)} công</span>
-                    {n(x.ot_hours) > 0 && <span className="block text-xs text-ink/60">+{n(x.ot_hours)}h thêm</span>}
+                    <span className="font-semibold">{n(x.work_hours)} giờ</span>
+                    {n(x.ot_hours) > 0 && (
+                      <span className="block text-xs text-ink/60">
+                        tăng ca {x.ot_status === "approved" ? `${n(x.ot_hours_approved)}h ✓` : x.ot_status === "rejected" ? "không duyệt" : `${n(x.ot_hours)}h chờ duyệt`}
+                      </span>
+                    )}
                   </span>
                   <button
                     className="text-xs text-navy underline"
@@ -556,10 +618,10 @@ function CheckinLog({ month, people, days, isOwner }: { month: string; people: S
         </div>
       ))}
       <p className="text-xs text-ink/60">
-        Nhân viên bấm Check-in khi đến và Check-out khi về ở đầu trang Quản lý; giờ lấy theo máy chủ, vị trí lấy từ điện thoại. Cách
-        chi nhánh quá 100m hoặc không lấy được vị trí thì ngày đó chờ chủ spa duyệt. Quên check-in / check-out: quản lý bổ sung giờ (ghi
-        lý do), chủ spa duyệt mới tính công. Tăng ca: check-out từ 18:30 trở đi mới tính, tính từ 18:00 theo từng nửa tiếng. Ngày chờ
-        duyệt / không duyệt không tính công.
+        Giờ làm = thời gian có mặt trong ca 9:00 – 18:00 (đến sớm / về muộn không cộng thêm). Giờ lấy theo máy chủ, vị trí lấy từ
+        điện thoại: cách chi nhánh quá 100m hoặc không lấy được vị trí thì chờ chủ spa duyệt. Quên check-in / check-out: quản lý bổ
+        sung giờ (ghi lý do), chủ spa duyệt mới tính. Tăng ca: check-out từ 18:30 trở đi, nhân viên ghi lý do, quản lý duyệt số giờ
+        (tính từ 18:00 theo từng nửa tiếng). Ngày / giờ chưa duyệt không tính lương.
       </p>
     </div>
   );
@@ -752,8 +814,9 @@ function Salaries({ people, allStaff, settings, config, branchName }: {
         {msg && <span className="text-sm">{msg}</span>}
       </div>
       <p className="text-xs text-ink/60">
-        Lương cơ bản là mức đủ ngày công chuẩn (chung {config?.standard_days ?? 27} công; ai khác thì nhập ở cột “Công chuẩn”), tháng
-        nào thiếu / thừa công thì tính theo tỉ lệ. Đơn giá giờ thêm = lương cơ bản ÷ công chuẩn ÷ {config?.hours_per_day ?? 8} giờ. Lương trách nhiệm
+        Lương cơ bản là mức đủ {config?.standard_days ?? 27} công × {config?.hours_per_day ?? 9} giờ (ai khác thì nhập ở cột “Công chuẩn”),
+        thiếu giờ thì trừ theo tỉ lệ. Nghỉ không phép trừ thêm 1 ngày lương = lương cơ bản ÷ công chuẩn. Đơn giá tăng ca = lương cơ
+        bản ÷ công chuẩn ÷ {config?.ot_hours_per_day ?? 8} giờ × 150%. Lương trách nhiệm
         trả đủ theo tháng. Lương đóng BHXH để 0 nếu nhân viên chưa đóng bảo hiểm. Phụ cấp ăn để trống thì theo mức chung
         ({formatVnd(config?.meal_per_day ?? 30000)}/công). Bỏ tích “Tính lương” với người không nhận lương ở đây (vd chủ spa).
       </p>
@@ -792,7 +855,8 @@ function Settings({ config, branches }: { config: PayrollConfig; branches: Branc
     <div className="card space-y-3 p-4">
       <div className="grid gap-3 sm:grid-cols-3">
         {field("standard_days", "Ngày công chuẩn / tháng", "0.5")}
-        {field("hours_per_day", "Số giờ / ngày công", "0.5")}
+        {field("hours_per_day", "Số giờ / công (9:00 – 18:00 = 9)", "0.5")}
+        {field("ot_hours_per_day", "Chia … giờ để ra đơn giá tăng ca", "0.5")}
         {field("overtime_rate", "Hệ số làm thêm giờ (1,5 = 150%)", "0.1")}
         <label className="text-xs">
           Phụ cấp ăn / ngày công
@@ -815,10 +879,8 @@ function Settings({ config, branches }: { config: PayrollConfig; branches: Branc
           Check-out từ giờ này mới tính tăng ca
           <input type="time" className="input mt-1 py-2 text-sm" value={c.ot_start ?? "18:30"} onChange={(e) => { setC({ ...c, ot_start: e.target.value }); setMsg(null); }} />
         </label>
-        {field("lunch_minutes", "Nghỉ trưa (phút)", "5")}
         {field("geo_radius_m", "Cách chi nhánh quá … mét thì cần duyệt", "10")}
-        {field("full_day_hours", "Làm từ … giờ = 1 công", "0.5")}
-        {field("half_day_hours", "Làm từ … giờ = 0,5 công", "0.5")}
+
       </div>
       <BranchLocations branches={branches} />
       <div className="flex items-center gap-2">

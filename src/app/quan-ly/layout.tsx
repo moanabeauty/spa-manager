@@ -55,10 +55,26 @@ export default async function ManagerLayout({ children }: { children: React.Reac
     const { count } = await supabase.from("staff_attendance").select("staff_id", { count: "exact", head: true }).eq("approval_status", "pending");
     pendingAttendance = count ?? 0;
   }
+  let otStart = "18:30";
+  let pendingLeave = 0;
+  let pendingOt = 0;
+  {
+    const supabase = await createClient();
+    const { data: cfg } = await supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle();
+    otStart = (cfg?.value as { ot_start?: string } | null)?.ot_start ?? "18:30";
+    if (role === "owner" || role === "manager") {
+      const [{ count: lc }, { count: oc }] = await Promise.all([
+        supabase.from("staff_leaves").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("staff_attendance").select("staff_id", { count: "exact", head: true }).eq("ot_status", "pending"),
+      ]);
+      pendingLeave = lc ?? 0;
+      pendingOt = oc ?? 0;
+    }
+  }
   const kho = { href: "/quan-ly/kho", label: pendingStock ? `Kho (${pendingStock})` : "Kho" };
   const tabs =
     role === "warehouse"
-      ? [kho]
+      ? [kho, { href: "/quan-ly/nghi-phep", label: "Nghỉ phép" }]
       : [
           { href: "/quan-ly", label: "Lịch hẹn" },
           { href: "/quan-ly/tao-lich", label: "+ Tạo lịch" },
@@ -73,9 +89,15 @@ export default async function ManagerLayout({ children }: { children: React.Reac
           ...(role === "owner" || role === "manager"
             ? [
                 { href: "/quan-ly/bao-cao", label: "Báo cáo" },
-                { href: "/quan-ly/bang-luong", label: role === "owner" ? (pendingAttendance ? `Bảng lương (${pendingAttendance} chờ duyệt)` : "Bảng lương") : "Chấm công" },
+                {
+                  href: "/quan-ly/bang-luong",
+                  label:
+                    (role === "owner" ? "Bảng lương" : "Chấm công") +
+                    ((role === "owner" ? pendingAttendance : 0) + pendingOt ? ` (${(role === "owner" ? pendingAttendance : 0) + pendingOt} chờ duyệt)` : ""),
+                },
               ]
             : []),
+          { href: "/quan-ly/nghi-phep", label: pendingLeave ? `Nghỉ phép (${pendingLeave})` : "Nghỉ phép" },
           ...(role === "owner" ? [{ href: "/quan-ly/thu-chi", label: "Thu chi" }] : []),
           ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/goi-combo", label: "Gói combo" }] : []),
           ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/dich-vu", label: "Menu dịch vụ" }] : []),
@@ -95,7 +117,7 @@ export default async function ManagerLayout({ children }: { children: React.Reac
   const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
   return (
     <div className="space-y-4">
-      {role !== "owner" && <CheckInBar today={attendance} />}
+      {role !== "owner" && <CheckInBar today={attendance} otStart={otStart} />}
       {role === "owner" && vapidKey && <PushToggle publicKey={vapidKey} hideWhenOn />}
       <div className="print:hidden"><ManagerTabs tabs={tabs} /></div>
       {children}

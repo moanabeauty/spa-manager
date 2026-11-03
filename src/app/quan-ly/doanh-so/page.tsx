@@ -101,18 +101,19 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
           </table>
         </div>
       )}
-      {p && (num("base_salary") > 0 || num("work_days") > 0) && (
+      {p && (num("base_salary") > 0 || num("work_hours") > 0) && (
         <div className="card p-4 text-sm">
           <p className="mb-2 font-semibold text-navy">Phiếu lương tạm tính của tôi</p>
           {[
-            ["Lương cơ bản", num("base_pay"), `${num("work_days")}/${num("standard_days")} công`],
+            ["Lương cơ bản", num("base_pay"), `${num("work_hours")}/${num("standard_hours")} giờ`],
             ["Lương trách nhiệm", num("responsibility_pay"), ""],
-            ["Phụ cấp ăn", num("meal_allowance"), ""],
+            ["Phụ cấp ăn", num("meal_allowance"), `${num("work_days")} ngày`],
             ["Làm thêm giờ", num("overtime_pay"), num("overtime_hours") ? `${num("overtime_hours")} giờ` : ""],
             ["Hoa hồng", num("commission"), ""],
             ["Tiền dịch vụ", num("service_fee"), ""],
             ["Cộng khác", num("other_allowance"), ""],
             ["Phạt nội quy", -num("penalties"), num("penalty_count") ? `${num("penalty_count")} lần` : ""],
+            ["Nghỉ không phép", -num("absence_deduction"), num("absences") ? `${num("absences")} ngày` : ""],
             ["BHXH, BHYT, BHTN", -num("insurance_employee"), ""],
             ["Trừ khác", -num("other_deduction"), ""],
           ]

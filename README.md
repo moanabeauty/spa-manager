@@ -151,3 +151,9 @@ Cơ sở dữ liệu (`20261103000022_reports_payroll_cashbook.sql`, `…23_repo
 - Check-in / out gửi vị trí điện thoại; cách chi nhánh gần nhất quá 100m hoặc không lấy được vị trí → **chờ chủ spa duyệt**. Vị trí chi nhánh: chủ spa đứng tại chi nhánh, vào Bảng lương → Cài đặt → "Tôi đang ở đây – lưu vị trí".
 - Quên check-in / check-out: quản lý bổ sung giờ (bắt buộc lý do) → chờ chủ spa duyệt; chủ spa sửa thì duyệt luôn (`review_attendance`). Ngày chờ duyệt / không duyệt không tính công.
 - Tăng ca: check-out từ 18:30 mới tính, tính từ 18:00 theo từng nửa tiếng.
+
+### Lương theo giờ, duyệt tăng ca, nghỉ phép (`20261103000026_hours_overtime_leave.sql`)
+- Tháng chuẩn 27 công × 9 giờ (9:00 – 18:00) = **243 giờ**. Giờ làm = thời gian có mặt trong khung ca (đến sớm / về muộn không cộng). Lương cơ bản = lương × giờ làm / 243. Phụ cấp ăn theo số ngày đi làm.
+- **Tăng ca**: check-out từ 18:30 bắt buộc ghi lý do (vd làm cho khách nào) → quản lý / chủ duyệt số giờ (Bảng lương / Chấm công → Check-in / out). Đơn giá = lương ÷ 27 ÷ 8 × 150%.
+- **Nghỉ phép** (`/quan-ly/nghi-phep`): nhân viên đăng ký (có lương / không lương, nửa ngày) → quản lý / chủ duyệt. Phép có lương được cộng 9 giờ / ngày. **Nghỉ không phép** do quản lý ghi: không lương ngày đó + trừ thêm 1 ngày lương (lương ÷ 27).
+- Tab Chấm công: ô Giờ làm / Ngày ăn / Giờ tăng ca để trống = tự lấy theo check-in; gõ số để tính khác.
