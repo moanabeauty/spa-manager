@@ -8,10 +8,10 @@ import MoneyInput from "@/components/MoneyInput";
 
 type Quote = {
   paid: number;
+  used_value: number;
   balance: number | null;
   bonus: number | null;
-  remaining_sessions: number | null;
-  total_sessions: number | null;
+  used_sessions: number;
   refund: number;
   max_refund: number;
 };
@@ -34,7 +34,15 @@ export default function RefundButton({ kind, id, label }: { kind: "card" | "pack
     if (error) return setError(vnError(error.message));
     const q = (Array.isArray(data) ? data[0] : data) as Quote;
     const n = (v: number | null) => (v === null ? null : Number(v));
-    const qq = { ...q, paid: Number(q.paid), balance: n(q.balance), bonus: n(q.bonus), refund: Number(q.refund), max_refund: Number(q.max_refund) };
+    const qq = {
+      ...q,
+      paid: Number(q.paid),
+      used_value: Number(q.used_value),
+      balance: n(q.balance),
+      bonus: n(q.bonus),
+      refund: Number(q.refund),
+      max_refund: Number(q.max_refund),
+    };
     setQuote(qq);
     setAmount(qq.refund);
   }
@@ -72,23 +80,23 @@ export default function RefundButton({ kind, id, label }: { kind: "card" | "pack
       <p className="font-semibold text-[#8A2323]">Huỷ {label}</p>
       {kind === "card" ? (
         <ul className="text-xs text-ink/80">
-          <li>Khách đã nạp: {formatVnd(quote.paid)} · được tặng: {formatVnd(quote.bonus ?? 0)}</li>
-          <li>Số dư hiện tại: {formatVnd(quote.balance ?? 0)}</li>
+          <li>Mệnh giá đã nạp: {formatVnd(quote.paid)} (tặng thêm {formatVnd(quote.bonus ?? 0)}, không hoàn)</li>
+          <li>Đã dùng {quote.used_sessions} dịch vụ, tính theo giá niêm yết: {formatVnd(quote.used_value)}</li>
+          <li>Số dư thẻ hiện tại: {formatVnd(quote.balance ?? 0)}</li>
           <li>
-            Trả lại = số dư − tiền tặng = <b>{formatVnd(quote.refund)}</b> (tiền tặng không hoàn)
+            Trả lại = mệnh giá − giá niêm yết đã dùng = <b>{formatVnd(quote.refund)}</b>
           </li>
         </ul>
       ) : (
         <ul className="text-xs text-ink/80">
-          <li>Khách mua gói: {formatVnd(quote.paid)}</li>
+          <li>Giá gói khách đã trả: {formatVnd(quote.paid)}</li>
+          <li>Đã dùng {quote.used_sessions} buổi, tính theo giá lẻ: {formatVnd(quote.used_value)}</li>
           <li>
-            Còn {quote.remaining_sessions}/{quote.total_sessions} buổi chưa dùng
-          </li>
-          <li>
-            Trả lại theo phần buổi chưa dùng (tính theo giá lẻ từng dịch vụ): <b>{formatVnd(quote.refund)}</b>
+            Trả lại = giá gói − buổi đã dùng = <b>{formatVnd(quote.refund)}</b>
           </li>
         </ul>
       )}
+      <p className="text-xs text-ink/60">Tiền hoàn sẽ trừ vào doanh số của người đã bán {kind === "card" ? "thẻ" : "gói"} này trong tháng hoàn.</p>
       <label className="flex items-center gap-2 text-xs">
         <span className="w-24">Số tiền hoàn</span>
         <MoneyInput value={amount} onChange={(n) => setAmount(Math.min(n, quote.max_refund))} className="flex-1" ariaLabel="Số tiền hoàn" />

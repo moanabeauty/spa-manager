@@ -11,7 +11,7 @@ export default async function PackagesPage() {
   const [{ data: packages }, { data: services }] = await Promise.all([
     supabase
       .from("packages")
-      .select("id, name, description, price, validity_days, is_active, package_services(service_id, quantity)")
+      .select("id, name, description, price, validity_days, is_active, package_items(label, quantity, unit_price, sort_order, package_item_services(service_id))")
       .order("is_active", { ascending: false })
       .order("name"),
     supabase.from("services").select("id, name, name_en, price, is_active").eq("is_active", true).order("name"),

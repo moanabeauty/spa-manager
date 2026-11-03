@@ -67,11 +67,11 @@ Cơ sở dữ liệu (`20261103000009_front_desk_tools.sql`):
 | `/quan-ly/doanh-so` | mọi nhân viên | Doanh số, hoa hồng (3% / 5%) và tiền dịch vụ KTV theo tháng; KTV chỉ thấy của mình |
 | `/lich-hen` | khách | Thêm số dư thẻ và số buổi gói còn lại |
 
-Cơ sở dữ liệu (`20261103000010_checkout.sql`):
-- `checkout_invoice(...)`: tạo hoá đơn + dòng + chia doanh số + thanh toán + chốt + hoàn thành lịch trong **1 bước** (lỗi thì không lưu gì). Giá lấy từ menu (chỉ nhập tay cho dịch vụ "báo giá"); tiền trừ thẻ = tổng các dòng đánh dấu trả thẻ; giảm cả hoá đơn được chia theo tỉ lệ vào từng dòng nên hoa hồng tính trên tiền thực thu.
-- Trừ buổi: dòng "trừ gói" gắn gói vào dịch vụ trong lịch, buổi bị trừ khi lịch hoàn thành; không trừ quá số buổi; mỗi lịch chỉ thu 1 lần; lịch đã thu không mở lại được.
-- `void_invoice(id, lý do)`: chỉ chủ spa. Hoàn tiền đã trừ thẻ, trả buổi gói, thu hồi tiền nạp + tiền tặng, huỷ gói đã bán (nếu chưa dùng), lịch về "đang làm" để thu lại. Tiền mặt / CK / POS chủ spa tự hoàn cho khách.
-- `save_package(...)`: chủ / quản lý tạo, sửa gói; gói khách đã mua giữ nguyên số buổi lúc mua.
-- Giá thành viên: dòng dịch vụ trừ thẻ nạp sẵn tự lấy `member_price` (dịch vụ không có giá thành viên thì giữ giá niêm yết).
-- `refund_quote()` + `refund_customer_asset()` (bảng `refunds`): chỉ quản lý / chủ. Thẻ: hoàn = số dư − tiền tặng (tiền tặng không hoàn), thẻ bị khoá. Gói: hoàn = tiền mua × phần buổi chưa dùng (tính theo giá lẻ từng dịch vụ), gói bị khoá; không huỷ khi gói đang gắn vào lịch chưa xong. Quản lý sửa được số tiền hoàn (không quá số dư / giá mua), bắt buộc ghi lý do.
-- Tiền vừa nạp chỉ dùng được ở hoá đơn sau (thu nạp thẻ riêng trước, rồi thu lịch).
+Cơ sở dữ liệu (`20261103000010_checkout.sql`, `20261103000011_seed_combos.sql`):
+- **Gói combo theo phần** (`package_items` + `package_item_services`): mỗi phần có số buổi (bỏ trống = không giới hạn), giá lẻ / buổi và các dịch vụ được dùng linh hoạt. Khách mua thì chép sang `customer_package_items`. 34 gói nhập từ sheet COMBO (thêm 7 dịch vụ còn thiếu trong menu, ghi chú "cần chủ spa kiểm tra lại").
+- `checkout_invoice(...)`: tạo hoá đơn + dòng + chia doanh số + thanh toán + chốt + hoàn thành lịch trong **1 bước** (lỗi thì không lưu gì). Giảm cả hoá đơn chia theo tỉ lệ vào từng dòng nên hoa hồng tính trên tiền thực thu. Lễ tân, KTV, quản lý, chủ đều thu được.
+- **Thẻ nạp sẵn** (chỉ 3 mức 5tr / 10tr / 20tr): chỉ trả được dịch vụ có giá thành viên, trừ theo giá thành viên; dịch vụ không có giá thành viên phải thanh toán ngoài. Số dư không đủ thì dịch vụ tính giá niêm yết, trả ngoài. Tiền vừa nạp dùng từ hoá đơn sau.
+- Trừ buổi: dịch vụ gắn vào 1 phần của gói, trừ khi lịch hoàn thành; không trừ quá số buổi; mỗi lịch chỉ thu 1 lần; lịch đã thu không mở lại được.
+- `void_invoice(id, lý do)`: chỉ chủ spa. Hoàn tiền đã trừ thẻ, trả buổi gói, thu hồi tiền nạp + tặng, huỷ gói đã bán (nếu chưa dùng), lịch về "đang làm" để thu lại.
+- **Huỷ gói / thẻ đang dùng dở** (`refund_quote`, `refund_customer_asset`, bảng `refunds`): chỉ quản lý / chủ. Thẻ: hoàn = mệnh giá đã nạp − giá niêm yết các dịch vụ đã trả bằng thẻ (tiền tặng không hoàn). Gói: hoàn = giá gói − số buổi đã dùng × giá lẻ / buổi. Sửa được số tiền, bắt buộc ghi lý do; thẻ / gói bị khoá. Tiền hoàn **trừ vào doanh số người bán** (`refund_seller_deductions`) trong tháng hoàn.
+- KTV chỉ xem hoá đơn mình được chia doanh số hoặc mình thu (`can_see_invoice`).

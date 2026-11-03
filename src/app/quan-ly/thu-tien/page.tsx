@@ -20,7 +20,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
     const { data } = await supabase
       .from("appointments")
       .select(
-        "id, branch_id, start_at, status, customer_id, customers(id, full_name, phone, note), appointment_services(id, service_id, technician_id, start_at, customer_package_id)",
+        "id, branch_id, start_at, status, customer_id, customers(id, full_name, phone, note), appointment_services(id, service_id, technician_id, start_at, customer_package_item_id)",
       )
       .eq("id", sp.lich)
       .maybeSingle();
@@ -71,7 +71,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       .order("name"),
     supabase
       .from("packages")
-      .select("id, name, price, validity_days, package_services(quantity, services(name))")
+      .select("id, name, price, validity_days, package_items(label, quantity, sort_order)")
       .eq("is_active", true)
       .order("name"),
     supabase.from("card_topup_tiers").select("id, topup_amount, bonus_amount").eq("is_active", true).order("topup_amount"),

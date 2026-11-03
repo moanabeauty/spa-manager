@@ -24,18 +24,32 @@ export const CARD_TXN_LABEL: Record<string, string> = {
   adjustment: "Điều chỉnh",
 };
 
+export type WalletItem = {
+  id: string;
+  label: string;
+  total_qty: number | null; // null = không giới hạn
+  used_qty: number;
+  services: { id: string; name: string }[];
+};
 export type WalletPackage = {
   id: string;
   name: string;
   purchased_at: string;
   expires_at: string | null;
   is_active: boolean;
-  services: { service_id: string; name: string; total_qty: number; used_qty: number }[];
+  items: WalletItem[];
 };
 export type Wallet = {
   cards: { card_id: string; code: string; balance: number }[];
   packages: WalletPackage[];
 };
+
+export function itemLeft(i: WalletItem): number {
+  return i.total_qty === null ? Infinity : i.total_qty - i.used_qty;
+}
+export function itemText(i: WalletItem): string {
+  return i.total_qty === null ? `đã dùng ${i.used_qty} buổi (không giới hạn)` : `còn ${i.total_qty - i.used_qty}/${i.total_qty} buổi`;
+}
 
 export function cardBalance(w: Wallet): number {
   return w.cards.reduce((a, c) => a + Number(c.balance), 0);
@@ -53,7 +67,7 @@ export async function fetchWallet(supabase: Db, customerId: string): Promise<Wal
     supabase
       .from("customer_packages")
       .select(
-        "id, purchased_at, expires_at, is_active, packages(name), customer_package_services(service_id, total_qty, used_qty, services(name))",
+        "id, purchased_at, expires_at, is_active, packages(name), customer_package_items(id, label, total_qty, used_qty, sort_order, customer_package_item_services(service_id, services(name)))",
       )
       .eq("customer_id", customerId)
       .order("purchased_at", { ascending: false }),
@@ -64,7 +78,14 @@ export async function fetchWallet(supabase: Db, customerId: string): Promise<Wal
     expires_at: string | null;
     is_active: boolean;
     packages: { name: string } | null;
-    customer_package_services: { service_id: string; total_qty: number; used_qty: number; services: { name: string } | null }[];
+    customer_package_items: {
+      id: string;
+      label: string;
+      total_qty: number | null;
+      used_qty: number;
+      sort_order: number;
+      customer_package_item_services: { service_id: string; services: { name: string } | null }[];
+    }[];
   };
   return {
     cards: ((cards ?? []) as Wallet["cards"])
@@ -76,9 +97,15 @@ export async function fetchWallet(supabase: Db, customerId: string): Promise<Wal
       purchased_at: p.purchased_at,
       expires_at: p.expires_at,
       is_active: p.is_active,
-      services: p.customer_package_services
-        .map((s) => ({ service_id: s.service_id, name: s.services?.name ?? "", total_qty: s.total_qty, used_qty: s.used_qty }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+      items: [...p.customer_package_items]
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((i) => ({
+          id: i.id,
+          label: i.label,
+          total_qty: i.total_qty,
+          used_qty: i.used_qty,
+          services: i.customer_package_item_services.map((x) => ({ id: x.service_id, name: x.services?.name ?? "" })),
+        })),
     })),
   };
 }

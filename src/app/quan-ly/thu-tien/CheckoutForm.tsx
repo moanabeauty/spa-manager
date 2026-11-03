@@ -10,6 +10,8 @@ import {
   cardBalance,
   fetchWallet,
   isPackageUsable,
+  itemLeft,
+  itemText,
   splitByShares,
   type Wallet,
 } from "@/lib/billing";
@@ -32,7 +34,7 @@ export type CheckoutPackage = {
   name: string;
   price: number;
   validity_days: number | null;
-  package_services: { quantity: number; services: { name: string } | null }[];
+  package_items: { label: string; quantity: number | null; sort_order: number }[];
 };
 export type CustomerInfo = { id: string; full_name: string; phone: string | null; note: string | null };
 export type ApptInfo = {
@@ -40,7 +42,7 @@ export type ApptInfo = {
   branch_id: string;
   start_at: string;
   status: string;
-  services: { id: string; service_id: string; technician_id: string | null; start_at: string; customer_package_id: string | null }[];
+  services: { id: string; service_id: string; technician_id: string | null; start_at: string; customer_package_item_id: string | null }[];
 };
 type Tier = { id: string; topup_amount: number; bonus_amount: number };
 
@@ -58,7 +60,7 @@ type Line = {
   qty: number;
   discount: number;
   card: boolean;
-  pkgId: string; // gói của khách dùng để trừ buổi ("" = trả tiền)
+  pkgId: string; // phần gói của khách dùng để trừ buổi ("" = trả tiền)
   sellers: SellerShare[];
 };
 
@@ -108,7 +110,7 @@ export default function CheckoutForm({
       qty: 1,
       discount: 0,
       card: false,
-      pkgId: s.customer_package_id ?? "",
+      pkgId: s.customer_package_item_id ?? "",
       sellers: s.technician_id ? [{ staffId: s.technician_id, share: 100 }] : [],
     })),
   );
@@ -126,6 +128,11 @@ export default function CheckoutForm({
 
   const balance = cardBalance(wallet);
 
+  /** Thẻ nạp sẵn chỉ trả được dịch vụ có giá thành viên */
+  function cardOk(s: CheckoutService) {
+    return s.card_allowed && s.member_price !== null;
+  }
+
   /** Khách còn số dư thẻ nạp sẵn: mặc định trừ thẻ (giá thành viên) cho dịch vụ dùng được thẻ, khi số dư còn đủ */
   function withCardDefaults(ls: Line[], w: Wallet): Line[] {
     let left = cardBalance(w);
@@ -133,8 +140,8 @@ export default function CheckoutForm({
     return ls.map((l) => {
       if (l.type !== "service" || l.pkgId) return l;
       const s = svcById.get(l.serviceId!);
-      if (!s || !s.card_allowed || s.price === null) return l;
-      const price = Number(s.member_price ?? s.price);
+      if (!s || !cardOk(s)) return l;
+      const price = Number(s.member_price);
       if (price > left) return l;
       left -= price;
       return { ...l, card: true };
@@ -168,7 +175,7 @@ export default function CheckoutForm({
       if (!s) return 0;
       if (l.pkgId) return 0;
       if (s.price === null) return l.customPrice;
-      if (l.card && s.member_price !== null) return Number(s.member_price); // trả thẻ nạp sẵn = giá thành viên
+      if (l.card && s.member_price !== null) return Number(s.member_price); // trừ thẻ nạp sẵn = giá thành viên
       return Number(s.price);
     }
     if (l.type === "package") return Number(pkgById.get(l.packageId!)?.price ?? 0);
@@ -200,15 +207,20 @@ export default function CheckoutForm({
   // số buổi còn lại theo từng gói (trừ các dòng khác trong hoá đơn này đang dùng)
   function packageOptions(l: Line) {
     if (l.type !== "service" || !l.serviceId) return [];
-    return wallet.packages
+    const out: { id: string; name: string; left: number }[] = [];
+    wallet.packages
       .filter((p) => isPackageUsable(p))
-      .map((p) => {
-        const s = p.services.find((x) => x.service_id === l.serviceId);
-        if (!s) return null;
-        const usedHere = lines.filter((o) => o.key !== l.key && o.pkgId === p.id && o.serviceId === l.serviceId).length;
-        return { id: p.id, name: p.name, left: s.total_qty - s.used_qty - usedHere };
-      })
-      .filter((x): x is { id: string; name: string; left: number } => x !== null && (x.left > 0 || x.id === l.pkgId));
+      .forEach((p) =>
+        p.items
+          .filter((i) => i.services.some((x) => x.id === l.serviceId))
+          .forEach((i) => {
+            const usedHere = lines.filter((o) => o.key !== l.key && o.pkgId === i.id).length;
+            const left = itemLeft(i) - usedHere;
+            if (left > 0 || i.id === l.pkgId)
+              out.push({ id: i.id, name: p.items.length > 1 ? `${p.name} – ${i.label}` : p.name, left });
+          }),
+      );
+    return out;
   }
 
   // ---- khách (khi bán gói / nạp thẻ không theo lịch) ----
@@ -286,7 +298,7 @@ export default function CheckoutForm({
       quantity: l.qty,
       discount: l.pkgId || l.type === "card_topup" ? 0 : l.discount,
       paid_with_card: l.card,
-      customer_package_id: l.pkgId || null,
+      customer_package_item_id: l.pkgId || null,
       sellers: l.sellers.filter((s) => s.staffId && s.share > 0).map((s) => ({ staff_id: s.staffId, share: s.share })),
     }));
     const payments = [
@@ -390,7 +402,7 @@ export default function CheckoutForm({
             {lockedPackages.map((p) => (
               <p key={p.id}>
                 {p.name}:{" "}
-                {p.services.map((s) => `${s.name} còn ${s.total_qty - s.used_qty}/${s.total_qty}`).join(" · ")}
+                {p.items.map((i) => `${i.label}: ${itemText(i)}`).join(" · ")}
               </p>
             ))}
           </div>
@@ -437,7 +449,7 @@ export default function CheckoutForm({
                   <button
                     className="flex w-full justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-cream"
                     onClick={() => {
-                      const p = Number(s.member_price ?? s.price ?? 0);
+                      const p = Number(s.member_price ?? 0);
                       addLine({
                         type: "service",
                         serviceId: s.id,
@@ -445,7 +457,7 @@ export default function CheckoutForm({
                         customPrice: 0,
                         qty: 1,
                         discount: 0,
-                        card: hasCard && s.card_allowed && s.price !== null && balance - cardTotal >= p,
+                        card: hasCard && s.card_allowed && s.member_price !== null && balance - cardTotal >= p,
                         pkgId: "",
                         sellers: [],
                       });
@@ -636,7 +648,7 @@ function LineRow({
   const title =
     l.type === "service" ? svc?.name ?? "Dịch vụ" : l.type === "package" ? `Gói ${pkg?.name ?? ""}` : "Nạp thẻ tài khoản";
   const usesPackage = !!l.pkgId;
-  const cardBlocked = l.type === "service" && svc && !svc.card_allowed;
+  const cardBlocked = l.type === "service" && svc && (!svc.card_allowed || svc.member_price === null);
   const showSellers = final > 0 && !l.card;
   const amounts = splitByShares(final, l.sellers.map((s) => s.share));
   const techs = sellers.filter((s) => s.role !== "receptionist");
@@ -652,7 +664,10 @@ function LineRow({
           </p>
           {l.type === "package" && pkg && (
             <p className="text-xs text-ink/60">
-              {pkg.package_services.map((s) => `${s.services?.name} ×${s.quantity}`).join(", ")}
+              {[...pkg.package_items]
+                .sort((a, b) => a.sort_order - b.sort_order)
+                .map((i) => `${i.label} ${i.quantity === null ? "(không giới hạn)" : `×${i.quantity}`}`)
+                .join(", ")}
               {pkg.validity_days ? ` · hạn ${pkg.validity_days} ngày` : ""}
             </p>
           )}
@@ -700,7 +715,7 @@ function LineRow({
             <option value="">Trả tiền</option>
             {packageOptions.map((p) => (
               <option key={p.id} value={p.id}>
-                Trừ buổi gói {p.name} (còn {p.left} buổi)
+                Trừ buổi gói {p.name} ({p.left === Infinity ? "không giới hạn" : `còn ${p.left} buổi`})
               </option>
             ))}
           </select>
@@ -734,7 +749,7 @@ function LineRow({
               <MoneyInput value={l.discount} onChange={(n) => onChange({ discount: n })} className="w-28" ariaLabel="Giảm giá dòng" />
             </label>
           )}
-          {l.type !== "card_topup" && hasCard && (
+          {l.type === "service" && hasCard && (
             <label className={`flex items-center gap-1 ${cardBlocked ? "text-ink/40" : ""}`}>
               <input
                 type="checkbox"
@@ -744,7 +759,7 @@ function LineRow({
               />
               Trừ thẻ nạp sẵn
               {cardBlocked
-                ? " (dịch vụ này không dùng thẻ)"
+                ? " (dịch vụ không có giá thành viên – thanh toán ngoài)"
                 : svc?.member_price != null
                   ? ` · giá thành viên ${formatVnd(svc.member_price)}`
                   : ""}

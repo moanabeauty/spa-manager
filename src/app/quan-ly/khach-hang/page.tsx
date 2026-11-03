@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatTime, formatVnd, normalizePhone } from "@/lib/format";
-import { CARD_TXN_LABEL, METHOD_LABEL, cardBalance, fetchWallet, isPackageUsable } from "@/lib/billing";
+import { CARD_TXN_LABEL, METHOD_LABEL, cardBalance, fetchWallet, isPackageUsable, itemLeft, itemText } from "@/lib/billing";
 import { canCheckout } from "@/lib/staff";
 import RefundButton from "./RefundButton";
 
@@ -87,7 +87,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             <div className="space-y-3">
               {wallet.packages.map((p) => {
                 const usable = isPackageUsable(p);
-                const left = p.services.reduce((a, s) => a + s.total_qty - s.used_qty, 0);
+                const left = p.items.reduce((a, i) => a + itemLeft(i), 0);
                 return (
                   <div key={p.id} className={`rounded-xl border border-beige-dark p-3 text-sm ${usable && left > 0 ? "" : "opacity-60"}`}>
                     <div className="flex justify-between gap-2">
@@ -99,12 +99,13 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                       </p>
                     </div>
                     <ul className="mt-1 space-y-0.5">
-                      {p.services.map((s) => (
-                        <li key={s.service_id} className="flex justify-between">
-                          <span>{s.name}</span>
+                      {p.items.map((i) => (
+                        <li key={i.id} className="flex justify-between gap-3">
                           <span>
-                            còn <b className="text-navy">{s.total_qty - s.used_qty}</b>/{s.total_qty} buổi
+                            {i.label}
+                            {i.services.length > 1 && <span className="block text-xs text-ink/50">{i.services.map((x) => x.name).join(", ")}</span>}
                           </span>
+                          <span className="shrink-0">{itemText(i)}</span>
                         </li>
                       ))}
                     </ul>

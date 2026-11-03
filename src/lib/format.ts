@@ -74,7 +74,7 @@ export function vnError(message: string | undefined): string {
   if (m.includes("row-level security")) return "Bạn không có quyền thực hiện thao tác này.";
   if (m.includes("no_technician_overlap")) return "Kỹ thuật viên đã có lịch trùng giờ.";
   if (m.includes("duplicate key") && m.includes("phone")) return "Số điện thoại này đã có hồ sơ khách.";
-  if (m.includes("customer_package_services_used_le_total")) return "Gói không còn đủ buổi cho dịch vụ này.";
+  if (m.includes("customer_package_items_used_le_total")) return "Gói không còn đủ buổi cho dịch vụ này.";
   if (m.includes("invoices_one_per_appointment")) return "Lịch hẹn này đã được thanh toán.";
   if (m.includes("violates check constraint")) return "Giá trị nhập không hợp lệ (số âm hoặc thời lượng bằng 0).";
   if (m.includes("invalid input syntax")) return "Giá trị nhập không hợp lệ.";

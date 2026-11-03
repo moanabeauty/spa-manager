@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { STATUS_LABEL, STATUS_STYLE, formatDate, formatTime, formatVnd } from "@/lib/format";
 import CancelButton from "./CancelButton";
-import { cardBalance, fetchWallet, isPackageUsable, type Wallet } from "@/lib/billing";
+import { cardBalance, fetchWallet, isPackageUsable, itemLeft, itemText, type Wallet } from "@/lib/billing";
 
 export const metadata = { title: "Lịch của tôi – Moana Beauty" };
 
@@ -60,12 +60,15 @@ export default async function MyAppointmentsPage() {
             <div key={p.id} className="border-t border-beige pt-2 text-sm">
               <p className="font-semibold">
                 {p.name}
-                {!isPackageUsable(p) ? <span className="text-xs font-normal text-ink/50"> (hết hạn)</span> : p.services.every((s) => s.used_qty >= s.total_qty) ? <span className="text-xs font-normal text-ink/50"> (đã dùng hết)</span> : null}
+                {!isPackageUsable(p) ? <span className="text-xs font-normal text-ink/50"> (hết hạn)</span> : p.items.every((i) => itemLeft(i) <= 0) ? <span className="text-xs font-normal text-ink/50"> (đã dùng hết)</span> : null}
               </p>
-              {p.services.map((s) => (
-                <p key={s.service_id} className="flex justify-between text-ink/80">
-                  <span>{s.name}</span>
-                  <span>còn {s.total_qty - s.used_qty}/{s.total_qty} buổi</span>
+              {p.items.map((i) => (
+                <p key={i.id} className="flex justify-between gap-3 text-ink/80">
+                  <span>
+                    {i.label}
+                    {i.services.length > 1 && <span className="block text-xs text-ink/50">{i.services.map((x) => x.name).join(", ")}</span>}
+                  </span>
+                  <span className="shrink-0">{itemText(i)}</span>
                 </p>
               ))}
               {p.expires_at && <p className="text-xs text-ink/50">Hạn dùng đến {formatDate(p.expires_at)}</p>}
