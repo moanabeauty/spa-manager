@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/config";
 
 // Các trang cần đăng nhập
-const PROTECTED = ["/dat-lich", "/lich-hen", "/quan-ly"];
+const PROTECTED = ["/dat-lich", "/lich-hen", "/tai-khoan", "/quan-ly"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });

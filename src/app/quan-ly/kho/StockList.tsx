@@ -96,7 +96,7 @@ export default function StockList({
                 <li key={p.id} className="px-4 py-2.5 text-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-medium">{productLabel(p)}</p>
+                      <Link href={`/quan-ly/kho/san-pham/${p.id}`} className="font-medium hover:text-navy hover:underline">{productLabel(p)}</Link>
                       <p className="text-xs text-ink/55">
                         {[p.brand, p.used_in && warehouseType === "treatment" ? `Dùng: ${p.used_in}` : null,
                           warehouseType === "retail" && p.retail_price != null ? `Giá niêm yết ${formatVnd(p.retail_price)}` : null]
@@ -136,6 +136,7 @@ function AdjustForm({ warehouseId, product, current, onDone }: { warehouseId: st
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
   const n = Number(counted);
   const valid = counted !== "" && Number.isInteger(n) && n >= 0;
 
@@ -150,13 +151,20 @@ function AdjustForm({ warehouseId, product, current, onDone }: { warehouseId: st
     });
     setBusy(false);
     if (error) return setError(vnError(error.message));
-    onDone();
+    setDone(true);
     router.refresh();
   }
+  if (done)
+    return (
+      <div className="mt-2 rounded-xl bg-cream p-3 text-xs">
+        Đã ghi phiếu kiểm kho. Nếu lệch số, tồn kho được cập nhật sau khi chủ spa duyệt (trang Kho → Kiểm kho).{" "}
+        <button className="font-semibold text-navy underline" onClick={onDone}>Đóng</button>
+      </div>
+    );
 
   return (
     <div className="mt-2 space-y-2 rounded-xl bg-cream p-3 text-xs">
-      <p>Đếm thực tế trong kho, hệ thống tự ghi phần chênh lệch.</p>
+      <p>Đếm thực tế trong kho, hệ thống ghi phiếu kiểm kho cho phần chênh lệch (lệch số cần chủ spa duyệt).</p>
       <div className="flex flex-wrap items-center gap-2">
         <span>Số đếm được</span>
         <input

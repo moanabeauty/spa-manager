@@ -106,3 +106,8 @@ export function normalizeText(s: string): string {
     .replace(/[̀-ͯ]/g, "")
     .replace(/đ/g, "d");
 }
+
+/** "04/11" theo giờ Việt Nam */
+export function formatShortDate(iso: string): string {
+  return new Intl.DateTimeFormat("vi-VN", { timeZone: TIMEZONE, day: "2-digit", month: "2-digit" }).format(new Date(iso));
+}

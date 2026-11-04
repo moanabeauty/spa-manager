@@ -11,6 +11,7 @@ type Flow = { month: number; kind: "income" | "expense"; source: string; categor
 type EntryRow = {
   id: string; entry_date: string; branch_id: string | null; kind: string; amount: number; method: string;
   description: string | null; source: string; cashbook_categories: { name: string } | null;
+  status: string; code: string | null;
 };
 
 export default async function CashbookPage({ searchParams }: { searchParams: Promise<{ nam?: string; cn?: string; thang?: string }> }) {
@@ -24,7 +25,7 @@ export default async function CashbookPage({ searchParams }: { searchParams: Pro
 
   let eq = supabase
     .from("cashbook_entries")
-    .select("id, entry_date, branch_id, kind, amount, method, description, source, cashbook_categories(name)")
+    .select("id, entry_date, branch_id, kind, amount, method, description, source, status, code, cashbook_categories(name)")
     .gte("entry_date", `${month}-01`)
     .lte("entry_date", monthEnd(month))
     .order("entry_date", { ascending: false })
@@ -161,13 +162,16 @@ export default async function CashbookPage({ searchParams }: { searchParams: Pro
         ) : (
           <ul className="divide-y divide-beige text-sm">
             {entries.map((e) => (
-              <li key={e.id} className="flex items-center justify-between gap-2 px-4 py-2">
+              <li key={e.id} className={`flex items-center justify-between gap-2 px-4 py-2 ${e.status !== "approved" ? "opacity-60" : ""}`}>
                 <span className="min-w-0">
                   <span className="font-medium">{e.cashbook_categories?.name}</span>
                   {e.description && <> · {e.description}</>}
                   <span className="block text-xs text-ink/50">
                     {shortLabel(e.entry_date)} · {bname(e.branch_id)} · {CASH_METHOD_LABEL[e.method] ?? e.method}
                     {e.source === "payroll" && " · từ bảng lương"}
+                    {e.source === "counter" && ` · phiếu tại quầy ${e.code ?? ""}`}
+                    {e.status === "pending" && <b className="text-[#7A5600]"> · chờ duyệt (chưa tính)</b>}
+                    {e.status === "rejected" && <b className="text-[#8A2323]"> · đã từ chối (không tính)</b>}
                   </span>
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
@@ -183,7 +187,8 @@ export default async function CashbookPage({ searchParams }: { searchParams: Pro
       </div>
 
       <p className="text-xs text-ink/60">
-        <b>Thu</b> = tiền khách trả tại quầy (tiền mặt + chuyển khoản + POS, gồm cả tiền nạp thẻ và bán gói) + các khoản thu nhập tay.
+        <b>Thu</b> = tiền khách trả tại quầy (tiền mặt + chuyển khoản + POS, gồm cả tiền nạp thẻ và bán gói) + tiền thu nợ khách + các khoản
+        thu nhập tay. Phiếu thu / chi tại quầy chỉ được tính sau khi chủ spa / quản lý duyệt.
         Dịch vụ trừ thẻ không tính lại vì tiền đã thu lúc nạp. <b>Chi</b> = tiền hoàn khách khi huỷ gói / thẻ + các khoản chi nhập tay
         (lương ghi từ trang Bảng lương). Lọc theo chi nhánh thì không gồm khoản “Chung”. Đây là dòng tiền thực tế: tháng khách nạp thẻ
         / mua gói nhiều thì lợi nhuận cao, nhưng spa vẫn còn nợ dịch vụ (xem trang Gói & thẻ).

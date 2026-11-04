@@ -177,7 +177,7 @@ export default function BookingForm({
         </p>
         <p className="mt-3 text-sm text-ink/70">Moana sẽ liên hệ xác nhận lịch với bạn sớm nhất.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/lich-hen" className="btn-primary">Xem lịch của tôi</Link>
+          <Link href="/tai-khoan" className="btn-primary">Xem lịch của tôi</Link>
           <button
             className="btn-outline"
             onClick={() => {

@@ -179,7 +179,25 @@ export default function CheckoutForm({
   const [pos, setPos] = useState(0);
   const [cashGiven, setCashGiven] = useState(0);
   const [note, setNote] = useState("");
+  // kênh bán + giao hàng (đơn online)
+  const [channel, setChannel] = useState<"store" | "online">("store");
+  const [ship, setShip] = useState({ carrier: "", tracking_code: "", recipient_name: "", recipient_phone: "", address: "", shipping_fee: 0 });
+  const [cod, setCod] = useState(0);
+  // ghi nợ: khách trả thiếu
+  const [debtOn, setDebtOn] = useState(false);
+  const [debtReason, setDebtReason] = useState("");
+  const [debtReq, setDebtReq] = useState<DiscountRequest | null>(null);
+  const [debtReqBusy, setDebtReqBusy] = useState(false);
+  const [debtReqError, setDebtReqError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (!customer) return;
+    setShip((x) => ({
+      ...x,
+      recipient_name: x.recipient_name || customer.full_name || "",
+      recipient_phone: x.recipient_phone || customer.phone || "",
+    }));
+  }, [customer]);
   const [error, setError] = useState<string | null>(null);
 
   const balance = cardBalance(wallet);
@@ -268,7 +286,11 @@ export default function CheckoutForm({
   const cardTotal = finals.reduce((a, f, i) => a + (lines[i].card && !lines[i].promoItemId ? f : 0), 0);
   const need = total - cardTotal;
   const paid = cash + bank + pos;
-  const diff = paid - need;
+  const online = channel === "online" && !appt;
+  const codPart = online ? cod : 0;
+  const debt = (debtOn || codPart > 0) && paid + codPart <= need ? need - paid : 0; // phần khách chưa trả (gồm COD)
+  const ownDebt = Math.max(0, debt - codPart); // phần nợ không phải ship thu hộ
+  const diff = paid + debt - need;
 
   // số buổi còn lại theo từng gói (trừ các dòng khác trong hoá đơn này đang dùng)
   function packageOptions(l: Line) {
@@ -447,8 +469,19 @@ export default function CheckoutForm({
   if (cardTotal > balance) problems.push(`Số dư thẻ không đủ (còn ${formatVnd(balance)}).`);
   if (lines.some((l) => l.card) && lines.some((l) => l.type === "card_topup"))
     problems.push("Tiền vừa nạp chỉ dùng được ở hoá đơn sau: hãy thu nạp thẻ riêng trước.");
-  if (diff !== 0 && lines.length > 0)
-    problems.push(diff < 0 ? `Còn thiếu ${formatVnd(-diff)}.` : `Đang nhập thừa ${formatVnd(diff)}.`);
+  if (online && paid + codPart > need && lines.length > 0)
+    problems.push(`Tiền đã trả + thu hộ (COD) đang thừa ${formatVnd(paid + codPart - need)}.`);
+  else if (diff !== 0 && lines.length > 0)
+    problems.push(diff < 0 ? `Còn thiếu ${formatVnd(-diff)} (hoặc bấm "Ghi nợ phần còn lại").` : `Đang nhập thừa ${formatVnd(diff)}.`);
+  if (online && lines.some((l) => l.type !== "product" && l.type !== "package" && l.type !== "card_topup"))
+    problems.push("Đơn online chỉ bán sản phẩm / gói / nạp thẻ, không có dịch vụ làm tại spa.");
+  if (online && !ship.address.trim()) problems.push("Nhập địa chỉ giao hàng.");
+  if (ownDebt > 0) {
+    if (!customer) problems.push("Ghi nợ cần chọn khách hàng.");
+    else if (canDiscount && !debtReason.trim()) problems.push("Ghi lý do cho khách nợ.");
+    else if (!canDiscount && !(debtReq?.status === "approved" && Number(debtReq.amount) >= debt))
+      problems.push(`Khách nợ ${formatVnd(debt)}: cần chủ spa / quản lý duyệt cho nợ.`);
+  }
 
   async function submit() {
     if (problems.length) return;
@@ -476,7 +509,12 @@ export default function CheckoutForm({
       { method: "bank_transfer", amount: bank },
       { method: "pos", amount: pos },
     ].filter((p) => p.amount > 0);
-    const { data, error } = await supabase.rpc("checkout_invoice_v2", {
+    const { data, error } = await supabase.rpc("checkout_invoice_v3", {
+      p_debt_amount: debt,
+      p_debt_reason: ownDebt > 0 && canDiscount ? debtReason : null,
+      p_debt_request_id: ownDebt > 0 && !canDiscount && debtReq?.status === "approved" ? debtReq.id : null,
+      p_channel: online ? "online" : "store",
+      p_shipment: online ? { ...ship, cod_amount: cod } : null,
       p_discount_reason: canDiscount ? discountReason : null,
       p_discount_request_id: approved > 0 ? request!.id : null,
       p_branch_id: branchId,
@@ -514,6 +552,31 @@ export default function CheckoutForm({
       body: JSON.stringify({ requestId: data }),
     }).catch(() => {});
   }
+  async function sendDebtRequest() {
+    setDebtReqBusy(true);
+    setDebtReqError(null);
+    const { data, error } = await supabase.rpc("request_debt", {
+      p_branch_id: branchId,
+      p_customer_id: customer?.id ?? null,
+      p_amount: debt,
+      p_reason: debtReason,
+    });
+    setDebtReqBusy(false);
+    if (error) return setDebtReqError(vnError(error.message));
+    setDebtReq({ id: data as string, amount: debt, reason: debtReason, status: "pending", review_note: null });
+    fetch("/api/thong-bao/giam-gia", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId: data }),
+    }).catch(() => {});
+  }
+  async function refreshDebtRequest() {
+    if (!debtReq) return;
+    setDebtReqBusy(true);
+    const { data } = await supabase.from("discount_requests").select("id, amount, reason, status, review_note").eq("id", debtReq.id).maybeSingle();
+    setDebtReqBusy(false);
+    if (data) setDebtReq(data as DiscountRequest);
+  }
   async function refreshRequest() {
     if (!request) return;
     setReqBusy(true);
@@ -528,7 +591,7 @@ export default function CheckoutForm({
 
   function fillRemaining(method: "cash" | "bank" | "pos") {
     const others = (method === "cash" ? 0 : cash) + (method === "bank" ? 0 : bank) + (method === "pos" ? 0 : pos);
-    const v = Math.max(0, need - others);
+    const v = Math.max(0, need - codPart - others);
     if (method === "cash") setCash(v);
     if (method === "bank") setBank(v);
     if (method === "pos") setPos(v);
@@ -546,6 +609,25 @@ export default function CheckoutForm({
           </p>
         )}
       </div>
+
+      {!appt && (
+        <div className="flex gap-1 rounded-full bg-white p-1 ring-1 ring-beige-dark">
+          {(
+            [
+              ["store", "Bán tại quầy"],
+              ["online", "Đơn online (giao hàng)"],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setChannel(k)}
+              className={`flex-1 rounded-full px-3 py-2 text-sm font-semibold ${channel === k ? "bg-navy text-white" : "text-navy"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ---- KHÁCH ---- */}
       <div className="card space-y-3">
@@ -964,6 +1046,89 @@ export default function CheckoutForm({
           )}
         </div>
 
+        {online && (
+          <div className="space-y-2 rounded-xl border border-beige-dark p-3 text-sm">
+            <p className="font-medium text-navy">Giao hàng</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className="input py-2 text-sm" placeholder="Người nhận" value={ship.recipient_name}
+                onChange={(e) => setShip({ ...ship, recipient_name: e.target.value })} />
+              <input className="input py-2 text-sm" placeholder="SĐT người nhận" inputMode="tel" value={ship.recipient_phone}
+                onChange={(e) => setShip({ ...ship, recipient_phone: e.target.value })} />
+            </div>
+            <input className="input py-2 text-sm" placeholder="Địa chỉ giao hàng (bắt buộc)" value={ship.address}
+              onChange={(e) => setShip({ ...ship, address: e.target.value })} />
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className="input py-2 text-sm" placeholder="Đơn vị vận chuyển (GHTK, Viettel Post…)" value={ship.carrier}
+                onChange={(e) => setShip({ ...ship, carrier: e.target.value })} />
+              <input className="input py-2 text-sm" placeholder="Mã vận đơn (có thể nhập sau)" value={ship.tracking_code}
+                onChange={(e) => setShip({ ...ship, tracking_code: e.target.value })} />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-28 shrink-0 text-xs">Phí ship</span>
+              <MoneyInput value={ship.shipping_fee} onChange={(v) => setShip({ ...ship, shipping_fee: v })} className="flex-1" ariaLabel="Phí ship" />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-28 shrink-0 text-xs">Thu hộ (COD)</span>
+              <MoneyInput value={cod} onChange={setCod} className="flex-1" ariaLabel="Tiền thu hộ COD" />
+              <button className="btn-ghost shrink-0 px-2 py-1 text-xs" disabled={need - paid <= 0} onClick={() => setCod(Math.max(0, need - paid))}>
+                Thu hộ phần còn lại
+              </button>
+            </div>
+            <p className="text-xs text-ink/60">
+              Phí ship chỉ để ghi lại; tiền ship spa tự trả thì lập phiếu chi. Tiền COD được tính là khách còn nợ cho đến khi đơn vị ship trả tiền,
+              lúc đó vào hoá đơn bấm “Thu nợ”.
+            </p>
+          </div>
+        )}
+
+        {lines.length > 0 && need - paid - codPart > 0 && (
+          <div className={`space-y-2 rounded-xl border p-3 text-sm ${debtOn ? "border-[#E0A526] bg-[#FFF4DB]/50" : "border-beige-dark"}`}>
+            <label className="flex items-center gap-2 font-medium">
+              <input type="checkbox" checked={debtOn} onChange={(e) => setDebtOn(e.target.checked)} />
+              Khách trả thiếu – ghi nợ phần còn lại ({formatVnd(need - paid - codPart)})
+            </label>
+            {debtOn && (
+              <>
+                <input className={`input py-2 text-sm ${debtReason.trim() ? "" : "border-[#E0A526]"}`}
+                  placeholder="Lý do cho nợ (bắt buộc)" value={debtReason} onChange={(e) => setDebtReason(e.target.value)} />
+                {!canDiscount && (
+                  <div className="text-xs">
+                    {debtReq?.status === "approved" && Number(debtReq.amount) >= debt && (
+                      <p className="text-[#22612A]">✓ Đã được duyệt cho nợ {formatVnd(Number(debtReq.amount))}.</p>
+                    )}
+                    {debtReq?.status === "approved" && Number(debtReq.amount) < debt && (
+                      <p className="text-[#8A2323]">Chỉ được duyệt nợ {formatVnd(Number(debtReq.amount))}, khách cần trả thêm.</p>
+                    )}
+                    {debtReq?.status === "pending" && (
+                      <p className="text-[#7A5600]">
+                        Đang chờ chủ spa / quản lý duyệt cho nợ {formatVnd(Number(debtReq.amount))}.{" "}
+                        <button className="font-semibold text-navy underline" disabled={debtReqBusy} onClick={refreshDebtRequest}>
+                          {debtReqBusy ? "…" : "Kiểm tra lại"}
+                        </button>
+                      </p>
+                    )}
+                    {debtReq?.status === "rejected" && (
+                      <p className="text-[#8A2323]">Không được duyệt cho nợ{debtReq.review_note ? `: ${debtReq.review_note}` : ""}.</p>
+                    )}
+                    {(!debtReq || debtReq.status === "rejected" || (debtReq.status === "approved" && Number(debtReq.amount) < debt)) && (
+                      <button className="btn-outline mt-2 w-full py-2" disabled={debtReqBusy || !customer || !debtReason.trim()} onClick={sendDebtRequest}>
+                        {debtReqBusy ? "Đang gửi…" : `Xin duyệt cho nợ ${formatVnd(debt)}`}
+                      </button>
+                    )}
+                    {debtReqError && <p className="mt-1 text-[#8A2323]">{debtReqError}</p>}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        {debt > 0 && (
+          <div className="flex justify-between rounded-xl bg-[#FFF4DB] px-3 py-2 text-sm">
+            <span>Khách còn nợ{codPart > 0 ? " (gồm tiền ship thu hộ)" : ""}</span>
+            <b className="text-[#7A5600]">{formatVnd(debt)}</b>
+          </div>
+        )}
+
         <label className="block">
           <span className="label">Ghi chú hoá đơn</span>
           <input className="input py-2" value={note} onChange={(e) => setNote(e.target.value)} placeholder="(không bắt buộc)" />
@@ -979,7 +1144,7 @@ export default function CheckoutForm({
             ) : problems.length ? (
               <p className="text-[#8A2323]">{problems[0]}</p>
             ) : (
-              <p className="text-[#22612A]">Đã đủ tiền, bấm để chốt hoá đơn.</p>
+              <p className="text-[#22612A]">{debt > 0 ? `Thu ${formatVnd(paid)}, ghi nợ ${formatVnd(debt)}. Bấm để chốt.` : "Đã đủ tiền, bấm để chốt hoá đơn."}</p>
             )}
           </div>
           <button className="btn-primary" disabled={saving || problems.length > 0} onClick={submit}>

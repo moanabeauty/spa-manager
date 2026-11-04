@@ -183,3 +183,27 @@ Cơ sở dữ liệu (`20261103000030_crm_menu_tiers.sql`):
 - `care_reminders`: lịch hoàn thành → tự tạo "hỏi thăm" (theo `services.followup_days`, mặc định 1 ngày cho peel, laser, meso, phi kim, RF, HIFU, tiêm, filler, botox, triệt lông) và "mời quay lại" (theo `services.recall_days`); khách quay lại làm thì nhắc "mời quay lại / lâu chưa đến" cũ tự đóng; lịch bị mở lại thì xoá nhắc chưa xử lý. `refresh_care_reminders()` (chạy khi mở trang Chăm sóc, không tạo trùng): gói sắp hết hạn còn buổi, khách còn buổi / số dư mà quá N ngày chưa đến, sinh nhật sắp tới. `add_care_reminder`, `complete_care_reminder`.
 - **Menu phân cấp**: `services.menu_tier` (`public` = khách mới thấy, `members` = chỉ khách đã mua gói). Quyền đọc bảng `services` lọc theo cấp ngay trong cơ sở dữ liệu: nhân viên thấy hết; khách thấy hết khi đã mua gói combo (kể cả gói khuyến mãi, gói đã huỷ / hết hạn), có thẻ nạp sẵn (nếu bật) hoặc được mở thủ công; dịch vụ đã có trong lịch của chính khách luôn hiện tên. Khách tự đặt online không đặt được dịch vụ 🔒 (`appointment_services_tier_check`). `menu_locked_summary()` đếm dịch vụ đang ẩn.
 - Mặc định 👁: Basic Treatment (2 nhóm), Biologique Recherche, Chemical Peel, Light Therapy, Laser, Body, Hair & Scalp, Triệt lông, Thermo + RF vùng mắt. 🔒: Meso, phi kim, MNRF, MPT / HIFU, Acne Scar, BAP, Filler, Botox, các dịch vụ mắt còn lại.
+
+## Giai đoạn 9: sắp xếp lại cấu trúc app
+
+Khu nhân viên chia **7 nhóm** (thanh nhóm trên máy tính, thanh dưới đáy trên điện thoại; mục nào không có quyền thì tự ẩn). Cấu hình ở `src/lib/nav.ts`, số việc chờ ở `src/lib/navCounts.ts`. Ô tìm kiếm chung (hàm `staff_search`) tìm khách / SĐT, mã hoá đơn, mã vận đơn, sản phẩm (tên, mã, mã vạch).
+
+| Nhóm | Trang |
+|---|---|
+| Tổng quan | `/quan-ly`: việc chờ duyệt (gộp), tiền hôm nay, lịch hẹn hôm nay, khách cần gọi, hàng sắp hết |
+| Quản lý | `/quan-ly/lich-hen`, `/tao-lich`, `/thu-tien`, `/hoa-don` (tab Tại quầy / Online / Còn nợ), `/phieu-thu-chi`, `/duyet-giam-gia` |
+| Khách hàng | `/khach-hang`, `/cham-soc` (tab Chưa quay lại 1·2·4·8·12 tuần + nhắc), `/khuyen-mai`, `/khach-hang/nhom` |
+| Kho | `/kho`, `/kho/nhap-hang`, `/kho/xin-xuat`, `/kho/kiem-kho`, `/kho/chuyen-kho`, `/kho/san-pham` (+ `/kho/san-pham/[id]` chi tiết, sửa, quét lại mã vạch, hạn dùng), `/kho/lich-su` |
+| Nhân sự | `/cham-cong`, `/nghi-phep`, `/bang-luong` (chủ), `/nhan-vien` (chủ) |
+| Báo cáo | `/doanh-so`, `/bao-cao`, `/bao-cao/goi-the`, `/bao-cao/cong-no`, `/thu-chi` (chủ) |
+| Cài đặt | menu dịch vụ, gói combo, chương trình KM, danh mục sản phẩm, `/cai-dat/bai-viet`, `/cai-dat/crm`, `/cai-dat/luong`, `/cai-dat/ngay-lam-viec` |
+
+Khu khách: trang chủ, `/menu`, `/khuyen-mai`, `/lieu-trinh-moi`, `/goc-cham-da`, `/bai-viet/[slug]`, `/dat-lich`, `/tai-khoan` (lịch hẹn, gói còn buổi, số dư thẻ, ưu đãi, đổi mật khẩu; `/lich-hen` cũ tự chuyển sang đây).
+
+Cơ sở dữ liệu (`20261104000032…34`):
+- **Đơn online**: `invoices.channel` (`store` / `online`), `invoice_shipments` (đơn vị ship, mã vận đơn, người nhận, địa chỉ, phí ship, COD, trạng thái giao); sửa bằng `update_shipment`.
+- **Công nợ**: `invoices.debt_amount`; thu sau bằng `collect_debt` → `debt_payments`; view `invoice_debts`. Chủ / quản lý cho nợ (ghi lý do), nhân viên khác gửi `request_debt` (chủ / quản lý duyệt ở trang Duyệt giảm giá & nợ). Phần COD của đơn online không cần duyệt. Thu tiền dùng `checkout_invoice_v3`. Báo cáo doanh thu thêm dòng `debt` / `debt_in`, sổ thu chi cộng tiền thu nợ.
+- **Phiếu thu / chi tại quầy**: `create_cash_voucher` (mọi nhân viên; chủ / quản lý tạo thì duyệt luôn), `review_cash_voucher`; chỉ phiếu đã duyệt vào sổ thu chi. Khoản mục dùng tại quầy: `cashbook_categories.counter`.
+- **Kho**: `stock_counts` + `submit_stock_count` / `review_stock_count` (lệch số chờ chủ duyệt; `adjust_stock` cũ cũng đi qua phiếu kiểm kho), `transfer_stock` (bán lẻ ⇄ liệu trình cùng chi nhánh), `products.expiry_date`.
+- **Chăm sóc lại**: `care_lapsed()` – khách theo số ngày từ lần làm dịch vụ gần nhất.
+- **Bài viết**: `posts` (liệu trình mới / góc chăm da), ảnh ở bucket `post-images`.

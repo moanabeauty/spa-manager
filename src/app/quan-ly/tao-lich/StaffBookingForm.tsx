@@ -224,7 +224,7 @@ export default function StaffBookingForm({
           {source === "walk_in" ? " · Khách đang ở spa (Đang làm)" : " · Đã xác nhận"}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href={`/quan-ly?ngay=${date}&cn=${branchId}`} className="btn-primary">Xem lịch trong ngày</Link>
+          <Link href={`/quan-ly/lich-hen?ngay=${date}&cn=${branchId}`} className="btn-primary">Xem lịch trong ngày</Link>
           <button className="btn-outline" onClick={reset}>Tạo lịch khác</button>
         </div>
       </div>

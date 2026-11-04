@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { formatVnd, normalizeText, vnError } from "@/lib/format";
 import { UNITS, productLabel, retailMinPrice, type Product } from "@/lib/inventory";
@@ -15,12 +16,15 @@ export default function ProductEditor({
   costs,
   defaultPct,
   isOwner,
+  canEdit,
 }: {
   products: Product[];
   costs: Record<string, number | null>;
   defaultPct: number;
   isOwner: boolean;
+  canEdit: boolean;
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<Scope>("all");
   const [open, setOpen] = useState<string | null>(null);
@@ -35,10 +39,10 @@ export default function ProductEditor({
     if (!code) return;
     const found = products.find((p) => p.barcode === code);
     if (found) {
-      setScope(found.is_active ? "all" : "inactive");
+      router.push(`/quan-ly/kho/san-pham/${found.id}`);
+    } else if (!canEdit) {
       setQuery(code);
-      setOpen(found.id);
-      setScanMsg(`Mã ${code}: ${productLabel(found)}`);
+      setScanMsg(`Mã ${code} chưa có trong danh mục.`);
     } else {
       setQuery("");
       setNewBarcode(code);
@@ -88,9 +92,11 @@ export default function ProductEditor({
               {label}
             </button>
           ))}
-          <button className="ml-auto rounded-full bg-[#D6EDD8] px-3 py-1.5 font-semibold text-[#22612A]" onClick={() => { setNewBarcode(""); setOpen(open === "new" ? null : "new"); }}>
-            + Sản phẩm mới
-          </button>
+          {canEdit && (
+            <button className="ml-auto rounded-full bg-[#D6EDD8] px-3 py-1.5 font-semibold text-[#22612A]" onClick={() => { setNewBarcode(""); setOpen(open === "new" ? null : "new"); }}>
+              + Sản phẩm mới
+            </button>
+          )}
         </div>
         {open === "new" && <ProductForm key={newBarcode} initialBarcode={newBarcode} cost={null} defaultPct={defaultPct} onDone={() => setOpen(null)} />}
       </div>
@@ -100,7 +106,7 @@ export default function ProductEditor({
         <ul className="divide-y divide-beige">
           {rows.map((p) => (
             <li key={p.id} className="px-4 py-2.5 text-sm">
-              <button className="flex w-full items-start justify-between gap-3 text-left" onClick={() => setOpen(open === p.id ? null : p.id)}>
+              <Link href={`/quan-ly/kho/san-pham/${p.id}`} className="flex w-full items-start justify-between gap-3 text-left hover:text-navy">
                 <span className="min-w-0">
                   <span className="font-medium">{productLabel(p)}</span>
                   <span className="block text-xs text-ink/55">
@@ -113,8 +119,7 @@ export default function ProductEditor({
                     {[p.for_treatment && "liệu trình", p.for_retail && "bán lẻ"].filter(Boolean).join(" + ") || "—"}
                   </span>
                 </span>
-              </button>
-              {open === p.id && <ProductForm product={p} cost={costs[p.id] ?? null} defaultPct={defaultPct} onDone={() => setOpen(null)} />}
+              </Link>
             </li>
           ))}
         </ul>
@@ -166,7 +171,7 @@ function DiscountSetting({ value }: { value: number }) {
   );
 }
 
-function ProductForm({
+export function ProductForm({
   product,
   initialBarcode,
   cost,
@@ -196,6 +201,7 @@ function ProductForm({
     for_retail: product?.for_retail ?? true,
     is_active: product?.is_active ?? true,
     note: product?.note ?? "",
+    expiry_date: product?.expiry_date ?? "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -226,6 +232,7 @@ function ProductForm({
       for_retail: f.for_retail,
       is_active: f.is_active,
       note: f.note || null,
+      expiry_date: f.expiry_date || null,
     };
     const supabase = createClient();
     const { error } = product
@@ -268,6 +275,7 @@ function ProductForm({
         </select>
       </label>
       <label>Nhóm<input className={input} value={f.category} onChange={(e) => set({ category: e.target.value })} /></label>
+      <label>Hạn sử dụng (lô gần hết hạn nhất)<input type="date" className={input} value={f.expiry_date} onChange={(e) => set({ expiry_date: e.target.value })} /></label>
       <label className="sm:col-span-2">Dùng trong liệu trình<input className={input} value={f.used_in} onChange={(e) => set({ used_in: e.target.value })} /></label>
       <label>
         Giá niêm yết (bán lẻ)

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { createClient, getCurrentUser, isStaffRole } from "@/lib/supabase/server";
-import ManagerTabs from "./ManagerTabs";
 import CheckInBar from "@/components/CheckInBar";
 import PushToggle from "@/components/PushToggle";
+import StaffNav from "@/components/StaffNav";
 import { todayVn } from "@/lib/format";
+import { buildNav } from "@/lib/nav";
+import { loadNavCounts } from "@/lib/navCounts";
 
 export default async function ManagerLayout({ children }: { children: React.ReactNode }) {
   const { user, profile } = await getCurrentUser();
@@ -23,112 +25,28 @@ export default async function ManagerLayout({ children }: { children: React.Reac
     );
   }
   const role = profile!.role;
-  let pendingDiscounts = 0;
-  if (role === "owner" || role === "manager") {
-    const supabase = await createClient();
-    const { count } = await supabase
-      .from("discount_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending");
-    pendingDiscounts = count ?? 0;
-  }
-  let pendingStock = 0;
-  if (role === "owner" || role === "manager" || role === "warehouse") {
-    const supabase = await createClient();
-    let q = supabase.from("stock_requests").select("id, warehouses!inner(branch_id)", { count: "exact", head: true }).eq("status", "pending");
-    if (role === "warehouse" && profile!.branch_id) q = q.eq("warehouses.branch_id", profile!.branch_id);
-    const { count } = await q;
-    pendingStock = count ?? 0;
-  }
-  let pendingPromo = 0;
-  if (role !== "warehouse") {
-    const supabase = await createClient();
-    const { count } = await supabase
-      .from("promotion_registrations")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending");
-    pendingPromo = count ?? 0;
-  }
-  let pendingAttendance = 0;
-  if (role === "owner") {
-    const supabase = await createClient();
-    const { count } = await supabase.from("staff_attendance").select("staff_id", { count: "exact", head: true }).eq("approval_status", "pending");
-    pendingAttendance = count ?? 0;
-  }
-  let otStart = "18:30";
-  let pendingLeave = 0;
-  let pendingOt = 0;
-  {
-    const supabase = await createClient();
-    const { data: cfg } = await supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle();
-    otStart = (cfg?.value as { ot_start?: string } | null)?.ot_start ?? "18:30";
-    if (role === "owner" || role === "manager") {
-      const [{ count: lc }, { count: oc }] = await Promise.all([
-        supabase.from("staff_leaves").select("id", { count: "exact", head: true }).eq("status", "pending"),
-        supabase.from("staff_attendance").select("staff_id", { count: "exact", head: true }).eq("ot_status", "pending"),
-      ]);
-      pendingLeave = lc ?? 0;
-      pendingOt = oc ?? 0;
-    }
-  }
-  let dueCare = 0;
-  if (role !== "warehouse") {
-    const supabase = await createClient();
-    let q = supabase.from("care_reminders").select("id", { count: "exact", head: true }).eq("status", "open").lte("due_date", todayVn());
-    if (role !== "owner" && role !== "manager" && profile!.branch_id) q = q.or(`branch_id.eq.${profile!.branch_id},branch_id.is.null`);
-    const { count } = await q;
-    dueCare = count ?? 0;
-  }
-  const kho = { href: "/quan-ly/kho", label: pendingStock ? `Kho (${pendingStock})` : "Kho" };
-  const tabs =
-    role === "warehouse"
-      ? [kho, { href: "/quan-ly/nghi-phep", label: "Nghỉ phép" }]
-      : [
-          { href: "/quan-ly", label: "Lịch hẹn" },
-          { href: "/quan-ly/tao-lich", label: "+ Tạo lịch" },
-          { href: "/quan-ly/khach-hang", label: "Khách hàng" },
-          { href: "/quan-ly/cham-soc", label: dueCare ? `Chăm sóc lại (${dueCare})` : "Chăm sóc lại" },
-          { href: "/quan-ly/hoa-don", label: "Hoá đơn" },
-          { href: "/quan-ly/khuyen-mai", label: pendingPromo ? `Khuyến mãi (${pendingPromo})` : "Khuyến mãi" },
-          { href: "/quan-ly/doanh-so", label: role === "owner" || role === "manager" ? "Doanh số" : "Doanh số của tôi" },
-          kho,
-          ...(role === "owner" || role === "manager"
-            ? [{ href: "/quan-ly/duyet-giam-gia", label: pendingDiscounts ? `Duyệt giảm giá (${pendingDiscounts})` : "Duyệt giảm giá" }]
-            : []),
-          ...(role === "owner" || role === "manager"
-            ? [
-                { href: "/quan-ly/bao-cao", label: "Báo cáo" },
-                {
-                  href: "/quan-ly/bang-luong",
-                  label:
-                    (role === "owner" ? "Bảng lương" : "Chấm công") +
-                    ((role === "owner" ? pendingAttendance : 0) + pendingOt ? ` (${(role === "owner" ? pendingAttendance : 0) + pendingOt} chờ duyệt)` : ""),
-                },
-              ]
-            : []),
-          { href: "/quan-ly/nghi-phep", label: pendingLeave ? `Nghỉ phép (${pendingLeave})` : "Nghỉ phép" },
-          ...(role === "owner" ? [{ href: "/quan-ly/thu-chi", label: "Thu chi" }] : []),
-          ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/goi-combo", label: "Gói combo" }] : []),
-          ...(role === "owner" || role === "manager" ? [{ href: "/quan-ly/dich-vu", label: "Menu dịch vụ" }] : []),
-          ...(role === "owner" ? [{ href: "/quan-ly/nhan-vien", label: "Nhân viên" }] : []),
-        ];
-  let attendance: { check_in: string; check_out: string | null; approval_status: string; approval_reason: string | null } | null = null;
-  if (role !== "owner") {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("staff_attendance")
-      .select("check_in, check_out, approval_status, approval_reason")
-      .eq("staff_id", profile!.id)
-      .eq("work_date", todayVn())
-      .maybeSingle();
-    attendance = data;
-  }
+  const supabase = await createClient();
+  const [counts, { data: cfg }, { data: attendance }] = await Promise.all([
+    loadNavCounts(role, profile!.branch_id),
+    supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
+    role !== "owner"
+      ? supabase
+          .from("staff_attendance")
+          .select("check_in, check_out, approval_status, approval_reason")
+          .eq("staff_id", profile!.id)
+          .eq("work_date", todayVn())
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const otStart = (cfg?.value as { ot_start?: string } | null)?.ot_start ?? "18:30";
+  const groups = buildNav(role, counts);
   const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-20 sm:pb-0">
       {role !== "owner" && <CheckInBar today={attendance} otStart={otStart} />}
       {role === "owner" && vapidKey && <PushToggle publicKey={vapidKey} hideWhenOn />}
-      <div className="print:hidden"><ManagerTabs tabs={tabs} /></div>
+      <StaffNav groups={groups} />
       {children}
     </div>
   );

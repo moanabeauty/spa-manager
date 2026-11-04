@@ -11,9 +11,9 @@ type ItemRow = { item_type: string; name: string; qty: number; amount: number; c
 
 type Sum = {
   service: number; serviceCard: number; pkg: number; product: number; topup: number;
-  cash: number; transfer: number; pos: number; card: number; refund: number;
+  cash: number; transfer: number; pos: number; card: number; refund: number; debt: number; debtIn: number;
 };
-const empty = (): Sum => ({ service: 0, serviceCard: 0, pkg: 0, product: 0, topup: 0, cash: 0, transfer: 0, pos: 0, card: 0, refund: 0 });
+const empty = (): Sum => ({ service: 0, serviceCard: 0, pkg: 0, product: 0, topup: 0, cash: 0, transfer: 0, pos: 0, card: 0, refund: 0, debt: 0, debtIn: 0 });
 
 function add(s: Sum, r: Row) {
   const a = Number(r.amount);
@@ -23,6 +23,12 @@ function add(s: Sum, r: Row) {
     else if (r.key.startsWith("package")) s.pkg += a;
     else if (r.key.startsWith("product")) s.product += a;
     else if (r.key.startsWith("card_topup")) s.topup += a;
+  } else if (r.kind === "debt") s.debt += a;
+  else if (r.kind === "debt_in") {
+    s.debtIn += a;
+    if (r.key === "cash") s.cash += a;
+    else if (r.key === "bank_transfer") s.transfer += a;
+    else if (r.key === "pos") s.pos += a;
   } else if (r.kind === "pay") {
     if (r.key === "cash") s.cash += a;
     else if (r.key === "bank_transfer") s.transfer += a;
@@ -176,6 +182,12 @@ export default async function RevenuePage({
         <p className="px-4 pb-3 pt-1 text-xs text-ink/60">
           Thu theo hình thức: tiền mặt {formatVnd(total.cash)} · chuyển khoản {formatVnd(total.transfer)} · POS {formatVnd(total.pos)}.
           Buổi trừ gói combo không có tiền (đã thu lúc bán gói).
+          {(total.debt > 0 || total.debtIn > 0) && (
+            <>
+              {" "}Công nợ: khách nợ lại {formatVnd(total.debt)} (đã tính trong doanh số, chưa vào tiền thực thu) · thu nợ{" "}
+              {formatVnd(total.debtIn)} (đã cộng vào tiền thực thu). <Link href="/quan-ly/bao-cao/cong-no" className="underline">Xem công nợ</Link>
+            </>
+          )}
         </p>
       </div>
 

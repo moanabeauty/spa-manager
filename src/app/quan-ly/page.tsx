@@ -2,210 +2,204 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import { STATUS_LABEL, STATUS_STYLE, formatDate, formatTime, formatVnd, todayVn, vnDateTime } from "@/lib/format";
-import StatusActions from "./StatusActions";
-import TechnicianPicker from "./TechnicianPicker";
-import { canCheckout, fetchBusy, fetchTechnicians } from "@/lib/staff";
+import { loadNavCounts } from "@/lib/navCounts";
 
-export const metadata = { title: "Lịch hẹn spa – Moana Beauty" };
+export const metadata = { title: "Tổng quan – Moana Beauty" };
 
-type Row = {
-  id: string;
-  start_at: string;
-  end_at: string | null;
-  status: string;
-  source: string;
-  note: string | null;
-  customers: { full_name: string; phone: string | null; note: string | null } | null;
-  appointment_services: {
-    id: string;
-    start_at: string;
-    end_at: string;
-    price: number | null;
-    technician_id: string | null;
-    services: { name: string } | null;
-  }[];
+type Appt = {
+  id: string; start_at: string; status: string; branch_id: string;
+  customers: { full_name: string } | null;
+  appointment_services: { services: { name: string } | null }[];
 };
 
-const SOURCE_LABEL: Record<string, string> = { online: "Online", walk_in: "Khách vãng lai", phone: "Điện thoại", staff: "Nhân viên" };
+export default async function OverviewPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const sp = await searchParams;
+  // đường dẫn cũ /quan-ly?ngay=…&cn=… (lịch hẹn) → trang Lịch hẹn mới
+  if (sp.ngay || sp.cn || sp.tt) {
+    const p = new URLSearchParams(Object.entries(sp).filter(([, v]) => v) as [string, string][]);
+    redirect(`/quan-ly/lich-hen?${p.toString()}`);
+  }
+  const { supabase, profile } = await getCurrentUser();
+  if (!isStaffRole(profile?.role)) return null; // layout đã báo
+  const role = profile!.role;
+  const M = role === "owner" || role === "manager";
+  const O = role === "owner";
+  const W = role === "warehouse";
+  const today = todayVn();
+  const from = vnDateTime(today, "00:00").toISOString();
+  const to = vnDateTime(todayVn(1), "00:00").toISOString();
+  const myBranch = M ? null : profile!.branch_id;
 
-function shiftDate(d: string, days: number) {
-  const t = vnDateTime(d, "12:00").getTime() + days * 86400000;
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(t));
-}
+  const counts = await loadNavCounts(role, profile!.branch_id);
+  const approvals = [
+    { n: counts.discounts, label: O ? "Giảm giá / cho nợ chờ duyệt" : "Cho nợ chờ duyệt", href: "/quan-ly/duyet-giam-gia" },
+    { n: counts.vouchers, label: "Phiếu thu / chi tại quầy", href: "/quan-ly/phieu-thu-chi" },
+    { n: counts.stockRequests, label: "Phiếu xin xuất kho", href: "/quan-ly/kho/xin-xuat" },
+    { n: counts.stockCounts, label: "Kiểm kho bị lệch", href: "/quan-ly/kho/kiem-kho" },
+    { n: counts.promos, label: "Khách đăng ký khuyến mãi", href: "/quan-ly/khuyen-mai" },
+    { n: counts.attendance, label: "Chấm công / tăng ca", href: "/quan-ly/cham-cong" },
+    { n: counts.leaves, label: "Đơn nghỉ phép", href: "/quan-ly/nghi-phep" },
+  ].filter((a) => a.n > 0 && (M || a.href === "/quan-ly/khuyen-mai" || (W && a.href.startsWith("/quan-ly/kho"))));
 
-export default async function StaffAppointmentsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ ngay?: string; cn?: string; tt?: string }>;
-}) {
-  const { supabase, user, profile } = await getCurrentUser();
-  if (!user) redirect("/dang-nhap?next=/quan-ly");
-  if (!isStaffRole(profile?.role)) {
-    return (
-      <div className="card">
-        <h1 className="text-lg font-bold text-navy">Trang dành cho nhân viên</h1>
-        <p className="mt-2 text-sm">Tài khoản của bạn chưa được cấp quyền nhân viên. Vui lòng nhờ chủ spa cấp quyền.</p>
-      </div>
-    );
+  let appts: Appt[] = [];
+  let money: { real: number; debt: number; debtIn: number } | null = null;
+  let lowStock = 0;
+  if (!W) {
+    let q = supabase
+      .from("appointments")
+      .select("id, start_at, status, branch_id, customers(full_name), appointment_services(services(name))")
+      .gte("start_at", from)
+      .lt("start_at", to)
+      .order("start_at");
+    if (myBranch) q = q.eq("branch_id", myBranch);
+    const { data } = await q;
+    appts = (data ?? []) as unknown as Appt[];
+  }
+  if (M) {
+    const [{ data: pays }, { data: inv }, { data: dIn }] = await Promise.all([
+      supabase.from("payments").select("amount, method, invoices!inner(status, paid_at)").neq("method", "service_card")
+        .eq("invoices.status", "paid").gte("invoices.paid_at", from).lt("invoices.paid_at", to),
+      supabase.from("invoices").select("debt_amount").eq("status", "paid").gt("debt_amount", 0).gte("paid_at", from).lt("paid_at", to),
+      supabase.from("debt_payments").select("amount").gte("created_at", from).lt("created_at", to),
+    ]);
+    const sum = (r: { amount?: number; debt_amount?: number }[] | null, k: "amount" | "debt_amount") =>
+      (r ?? []).reduce((a, x) => a + Number(x[k] ?? 0), 0);
+    money = { real: sum(pays, "amount") + sum(dIn, "amount"), debt: sum(inv, "debt_amount"), debtIn: sum(dIn, "amount") };
+  }
+  if (W || M) {
+    let lq = supabase.from("stock_levels").select("product_id, quantity, branch_id");
+    if (W && profile!.branch_id) lq = lq.eq("branch_id", profile!.branch_id);
+    const [{ data: lv }, { data: ps }] = await Promise.all([lq, supabase.from("products").select("id, min_stock").eq("is_active", true)]);
+    const min = new Map(((ps ?? []) as { id: string; min_stock: number }[]).map((p) => [p.id, p.min_stock]));
+    lowStock = ((lv ?? []) as { product_id: string; quantity: number }[]).filter(
+      (r) => min.has(r.product_id) && Number(r.quantity) <= (min.get(r.product_id) ?? 0),
+    ).length;
   }
 
-  if (profile?.role === "warehouse") redirect("/quan-ly/kho");
+  const byStatus = (s: string) => appts.filter((a) => a.status === s).length;
+  const now = Date.now();
+  const upcoming = appts.filter((a) => ["pending", "confirmed", "in_progress"].includes(a.status) && new Date(a.start_at).getTime() > now - 3600000).slice(0, 6);
 
-  const sp = await searchParams;
-  const date = sp.ngay && /^\d{4}-\d{2}-\d{2}$/.test(sp.ngay) ? sp.ngay : todayVn();
-  const { data: branches } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
-  const branchId = sp.cn ?? profile?.branch_id ?? branches?.[0]?.id ?? "";
-  const filter = sp.tt ?? "active";
-
-  const from = vnDateTime(date, "00:00").toISOString();
-  const to = vnDateTime(shiftDate(date, 1), "00:00").toISOString();
-  let q = supabase
-    .from("appointments")
-    .select(
-      "id, start_at, end_at, status, source, note, customers(full_name, phone, note), appointment_services(id, start_at, end_at, price, technician_id, services(name))",
-    )
-    .eq("branch_id", branchId)
-    .gte("start_at", from)
-    .lt("start_at", to)
-    .order("start_at");
-  if (filter === "active") q = q.not("status", "in", "(cancelled,no_show)");
-  const [{ data, error }, technicians, busy] = await Promise.all([q, fetchTechnicians(supabase), fetchBusy(supabase, from, to)]);
-  const rows = (data ?? []) as unknown as Row[];
-  const canAssign = profile?.role !== "customer";
-  const cashier = canCheckout(profile?.role);
-  const { data: invs } = rows.length
-    ? await supabase
-        .from("invoices")
-        .select("id, code, appointment_id")
-        .in("appointment_id", rows.map((r) => r.id))
-        .neq("status", "cancelled")
-    : { data: [] };
-  const invoiceOf = new Map(((invs ?? []) as { id: string; code: string; appointment_id: string }[]).map((i) => [i.appointment_id, i]));
-
-  const link = (p: { ngay?: string; cn?: string; tt?: string }) => {
-    const params = new URLSearchParams({ ngay: p.ngay ?? date, cn: p.cn ?? branchId, tt: p.tt ?? filter });
-    return `/quan-ly?${params.toString()}`;
-  };
-  const pendingCount = rows.filter((r) => r.status === "pending").length;
+  const actions = W
+    ? [
+        { href: "/quan-ly/kho/nhap-hang", label: "Nhập hàng" },
+        { href: "/quan-ly/kho/kiem-kho", label: "Kiểm kho" },
+        { href: "/quan-ly/kho/chuyen-kho", label: "Chuyển kho" },
+        { href: "/quan-ly/phieu-thu-chi", label: "Phiếu thu / chi" },
+      ]
+    : [
+        { href: "/quan-ly/tao-lich", label: "+ Tạo lịch" },
+        { href: "/quan-ly/thu-tien", label: "Thu tiền / bán hàng" },
+        { href: "/quan-ly/phieu-thu-chi", label: "Phiếu thu / chi" },
+        { href: "/quan-ly/kho/xin-xuat", label: "Xin xuất hàng" },
+      ];
 
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-navy">Lịch hẹn spa</h1>
-        <p className="text-sm capitalize text-ink/70">{formatDate(vnDateTime(date, "12:00").toISOString())}</p>
+        <h1 className="text-2xl font-bold text-navy">Xin chào, {profile!.full_name ?? "bạn"}</h1>
+        <p className="text-sm capitalize text-ink/70">{formatDate(vnDateTime(today, "12:00").toISOString())}</p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {(branches ?? []).map((b) => (
-          <Link
-            key={b.id}
-            href={link({ cn: b.id })}
-            className={`rounded-full px-4 py-2 text-sm font-semibold ${b.id === branchId ? "bg-navy text-white" : "bg-white text-navy ring-1 ring-beige-dark"}`}
-          >
-            {b.name}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {actions.map((a) => (
+          <Link key={a.href} href={a.href} className="card p-3 text-center text-sm font-semibold text-navy hover:border-navy">
+            {a.label}
           </Link>
         ))}
       </div>
 
-      <div className="card flex flex-wrap items-center gap-2 p-3">
-        <Link href={link({ ngay: shiftDate(date, -1) })} className="btn-ghost">‹ Hôm trước</Link>
-        <form action="/quan-ly" className="flex items-center gap-2">
-          <input type="hidden" name="cn" value={branchId} />
-          <input type="hidden" name="tt" value={filter} />
-          <input type="date" name="ngay" defaultValue={date} className="input w-auto py-2" />
-          <button className="btn-outline py-2">Xem</button>
-        </form>
-        <Link href={link({ ngay: shiftDate(date, 1) })} className="btn-ghost">Hôm sau ›</Link>
-        <Link href={link({ ngay: todayVn() })} className="btn-ghost">Hôm nay</Link>
-        <Link href={link({ tt: filter === "active" ? "all" : "active" })} className="ml-auto text-sm text-navy underline">
-          {filter === "active" ? "Hiện cả lịch đã huỷ" : "Ẩn lịch đã huỷ"}
-        </Link>
-      </div>
+      {(M || W || approvals.length > 0) && (
+        <section className="card space-y-2 p-4">
+          <h2 className="font-semibold text-navy">Chờ duyệt / xử lý</h2>
+          {approvals.length === 0 ? (
+            <p className="text-sm text-[#22612A]">✓ Không có việc nào đang chờ.</p>
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {approvals.map((a) => (
+                <li key={a.href}>
+                  <Link href={a.href} className="flex items-center justify-between rounded-xl bg-[#FFF4DB] px-3 py-2 text-sm hover:ring-1 hover:ring-[#E0A526]">
+                    <span>{a.label}</span>
+                    <b className="rounded-full bg-[#C2410C] px-2 text-white">{a.n}</b>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
-      {error && <p className="card text-sm text-[#8A2323]">Không tải được lịch: {error.message}</p>}
+      {money && (
+        <section className="grid grid-cols-3 gap-2">
+          <div className="card p-3">
+            <p className="text-xs text-ink/60">Tiền thực thu hôm nay</p>
+            <p className="text-lg font-bold text-navy">{formatVnd(money.real)}</p>
+          </div>
+          <div className="card p-3">
+            <p className="text-xs text-ink/60">Khách nợ lại hôm nay</p>
+            <p className={`text-lg font-bold ${money.debt ? "text-[#7A5600]" : ""}`}>{formatVnd(money.debt)}</p>
+          </div>
+          <div className="card p-3">
+            <p className="text-xs text-ink/60">Thu nợ cũ hôm nay</p>
+            <p className="text-lg font-bold">{formatVnd(money.debtIn)}</p>
+          </div>
+        </section>
+      )}
 
-      <p className="text-sm text-ink/70">
-        {rows.length} lịch hẹn{pendingCount > 0 && <> · <b className="text-[#7A5600]">{pendingCount} chờ xác nhận</b></>}
-      </p>
-
-      {rows.length === 0 && <p className="card text-sm text-ink/60">Không có lịch hẹn nào trong ngày này.</p>}
-
-      <div className="space-y-3">
-        {rows.map((r) => {
-          const items = [...r.appointment_services].sort((x, y) => x.start_at.localeCompare(y.start_at));
-          const total = items.reduce((a, s) => a + (s.price ?? 0), 0);
-          return (
-            <div key={r.id} className={`card ${r.status === "pending" ? "border-l-4 border-l-[#E0A526]" : ""}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex gap-4">
-                  <div className="text-center">
-                    <p className="text-xl font-bold text-navy">{formatTime(r.start_at)}</p>
-                    {r.end_at && <p className="text-xs text-ink/50">{formatTime(r.end_at)}</p>}
-                  </div>
-                  <div>
-                    <p className="font-semibold">{r.customers?.full_name ?? "—"}</p>
-                    {r.customers?.phone && (
-                      <a href={`tel:${r.customers.phone}`} className="text-sm text-navy underline">{r.customers.phone}</a>
-                    )}
-                    <p className="text-xs text-ink/50">{SOURCE_LABEL[r.source] ?? r.source}</p>
-                  </div>
-                </div>
-                <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLE[r.status] ?? ""}`}>
-                  {STATUS_LABEL[r.status] ?? r.status}
-                </span>
+      {!W && (
+        <section className="card space-y-3 p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-navy">Lịch hẹn hôm nay{myBranch ? "" : " (cả 2 chi nhánh)"}</h2>
+            <Link href="/quan-ly/lich-hen" className="text-sm text-navy underline">Xem lịch</Link>
+          </div>
+          <div className="grid grid-cols-4 gap-2 text-center text-xs">
+            {[
+              ["pending", "Chờ xác nhận"],
+              ["confirmed", "Đã xác nhận"],
+              ["in_progress", "Đang làm"],
+              ["completed", "Hoàn thành"],
+            ].map(([k, l]) => (
+              <div key={k} className="rounded-xl bg-cream px-1 py-2">
+                <p className="text-lg font-bold text-navy">{byStatus(k)}</p>
+                <p className="leading-tight text-ink/60">{l}</p>
               </div>
-              <ul className="mt-3 space-y-1 border-t border-beige pt-3 text-sm">
-                {items.map((s) => (
-                  <li key={s.id} className="py-1">
-                    <div className="flex justify-between gap-3">
-                      <span>
-                        <span className="text-ink/50">{formatTime(s.start_at)}</span> {s.services?.name}
-                      </span>
-                      <span className="shrink-0 text-ink/60">{formatVnd(s.price)}</span>
-                    </div>
-                    {canAssign && (
-                      <TechnicianPicker
-                        serviceRowId={s.id}
-                        current={s.technician_id}
-                        start={s.start_at}
-                        end={s.end_at}
-                        locked={r.status === "cancelled" || r.status === "no_show" || r.status === "completed"}
-                        technicians={technicians}
-                        busy={busy}
-                        branches={branches ?? []}
-                      />
-                    )}
-                  </li>
-                ))}
-                {items.length > 1 && (
-                  <li className="flex justify-between pt-1 font-semibold">
-                    <span>Tạm tính</span>
-                    <span>{formatVnd(total)}</span>
-                  </li>
-                )}
-              </ul>
-              {r.note && <p className="mt-2 rounded-lg bg-cream px-3 py-2 text-sm">Khách ghi chú: {r.note}</p>}
-              {r.customers?.note && <p className="mt-2 rounded-lg bg-[#FFE8BA]/60 px-3 py-2 text-xs">Hồ sơ khách: {r.customers.note}</p>}
-              {invoiceOf.get(r.id) ? (
-                <p className="mt-3 flex items-center justify-between border-t border-beige pt-3 text-sm">
-                  <span className="font-semibold text-[#22612A]">✓ Đã thanh toán</span>
-                  <Link href={`/quan-ly/hoa-don/${invoiceOf.get(r.id)!.id}`} className="text-navy underline">{invoiceOf.get(r.id)!.code}</Link>
-                </p>
-              ) : (
-                <>
-                  <StatusActions id={r.id} status={r.status} />
-                  {cashier && ["confirmed", "in_progress", "completed"].includes(r.status) && (
-                    <div className="mt-2 flex justify-end">
-                      <Link href={`/quan-ly/thu-tien?lich=${r.id}`} className="btn-primary bg-brown py-2 hover:bg-[#87704f]">
-                        Thu tiền
-                      </Link>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          );
-        })}
+            ))}
+          </div>
+          {upcoming.length > 0 && (
+            <ul className="divide-y divide-beige text-sm">
+              {upcoming.map((a) => (
+                <li key={a.id} className="flex items-center justify-between gap-2 py-2">
+                  <span className="min-w-0">
+                    <b>{formatTime(a.start_at)}</b> {a.customers?.full_name ?? "Khách"}
+                    <span className="block truncate text-xs text-ink/60">{a.appointment_services.map((s) => s.services?.name).filter(Boolean).join(", ")}</span>
+                  </span>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[a.status] ?? ""}`}>{STATUS_LABEL[a.status] ?? a.status}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        {!W && (
+          <Link href="/quan-ly/cham-soc" className="card flex items-center justify-between p-4 text-sm hover:border-navy">
+            <span>
+              <b className="text-navy">Khách cần gọi</b>
+              <span className="block text-xs text-ink/60">Nhắc chăm sóc đến hạn · khách chưa quay lại theo tuần</span>
+            </span>
+            <b className="text-lg text-navy">{counts.care}</b>
+          </Link>
+        )}
+        {(W || M) && (
+          <Link href="/quan-ly/kho" className="card flex items-center justify-between p-4 text-sm hover:border-navy">
+            <span>
+              <b className="text-navy">Hàng sắp hết / hết</b>
+              <span className="block text-xs text-ink/60">Số dòng tồn kho ≤ mức báo</span>
+            </span>
+            <b className={`text-lg ${lowStock ? "text-[#8A2323]" : "text-navy"}`}>{lowStock}</b>
+          </Link>
+        )}
       </div>
     </div>
   );

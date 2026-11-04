@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { formatDate, formatTime, formatVnd } from "@/lib/format";
+import { formatDate, formatShortDate, formatTime, formatVnd } from "@/lib/format";
 import { METHOD_LABEL } from "@/lib/billing";
 import PrintButton from "./PrintButton";
 import VoidButton from "./VoidButton";
+import DebtCollect from "./DebtCollect";
+import ShipmentEditor, { type Shipment } from "./ShipmentEditor";
+import { SHIP_STATUS } from "@/lib/shipping";
+import { canCheckout } from "@/lib/staff";
 
 export const metadata = { title: "Hoá đơn – Moana Beauty" };
 
@@ -34,6 +38,11 @@ type Inv = {
     invoice_item_sellers: { amount: number; profiles: { full_name: string | null } | null }[];
   }[];
   payments: { id: string; method: string; amount: number }[];
+  channel: string;
+  debt_amount: number;
+  debt_reason: string | null;
+  debt_payments: { id: string; method: string; amount: number; created_at: string; note: string | null }[];
+  invoice_shipments: Shipment | null;
 };
 
 export default async function InvoicePage({
@@ -53,7 +62,9 @@ export default async function InvoicePage({
        branches(name, address), customers(id, full_name, phone), creator:profiles!invoices_created_by_fkey(full_name),
        invoice_items(id, item_type, description, quantity, unit_price, discount, amount, paid_with_card, customer_package_id,
          invoice_item_sellers(amount, profiles(full_name))),
-       payments(id, method, amount)`,
+       payments(id, method, amount), channel, debt_amount, debt_reason,
+       debt_payments(id, method, amount, created_at, note),
+       invoice_shipments(carrier, tracking_code, recipient_name, recipient_phone, address, shipping_fee, cod_amount, status, note)`,
     )
     .eq("id", id)
     .maybeSingle();
@@ -63,6 +74,10 @@ export default async function InvoicePage({
   const gross = inv.invoice_items.reduce((a, i) => a + Number(i.unit_price) * i.quantity, 0);
   const discount = gross - total;
   const cancelled = inv.status === "cancelled";
+  const paidNow = inv.payments.reduce((a, p) => a + Number(p.amount), 0);
+  const collected = inv.debt_payments.reduce((a, p) => a + Number(p.amount), 0);
+  const owed = cancelled ? 0 : Math.max(0, total - paidNow - collected);
+  const sh = inv.invoice_shipments;
   const showSellers = profile?.role === "owner" || profile?.role === "manager" || profile?.role === "receptionist";
 
   return (
@@ -71,7 +86,9 @@ export default async function InvoicePage({
         <div className="card flex flex-wrap items-center justify-between gap-2 border-l-4 border-l-[#22612A] p-4 text-sm print:hidden">
           <span>✓ Đã thu tiền và chốt hoá đơn.</span>
           <span className="flex gap-2">
-            <Link href="/quan-ly" className="btn-outline py-2">Về lịch hẹn</Link>
+            <Link href={inv.appointment_id ? "/quan-ly/lich-hen" : "/quan-ly/thu-tien"} className="btn-outline py-2">
+              {inv.appointment_id ? "Về lịch hẹn" : "Thu hoá đơn khác"}
+            </Link>
             {inv.customers && <Link href={`/quan-ly/khach-hang?id=${inv.customers.id}`} className="btn-ghost py-2">Hồ sơ khách</Link>}
           </span>
         </div>
@@ -81,7 +98,7 @@ export default async function InvoicePage({
         <div className="text-center">
           <p className="text-lg font-bold tracking-[0.2em] text-navy">MOANA BEAUTY</p>
           {inv.branches && <p className="text-xs text-ink/60">{inv.branches.address}</p>}
-          <p className="mt-2 font-semibold">HOÁ ĐƠN {inv.code}</p>
+          <p className="mt-2 font-semibold">HOÁ ĐƠN {inv.code}{inv.channel === "online" ? " · ONLINE" : ""}</p>
           <p className="text-xs text-ink/60">
             {inv.paid_at ? `${formatTime(inv.paid_at)} · ${formatDate(inv.paid_at)}` : formatDate(inv.created_at)}
           </p>
@@ -139,10 +156,48 @@ export default async function InvoicePage({
               <span>{formatVnd(Number(p.amount))}</span>
             </p>
           ))}
+          {inv.debt_payments.map((p) => (
+            <p key={p.id} className="flex justify-between text-[#22612A]">
+              <span>Thu nợ {formatShortDate(p.created_at)} · {METHOD_LABEL[p.method] ?? p.method}</span>
+              <span>{formatVnd(Number(p.amount))}</span>
+            </p>
+          ))}
+          {Number(inv.debt_amount) > 0 && (
+            <div className="mt-2 grid grid-cols-3 gap-2 rounded-xl bg-cream p-2 text-center text-xs">
+              <div><p className="text-ink/60">Phải trả</p><p className="font-bold">{formatVnd(total)}</p></div>
+              <div><p className="text-ink/60">Đã trả</p><p className="font-bold text-[#22612A]">{formatVnd(paidNow + collected)}</p></div>
+              <div><p className="text-ink/60">Còn nợ</p><p className={`font-bold ${owed > 0 ? "text-[#8A2323]" : "text-[#22612A]"}`}>{owed > 0 ? formatVnd(owed) : "Đã trả đủ"}</p></div>
+            </div>
+          )}
+          {inv.debt_reason && <p className="text-xs text-ink/60 print:hidden">Lý do nợ: {inv.debt_reason}</p>}
         </div>
+        {sh && (
+          <div className="space-y-0.5 border-t border-beige pt-3 text-sm">
+            <p className="flex items-center justify-between">
+              <b>Giao hàng</b>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${SHIP_STATUS[sh.status]?.cls ?? ""}`}>{SHIP_STATUS[sh.status]?.label}</span>
+            </p>
+            <p>{[sh.recipient_name, sh.recipient_phone].filter(Boolean).join(" · ")}</p>
+            {sh.address && <p className="text-ink/70">{sh.address}</p>}
+            <p className="text-ink/70">
+              {[sh.carrier, sh.tracking_code ? `Mã vận đơn ${sh.tracking_code}` : "Chưa có mã vận đơn"].filter(Boolean).join(" · ")}
+            </p>
+            {(Number(sh.shipping_fee) > 0 || Number(sh.cod_amount) > 0) && (
+              <p className="text-ink/70">
+                {Number(sh.shipping_fee) > 0 && `Phí ship ${formatVnd(Number(sh.shipping_fee))}`}
+                {Number(sh.shipping_fee) > 0 && Number(sh.cod_amount) > 0 && " · "}
+                {Number(sh.cod_amount) > 0 && `Thu hộ COD ${formatVnd(Number(sh.cod_amount))}`}
+              </p>
+            )}
+            {sh.note && <p className="text-xs text-ink/60">{sh.note}</p>}
+          </div>
+        )}
         {inv.note && <p className="text-sm text-ink/70">Ghi chú: {inv.note}</p>}
         <p className="text-center text-xs text-ink/50">Cảm ơn quý khách!</p>
       </div>
+
+      {owed > 0 && canCheckout(profile?.role) && <DebtCollect invoiceId={inv.id} owed={owed} />}
+      {sh && !cancelled && canCheckout(profile?.role) && <ShipmentEditor invoiceId={inv.id} initial={sh} />}
 
       <div className="flex flex-wrap justify-between gap-2 print:hidden">
         <Link href="/quan-ly/hoa-don" className="btn-ghost">‹ Danh sách hoá đơn</Link>

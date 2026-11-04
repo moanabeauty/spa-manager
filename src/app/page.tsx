@@ -1,9 +1,22 @@
 import Link from "next/link";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
+import { POST_KIND, PostCard, type Post } from "@/lib/posts";
 
 export default async function Home() {
   const { supabase, user, profile } = await getCurrentUser();
-  const { data: branches } = await supabase.from("branches").select("id, name, address").eq("is_active", true).order("name");
+  const [{ data: branches }, { data: postData }] = await Promise.all([
+    supabase.from("branches").select("id, name, address").eq("is_active", true).order("name"),
+    supabase
+      .from("posts")
+      .select("slug, title, summary, cover_url, published_at, kind")
+      .eq("is_published", true)
+      .order("published_at", { ascending: false })
+      .limit(12),
+  ]);
+  const posts = (postData ?? []) as Post[];
+  const sections = (["new_treatment", "skincare"] as const)
+    .map((k) => ({ k, items: posts.filter((p) => p.kind === k).slice(0, 2) }))
+    .filter((s) => s.items.length > 0);
 
   return (
     <div className="space-y-6">
@@ -14,23 +27,13 @@ export default async function Home() {
           Chọn chi nhánh, dịch vụ và giờ phù hợp. Moana sẽ xác nhận lịch với bạn sớm nhất.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/dat-lich" className="btn-primary">
-            Đặt lịch ngay
-          </Link>
-          <Link href="/menu" className="btn-outline">
-            Menu dịch vụ
-          </Link>
-          <Link href="/khuyen-mai" className="btn-outline">
-            Xem khuyến mãi
-          </Link>
+          <Link href="/dat-lich" className="btn-primary">Đặt lịch ngay</Link>
+          <Link href="/menu" className="btn-outline">Menu dịch vụ</Link>
+          <Link href="/khuyen-mai" className="btn-outline">Xem khuyến mãi</Link>
           {user ? (
-            <Link href="/lich-hen" className="btn-outline">
-              Xem lịch của tôi
-            </Link>
+            <Link href="/tai-khoan" className="btn-outline">Tài khoản của tôi</Link>
           ) : (
-            <Link href="/dang-nhap?tab=dang-ky" className="btn-outline">
-              Tạo tài khoản
-            </Link>
+            <Link href="/dang-nhap?tab=dang-ky" className="btn-outline">Tạo tài khoản</Link>
           )}
         </div>
         {user && profile && (
@@ -39,14 +42,24 @@ export default async function Home() {
             {isStaffRole(profile.role) && (
               <>
                 {" · "}
-                <Link href="/quan-ly" className="font-semibold text-navy underline">
-                  Mở lịch hẹn của spa
-                </Link>
+                <Link href="/quan-ly" className="font-semibold text-navy underline">Vào trang quản lý</Link>
               </>
             )}
           </p>
         )}
       </section>
+
+      {sections.map((s) => (
+        <section key={s.k} className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-lg font-bold text-navy">{POST_KIND[s.k].label}</h2>
+            <Link href={POST_KIND[s.k].path} className="text-sm font-semibold text-navy underline">Xem tất cả</Link>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {s.items.map((p) => <PostCard key={p.slug} p={p} />)}
+          </div>
+        </section>
+      ))}
 
       <section className="grid gap-3 sm:grid-cols-2">
         {(branches ?? []).map((b) => (

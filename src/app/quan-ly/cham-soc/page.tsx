@@ -3,10 +3,11 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { todayVn } from "@/lib/format";
 import { REMINDER_KIND, shortDate } from "@/lib/crm";
 import ReminderActions from "./ReminderActions";
+import LapsedList, { type Lapsed } from "./LapsedList";
 
 export const metadata = { title: "Chăm sóc lại – Moana Beauty" };
 
-type Sp = { tab?: string; cn?: string; loai?: string };
+type Sp = { tab?: string; cn?: string; loai?: string; tuan?: string; lich?: string };
 type Rem = {
   id: string;
   kind: string;
@@ -22,7 +23,8 @@ type Rem = {
 };
 
 const TABS = [
-  { key: "den-han", label: "Đến hạn & quá hạn" },
+  { key: "chua-quay-lai", label: "Chưa quay lại" },
+  { key: "den-han", label: "Nhắc đến hạn" },
   { key: "sap-toi", label: "Sắp tới (14 ngày)" },
   { key: "da-xong", label: "Đã xử lý (30 ngày)" },
 ];
@@ -32,7 +34,7 @@ export default async function CarePage({ searchParams }: { searchParams: Promise
   const role = profile?.role;
   if (role === "warehouse") return <p className="card text-sm">Trang này dành cho lễ tân, KTV, quản lý và chủ spa.</p>;
   const sp = await searchParams;
-  const tab = TABS.some((t) => t.key === sp.tab) ? sp.tab! : "den-han";
+  const tab = TABS.some((t) => t.key === sp.tab) ? sp.tab! : "chua-quay-lai";
   const today = todayVn();
 
   // tạo nhắc định kỳ (gói sắp hết hạn, lâu chưa đến, sinh nhật) – chạy lại không bị trùng
@@ -43,6 +45,25 @@ export default async function CarePage({ searchParams }: { searchParams: Promise
   const defaultBranch = role === "owner" || role === "manager" ? "" : profile?.branch_id ?? "";
   const cn = sp.cn === "all" ? "" : sp.cn && branches.some((b) => b.id === sp.cn) ? sp.cn : defaultBranch;
   const kind = sp.loai && REMINDER_KIND[sp.loai] ? sp.loai : "";
+
+  if (tab === "chua-quay-lai") {
+    const { data: lapsedData, error: lapsedErr } = await supabase.rpc("care_lapsed", { p_branch: cn || null });
+    const { count: dueCount } = await supabase.from("care_reminders").select("id", { count: "exact", head: true }).eq("status", "open").lte("due_date", today);
+    return (
+      <div className="space-y-4">
+        <Head />
+        <Tabs tab={tab} dueCount={dueCount ?? 0} cn={sp.cn} />
+        {lapsedErr && <p className="card text-sm text-[#8A2323]">{lapsedErr.message}</p>}
+        <LapsedList
+          rows={(lapsedData ?? []) as Lapsed[]}
+          branches={branches}
+          cn={cn}
+          week={sp.tuan ?? "1"}
+          showBooked={sp.lich === "1"}
+        />
+      </div>
+    );
+  }
 
   let query = supabase
     .from("care_reminders")
@@ -58,35 +79,15 @@ export default async function CarePage({ searchParams }: { searchParams: Promise
 
   const { count: dueCount } = await supabase.from("care_reminders").select("id", { count: "exact", head: true }).eq("status", "open").lte("due_date", today);
 
-  const link = (patch: Partial<Sp>) => {
-    const p = new URLSearchParams();
-    const merged: Sp = { tab, cn: sp.cn, loai: kind || undefined, ...patch };
-    for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
-    return `/quan-ly/cham-soc?${p.toString()}`;
-  };
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-navy">Chăm sóc lại khách</h1>
-        <p className="mt-1 text-sm text-ink/70">
-          Hệ thống tự nhắc: hỏi thăm sau buổi làm, mời quay lại theo chu kỳ từng dịch vụ, gói sắp hết hạn, khách còn buổi / số dư mà lâu chưa đến,
-          sinh nhật. Gọi khách xong bấm <b>Đã liên hệ</b> và ghi kết quả. Khách quay lại làm dịch vụ thì nhắc “mời quay lại” tự đóng.
-        </p>
-      </div>
-
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
-        {TABS.map((t) => (
-          <Link
-            key={t.key}
-            href={link({ tab: t.key })}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${tab === t.key ? "bg-navy text-white" : "bg-white text-navy ring-1 ring-beige-dark"}`}
-          >
-            {t.label}
-            {t.key === "den-han" && dueCount ? ` (${dueCount})` : ""}
-          </Link>
-        ))}
-      </div>
+      <Head />
+      <Tabs tab={tab} dueCount={dueCount ?? 0} cn={sp.cn} />
+      <p className="text-xs text-ink/60">
+        Hệ thống tự nhắc: hỏi thăm sau buổi làm, mời quay lại theo chu kỳ từng dịch vụ, gói sắp hết hạn, khách còn buổi / số dư mà lâu chưa đến,
+        sinh nhật. Gọi khách xong bấm <b>Đã liên hệ</b> và ghi kết quả. Khách quay lại làm dịch vụ thì nhắc “mời quay lại” tự đóng.
+      </p>
 
       <form action="/quan-ly/cham-soc" className="card grid grid-cols-2 gap-2 p-3">
         <input type="hidden" name="tab" value={tab} />
@@ -155,6 +156,32 @@ export default async function CarePage({ searchParams }: { searchParams: Promise
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+function Head() {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-navy">Chăm sóc lại khách</h1>
+      <p className="mt-1 text-sm text-ink/70">Khách lâu chưa quay lại và các nhắc gọi điện hỏi thăm.</p>
+    </div>
+  );
+}
+
+function Tabs({ tab, dueCount, cn }: { tab: string; dueCount: number; cn?: string }) {
+  return (
+    <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
+      {TABS.map((t) => (
+        <Link
+          key={t.key}
+          href={`/quan-ly/cham-soc?${new URLSearchParams({ tab: t.key, ...(cn ? { cn } : {}) }).toString()}`}
+          className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${tab === t.key ? "bg-navy text-white" : "bg-white text-navy ring-1 ring-beige-dark"}`}
+        >
+          {t.label}
+          {t.key === "den-han" && dueCount ? ` (${dueCount})` : ""}
+        </Link>
+      ))}
     </div>
   );
 }

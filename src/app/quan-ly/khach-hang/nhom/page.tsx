@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
-import type { CrmSettings, Group } from "@/lib/crm";
-import GroupsEditor, { CrmSettingsForm } from "./GroupsEditor";
+import type { Group } from "@/lib/crm";
+import GroupsEditor from "./GroupsEditor";
 
 export const metadata = { title: "Nhóm khách – Moana Beauty" };
 
@@ -10,10 +10,9 @@ export default async function GroupsPage() {
   if (profile?.role !== "owner" && profile?.role !== "manager") {
     return <p className="card text-sm">Chỉ chủ spa và quản lý quản lý được nhóm khách.</p>;
   }
-  const [{ data: groups }, { data: members }, { data: settings }] = await Promise.all([
+  const [{ data: groups }, { data: members }] = await Promise.all([
     supabase.from("customer_groups").select("id, name, color, description, sort_order").order("sort_order").order("name"),
     supabase.from("customer_group_members").select("group_id"),
-    supabase.rpc("crm_settings"),
   ]);
   const counts: Record<string, number> = {};
   for (const m of (members ?? []) as { group_id: string }[]) counts[m.group_id] = (counts[m.group_id] ?? 0) + 1;
@@ -29,7 +28,12 @@ export default async function GroupsPage() {
         </p>
       </div>
       <GroupsEditor groups={(groups ?? []) as Group[]} counts={counts} />
-      {profile.role === "owner" && settings && <CrmSettingsForm settings={settings as CrmSettings} />}
+      {profile.role === "owner" && (
+        <p className="text-xs text-ink/60">
+          Mức chi tiêu VIP, số ngày “lâu chưa quay lại”, nhắc sinh nhật… sửa ở{" "}
+          <Link href="/quan-ly/cai-dat/crm" className="font-semibold text-navy underline">Cài đặt → Cài đặt CRM</Link>.
+        </p>
+      )}
     </div>
   );
 }

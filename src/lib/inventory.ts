@@ -35,7 +35,7 @@ export const UNITS = ["chai", "hộp", "lọ", "ống", "tuýp", "hũ", "túi", 
 
 /** Cột sản phẩm mọi nhân viên đọc được (không có giá nhập) */
 export const PRODUCT_COLUMNS =
-  "id, name, brand, capacity, volume, unit, barcode, category, used_in, retail_price, for_treatment, for_retail, max_staff_discount_pct, min_stock, note, is_active";
+  "id, name, brand, capacity, volume, unit, barcode, category, used_in, retail_price, for_treatment, for_retail, max_staff_discount_pct, min_stock, note, is_active, sku, expiry_date";
 
 export type Product = {
   id: string;
@@ -54,6 +54,8 @@ export type Product = {
   min_stock: number;
   note: string | null;
   is_active: boolean;
+  sku: string | null;
+  expiry_date: string | null;
 };
 
 export type Warehouse = { id: string; branch_id: string; type: WarehouseType; name: string };

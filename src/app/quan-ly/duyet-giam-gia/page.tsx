@@ -4,10 +4,11 @@ import { formatTime, formatVnd } from "@/lib/format";
 import ReviewButtons from "./ReviewButtons";
 import PushToggle from "@/components/PushToggle";
 
-export const metadata = { title: "Duyệt giảm giá – Moana Beauty" };
+export const metadata = { title: "Duyệt giảm giá & cho nợ – Moana Beauty" };
 
 type Req = {
   id: string;
+  kind: string;
   amount: number;
   reason: string;
   status: string;
@@ -34,7 +35,7 @@ export default async function DiscountApprovalPage() {
   const { data } = await supabase
     .from("discount_requests")
     .select(
-      "id, amount, reason, status, review_note, created_at, appointment_id, invoice_id, branches(name), customers(id, full_name, phone), requester:profiles!discount_requests_requested_by_fkey(full_name)",
+      "id, kind, amount, reason, status, review_note, created_at, appointment_id, invoice_id, branches(name), customers(id, full_name, phone), requester:profiles!discount_requests_requested_by_fkey(full_name)",
     )
     .order("created_at", { ascending: false })
     .limit(60);
@@ -47,8 +48,8 @@ export default async function DiscountApprovalPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-navy">Duyệt giảm giá</h1>
-        <p className="text-sm text-ink/70">Lễ tân / KTV xin giảm giá cho khách, chủ spa duyệt rồi mới thu được.</p>
+        <h1 className="text-2xl font-bold text-navy">Duyệt giảm giá & cho nợ</h1>
+        <p className="text-sm text-ink/70">Lễ tân / KTV xin giảm giá (chủ spa duyệt) hoặc xin cho khách nợ (chủ spa / quản lý duyệt) rồi mới thu được.</p>
       </div>
       {isOwner && vapidKey && <PushToggle publicKey={vapidKey} />}
       {pending.length === 0 && <p className="card text-sm text-ink/60">Không có yêu cầu nào đang chờ.</p>}
@@ -56,7 +57,7 @@ export default async function DiscountApprovalPage() {
         <div key={r.id} className="card border-l-4 border-l-[#E0A526] p-4 text-sm">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <p className="text-lg font-bold text-navy">Giảm {formatVnd(Number(r.amount))}</p>
+              <p className="text-lg font-bold text-navy">{r.kind === "debt" ? "Cho nợ" : "Giảm"} {formatVnd(Number(r.amount))}</p>
               <p>Lý do: {r.reason}</p>
               <p className="text-xs text-ink/60">
                 {r.requester?.full_name ?? "?"} xin lúc {formatTime(r.created_at)} {shortDate(r.created_at)} · {r.branches?.name}
@@ -69,7 +70,7 @@ export default async function DiscountApprovalPage() {
               </Link>
             )}
           </div>
-          {isOwner ? <ReviewButtons id={r.id} amount={Number(r.amount)} /> : <p className="mt-2 text-xs text-ink/60">Chờ chủ spa duyệt.</p>}
+          {isOwner || r.kind === "debt" ? <ReviewButtons id={r.id} amount={Number(r.amount)} /> : <p className="mt-2 text-xs text-ink/60">Chờ chủ spa duyệt.</p>}
         </div>
       ))}
 
@@ -80,7 +81,7 @@ export default async function DiscountApprovalPage() {
             {done.map((r) => (
               <li key={r.id} className="flex justify-between gap-3 px-4 py-2">
                 <span className="min-w-0">
-                  <span className="text-ink/50">{shortDate(r.created_at)}</span> {r.customers?.full_name ?? "Khách lẻ"} · {r.reason}
+                  <span className="text-ink/50">{shortDate(r.created_at)}</span> {r.kind === "debt" ? "Cho nợ · " : ""}{r.customers?.full_name ?? "Khách lẻ"} · {r.reason}
                   <span className="block text-xs text-ink/50">
                     {r.requester?.full_name}
                     {r.review_note ? ` · ${r.review_note}` : ""}

@@ -77,6 +77,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
     .from("discount_requests")
     .select("id, amount, reason, status, review_note")
     .neq("status", "used")
+    .eq("kind", "discount")
     .order("created_at", { ascending: false })
     .limit(1);
   dq = appt ? dq.eq("appointment_id", appt.id) : customer ? dq.eq("customer_id", customer.id).is("appointment_id", null) : dq.eq("id", "00000000-0000-0000-0000-000000000000");

@@ -49,21 +49,29 @@ export type PayrollRow = {
 type Tab = "cham-cong" | "checkin" | "phat" | "luong" | "muc-luong" | "cai-dat";
 const n = (v: unknown) => Number(v ?? 0);
 
+export type PayrollMode = "luong" | "cham-cong" | "muc-luong" | "ngay-lam-viec";
+
 export default function PayrollEditor(props: {
+  mode: PayrollMode;
   month: string; isOwner: boolean; staff: Staff[]; branches: Branch[];
   entries: Entry[]; penalties: Penalty[]; rows: PayrollRow[]; settings: PaySetting[]; config: PayrollConfig | null; posted: boolean;
   attSum: AttSum[]; attDays: AttDay[]; holidays: Holiday[];
 }) {
   const { month, isOwner } = props;
   const pendingAtt = props.attDays.filter((d) => d.approval_status === "pending" || d.ot_status === "pending").length;
-  const [tab, setTab] = useState<Tab>(isOwner ? "luong" : "cham-cong");
-  const tabs: { key: Tab; label: string }[] = [
-    ...(isOwner ? [{ key: "luong" as Tab, label: "Bảng lương" }] : []),
-    { key: "cham-cong", label: "Chấm công" },
-    { key: "checkin", label: `Check-in / out${pendingAtt ? ` (${pendingAtt} chờ duyệt)` : ""}` },
-    { key: "phat", label: `Phạt nội quy${props.penalties.length ? ` (${props.penalties.length})` : ""}` },
-    ...(isOwner ? [{ key: "muc-luong" as Tab, label: "Mức lương" }, { key: "cai-dat" as Tab, label: "Cài đặt" }] : []),
-  ];
+  const mode = props.mode;
+  const [tab, setTab] = useState<Tab>(
+    mode === "muc-luong" ? "muc-luong" : mode === "ngay-lam-viec" ? "cai-dat" : mode === "luong" && isOwner ? "luong" : pendingAtt ? "checkin" : "cham-cong",
+  );
+  const tabs: { key: Tab; label: string }[] =
+    mode === "muc-luong" || mode === "ngay-lam-viec"
+      ? []
+      : [
+          ...(isOwner && mode === "luong" ? [{ key: "luong" as Tab, label: "Bảng lương" }] : []),
+          { key: "cham-cong", label: "Chấm công" },
+          { key: "checkin", label: `Check-in / out${pendingAtt ? ` (${pendingAtt} chờ duyệt)` : ""}` },
+          { key: "phat", label: `Phạt nội quy${props.penalties.length ? ` (${props.penalties.length})` : ""}` },
+        ];
   const branchName = (id: string | null) => props.branches.find((b) => b.id === id)?.name.replace("Moana ", "") ?? "";
   const settingIds = new Set(props.settings.map((s) => s.staff_id));
   const entryIds = new Set(props.entries.map((e) => e.staff_id));
@@ -88,8 +96,13 @@ export default function PayrollEditor(props: {
       {tab === "cham-cong" && <Attendance month={month} people={people} entries={props.entries} attSum={props.attSum} branchName={branchName} config={props.config} />}
       {tab === "checkin" && <CheckinLog month={month} people={people} days={props.attDays} isOwner={isOwner} />}
       {tab === "phat" && <Penalties month={month} people={people} penalties={props.penalties} />}
-      {tab === "muc-luong" && isOwner && <Salaries people={people} allStaff={props.staff} settings={props.settings} config={props.config} branchName={branchName} />}
-      {tab === "cai-dat" && isOwner && props.config && <Settings config={props.config} branches={props.branches} holidays={props.holidays} people={people} />}
+      {tab === "muc-luong" && isOwner && (
+        <>
+          <Salaries people={people} allStaff={props.staff} settings={props.settings} config={props.config} branchName={branchName} />
+          {props.config && <Settings part="pay" config={props.config} branches={props.branches} holidays={props.holidays} people={people} />}
+        </>
+      )}
+      {tab === "cai-dat" && isOwner && props.config && <Settings part="work" config={props.config} branches={props.branches} holidays={props.holidays} people={people} />}
     </div>
   );
 }
@@ -830,7 +843,7 @@ function Salaries({ people, allStaff, settings, config, branchName }: {
 }
 
 // ============ CÀI ĐẶT CHUNG ============
-function Settings({ config, branches, holidays, people }: { config: PayrollConfig; branches: Branch[]; holidays: Holiday[]; people: Staff[] }) {
+function Settings({ part, config, branches, holidays, people }: { part: "pay" | "work"; config: PayrollConfig; branches: Branch[]; holidays: Holiday[]; people: Staff[] }) {
   const router = useRouter();
   const [c, setC] = useState<PayrollConfig>({ ...config });
   const [busy, setBusy] = useState(false);
@@ -858,6 +871,8 @@ function Settings({ config, branches, holidays, people }: { config: PayrollConfi
   }
   return (
     <div className="card space-y-3 p-4">
+      <p className="text-sm font-semibold text-navy">{part === "pay" ? "Cách tính lương" : "Ca làm việc & chấm công"}</p>
+      {part === "pay" && (
       <div className="grid gap-3 sm:grid-cols-3">
         {field("standard_days", "Ngày công chuẩn / tháng", "0.5")}
         {field("hours_per_day", "Số giờ / công (9:00 – 18:00 = 9)", "0.5")}
@@ -870,6 +885,9 @@ function Settings({ config, branches, holidays, people }: { config: PayrollConfi
         {field("bhxh_employee_pct", "% BHXH trừ lương nhân viên", "0.1")}
         {field("bhxh_employer_pct", "% BHXH Moana đóng", "0.1")}
       </div>
+      )}
+      {part === "work" && (
+      <>
       <p className="text-xs font-semibold text-navy">Tính công từ check-in / out</p>
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="text-xs">
@@ -889,14 +907,18 @@ function Settings({ config, branches, holidays, people }: { config: PayrollConfi
       </div>
       <BranchLocations branches={branches} />
       <Holidays holidays={holidays} people={people} />
+      </>
+      )}
       <div className="flex items-center gap-2">
         <button className="btn-primary" disabled={busy} onClick={save}>Lưu cài đặt</button>
         {msg && <span className="text-sm">{msg}</span>}
       </div>
+      {part === "pay" && (
       <p className="text-xs text-ink/60">
         Mức BHXH 2026 theo luật: nhân viên đóng 10,5% (8% BHXH + 1,5% BHYT + 1% BHTN), doanh nghiệp đóng 21,5% (17,5% BHXH + 3% BHYT + 1%
         BHTN), tính trên lương đóng bảo hiểm. Bảng lương các tháng luôn tính theo cài đặt hiện tại; tháng đã ghi sổ chi thì bấm “Cập nhật lại vào sổ chi” nếu muốn đổi số.
       </p>
+      )}
     </div>
   );
 }

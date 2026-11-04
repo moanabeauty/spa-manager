@@ -60,7 +60,7 @@ export default async function PromotionsPage() {
           <p className="text-sm text-ink/70">Đăng ký online, Moana sẽ gọi xác nhận và hẹn lịch với bạn.</p>
         </div>
         {user && (
-          <Link href="/lich-hen" className="btn-outline shrink-0">Ưu đãi của tôi</Link>
+          <Link href="/tai-khoan#uu-dai" className="btn-outline shrink-0">Ưu đãi của tôi</Link>
         )}
       </div>
 
