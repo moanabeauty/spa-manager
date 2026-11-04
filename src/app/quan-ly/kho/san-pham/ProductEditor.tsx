@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatVnd, normalizeText, vnError } from "@/lib/format";
 import { UNITS, productLabel, retailMinPrice, type Product } from "@/lib/inventory";
 import MoneyInput from "@/components/MoneyInput";
+import CameraScanner from "@/components/CameraScanner";
 
 type Scope = "all" | "treatment" | "retail" | "nobarcode" | "inactive";
 
@@ -23,6 +24,28 @@ export default function ProductEditor({
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<Scope>("all");
   const [open, setOpen] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [newBarcode, setNewBarcode] = useState("");
+  const [scanMsg, setScanMsg] = useState<string | null>(null);
+
+  // Quét mã vạch: có trong danh mục thì mở sản phẩm đó, chưa có thì mở form tạo mới với mã vạch điền sẵn
+  function handleScan(raw: string) {
+    const code = raw.replace(/\s/g, "");
+    setScanning(false);
+    if (!code) return;
+    const found = products.find((p) => p.barcode === code);
+    if (found) {
+      setScope(found.is_active ? "all" : "inactive");
+      setQuery(code);
+      setOpen(found.id);
+      setScanMsg(`Mã ${code}: ${productLabel(found)}`);
+    } else {
+      setQuery("");
+      setNewBarcode(code);
+      setOpen("new");
+      setScanMsg(`Mã ${code} chưa có trong danh mục. Điền thông tin để tạo sản phẩm mới, hoặc gắn mã này cho sản phẩm có sẵn (mở sản phẩm → ô Mã vạch).`);
+    }
+  }
 
   const rows = useMemo(() => {
     const q = normalizeText(query.trim());
@@ -44,7 +67,13 @@ export default function ProductEditor({
       {isOwner && <DiscountSetting value={defaultPct} />}
 
       <div className="card space-y-3 p-4">
-        <input className="input py-2" placeholder="Tìm sản phẩm…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <div className="flex gap-2">
+          <input className="input flex-1 py-2" placeholder="Tìm tên, nhãn hàng hoặc mã vạch…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <button className="btn-primary shrink-0 py-2" onClick={() => { setScanMsg(null); setScanning(true); }}>
+            📷 Quét mã vạch
+          </button>
+        </div>
+        {scanMsg && <p className="rounded-lg bg-cream px-3 py-2 text-xs">{scanMsg}</p>}
         <div className="flex flex-wrap gap-2 text-xs">
           {(
             [
@@ -59,11 +88,11 @@ export default function ProductEditor({
               {label}
             </button>
           ))}
-          <button className="ml-auto rounded-full bg-[#D6EDD8] px-3 py-1.5 font-semibold text-[#22612A]" onClick={() => setOpen(open === "new" ? null : "new")}>
+          <button className="ml-auto rounded-full bg-[#D6EDD8] px-3 py-1.5 font-semibold text-[#22612A]" onClick={() => { setNewBarcode(""); setOpen(open === "new" ? null : "new"); }}>
             + Sản phẩm mới
           </button>
         </div>
-        {open === "new" && <ProductForm cost={null} defaultPct={defaultPct} onDone={() => setOpen(null)} />}
+        {open === "new" && <ProductForm key={newBarcode} initialBarcode={newBarcode} cost={null} defaultPct={defaultPct} onDone={() => setOpen(null)} />}
       </div>
 
       <div className="card p-0">
@@ -90,6 +119,7 @@ export default function ProductEditor({
           ))}
         </ul>
       </div>
+      {scanning && <CameraScanner onScan={handleScan} onClose={() => setScanning(false)} />}
     </div>
   );
 }
@@ -138,11 +168,13 @@ function DiscountSetting({ value }: { value: number }) {
 
 function ProductForm({
   product,
+  initialBarcode,
   cost,
   defaultPct,
   onDone,
 }: {
   product?: Product;
+  initialBarcode?: string;
   cost: number | null;
   defaultPct: number;
   onDone: () => void;
@@ -153,7 +185,7 @@ function ProductForm({
     name: product?.name ?? "",
     capacity: product?.capacity ?? "",
     unit: product?.unit ?? "chai",
-    barcode: product?.barcode ?? "",
+    barcode: product?.barcode ?? initialBarcode ?? "",
     category: product?.category ?? "",
     used_in: product?.used_in ?? "",
     retail_price: Number(product?.retail_price ?? 0),
@@ -167,6 +199,7 @@ function ProductForm({
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
   const set = (p: Partial<typeof f>) => setF((x) => ({ ...x, ...p }));
 
   const pctNum = f.pct === "" ? null : Number(f.pct);
@@ -207,6 +240,22 @@ function ProductForm({
   const input = "w-full rounded-lg border border-beige-dark bg-white px-2 py-1.5 text-sm";
   return (
     <div className="mt-2 grid gap-2 rounded-xl bg-cream p-3 text-xs sm:grid-cols-2">
+      <div className="sm:col-span-2">
+        <span>Mã vạch</span>
+        <div className="flex gap-2">
+          <input className={`${input} font-mono`} value={f.barcode} onChange={(e) => set({ barcode: e.target.value })} placeholder="bấm Quét, dùng máy quét hoặc gõ tay" />
+          <button type="button" className="btn-primary shrink-0 py-1.5" onClick={() => setScanning(true)}>📷 Quét</button>
+        </div>
+        {scanning && (
+          <CameraScanner
+            onScan={(code) => {
+              set({ barcode: code.replace(/\s/g, "") });
+              setScanning(false);
+            }}
+            onClose={() => setScanning(false)}
+          />
+        )}
+      </div>
       <label>Nhãn hàng{product ? "" : " *"}<input className={input} value={f.brand} onChange={(e) => set({ brand: e.target.value })} /></label>
       <label>Tên sản phẩm *<input className={input} value={f.name} onChange={(e) => set({ name: e.target.value })} /></label>
       <label>Dung tích / quy cách{product ? "" : " *"}<input className={input} value={f.capacity} onChange={(e) => set({ capacity: e.target.value })} placeholder="50ml, Hộp 10 ống x 5ml" /></label>
@@ -218,7 +267,6 @@ function ProductForm({
           ))}
         </select>
       </label>
-      <label>Mã vạch<input className={`${input} font-mono`} value={f.barcode} onChange={(e) => set({ barcode: e.target.value })} placeholder="quét hoặc gõ" /></label>
       <label>Nhóm<input className={input} value={f.category} onChange={(e) => set({ category: e.target.value })} /></label>
       <label className="sm:col-span-2">Dùng trong liệu trình<input className={input} value={f.used_in} onChange={(e) => set({ used_in: e.target.value })} /></label>
       <label>
