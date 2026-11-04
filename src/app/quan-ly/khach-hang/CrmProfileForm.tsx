@@ -24,12 +24,14 @@ export default function CrmProfileForm({
   groups,
   memberOf,
   branches,
+  canSeePhone = true,
 }: {
   customer: Cust;
   crm: CrmProfile | null;
   groups: Group[];
   memberOf: string[];
   branches: { id: string; name: string }[];
+  canSeePhone?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -71,7 +73,7 @@ export default function CrmProfileForm({
       .from("customers")
       .update({
         full_name: c.full_name.trim(),
-        phone,
+        ...(canSeePhone ? { phone } : {}),
         email: c.email?.trim() || null,
         birthday: c.birthday || null,
         gender: c.gender || null,
@@ -135,10 +137,12 @@ export default function CrmProfileForm({
             <span className="label">Họ tên</span>
             <input className="input py-2" value={c.full_name} onChange={(e) => setC({ ...c, full_name: e.target.value })} />
           </label>
-          <label className="text-sm">
-            <span className="label">Số điện thoại</span>
-            <input className="input py-2" inputMode="tel" value={c.phone ?? ""} onChange={(e) => setC({ ...c, phone: e.target.value })} />
-          </label>
+          {canSeePhone && (
+            <label className="text-sm">
+              <span className="label">Số điện thoại</span>
+              <input className="input py-2" inputMode="tel" value={c.phone ?? ""} onChange={(e) => setC({ ...c, phone: e.target.value })} />
+            </label>
+          )}
           <label className="text-sm">
             <span className="label">Email</span>
             <input className="input py-2" type="email" value={c.email ?? ""} onChange={(e) => setC({ ...c, email: e.target.value })} />

@@ -323,12 +323,7 @@ export default function CheckoutForm({
     }
     let cancelled = false;
     const t = setTimeout(async () => {
-      const { data } = await supabase
-        .from("customers")
-        .select("id, full_name, phone, note")
-        .ilike("phone", `%${digits}%`)
-        .order("full_name")
-        .limit(8);
+      const { data } = await supabase.rpc("search_customers", { p_q: digits, p_limit: 8 });
       if (!cancelled) setMatches((data ?? []) as CustomerInfo[]);
     }, 300);
     return () => {
@@ -646,7 +641,7 @@ export default function CheckoutForm({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-semibold">{customer.full_name}</p>
-              <p className="text-sm text-ink/60">{customer.phone ?? "(chưa có SĐT)"}</p>
+              <p className="text-sm text-ink/60">{customer.phone ?? "(SĐT ẩn hoặc chưa có)"}</p>
               {customer.note && <p className="mt-1 rounded-lg bg-[#FFE8BA]/60 px-2 py-1 text-xs">{customer.note}</p>}
             </div>
             <div className="text-right text-sm">

@@ -16,7 +16,7 @@ export default async function BookingPage() {
       .select("id, category_id, name, name_en, description, duration_minutes, price, branch_id")
       .eq("is_active", true)
       .order("name"),
-    supabase.from("customers").select("id, full_name, phone").eq("profile_id", user.id).maybeSingle(),
+    supabase.from("customers").select("id, full_name").eq("profile_id", user.id).maybeSingle(),
   ]);
 
   if (!customer) {

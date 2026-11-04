@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatDate, formatTime, formatVnd, todayVn, vnDateTime } from "@/lib/format";
 import { METHOD_LABEL } from "@/lib/billing";
@@ -15,7 +16,7 @@ type Row = {
   paid_at: string | null;
   created_at: string;
   debt_amount: number;
-  customers: { full_name: string; phone: string | null } | null;
+  customers: { id: string; full_name: string; phone: string | null } | null;
   invoice_items: { item_type: string; description: string | null; amount: number }[];
   payments: { method: string; amount: number }[];
   debt_payments: { amount: number }[];
@@ -31,7 +32,7 @@ function shortDate(iso: string) {
   return new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit" }).format(new Date(iso));
 }
 const SELECT =
-  "id, code, status, channel, paid_at, created_at, debt_amount, customers(full_name, phone), invoice_items(item_type, description, amount), payments(method, amount), debt_payments(amount), invoice_shipments(carrier, tracking_code, status, recipient_name, address)";
+  "id, code, status, channel, paid_at, created_at, debt_amount, customers(id, full_name), invoice_items(item_type, description, amount), payments(method, amount), debt_payments(amount), invoice_shipments(carrier, tracking_code, status, recipient_name, address)";
 
 export default async function InvoicesPage({
   searchParams,
@@ -57,6 +58,7 @@ export default async function InvoicesPage({
   } else q = q.eq("status", "paid").gt("debt_amount", 0).order("paid_at", { ascending: true }).limit(300);
   const { data } = await q;
   let rows = (data ?? []) as unknown as Row[];
+  await fillPhones(supabase, rows.map((r) => r.customers));
   const paidOf = (r: Row) => r.payments.reduce((a, p) => a + Number(p.amount), 0) + r.debt_payments.reduce((a, p) => a + Number(p.amount), 0);
   const totalOf = (r: Row) => r.invoice_items.reduce((a, i) => a + Number(i.amount), 0);
   const owedOf = (r: Row) => (r.status === "paid" ? Math.max(0, totalOf(r) - paidOf(r)) : 0);

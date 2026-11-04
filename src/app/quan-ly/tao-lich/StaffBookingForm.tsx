@@ -97,12 +97,7 @@ export default function StaffBookingForm({
     let cancelled = false;
     setSearching(true);
     const t = setTimeout(async () => {
-      const { data } = await supabase
-        .from("customers")
-        .select("id, full_name, phone, note")
-        .ilike("phone", `%${digits}%`)
-        .order("full_name")
-        .limit(8);
+      const { data } = await supabase.rpc("search_customers", { p_q: digits, p_limit: 8 });
       if (cancelled) return;
       const list = (data ?? []) as Customer[];
       setMatches(list);

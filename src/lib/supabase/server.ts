@@ -35,11 +35,14 @@ export async function getCurrentUser() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { supabase, user: null, profile: null };
-  const { data: profile } = await supabase
+  // cột phone của profiles không đọc trực tiếp được (bảo mật SĐT) – lấy từ tài khoản đăng nhập
+  const { data: row } = await supabase
     .from("profiles")
-    .select("id, full_name, phone, role, branch_id")
+    .select("id, full_name, role, branch_id")
     .eq("id", user.id)
-    .maybeSingle<Profile>();
+    .maybeSingle<Omit<Profile, "phone">>();
+  const meta = (user.user_metadata ?? {}) as { phone?: string };
+  const profile: Profile | null = row ? { ...row, phone: user.phone || meta.phone || null } : null;
   return { supabase, user, profile };
 }
 

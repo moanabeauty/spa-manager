@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { todayVn } from "@/lib/format";
 import { REMINDER_KIND, shortDate } from "@/lib/crm";
@@ -67,7 +68,7 @@ export default async function CarePage({ searchParams }: { searchParams: Promise
 
   let query = supabase
     .from("care_reminders")
-    .select("id, kind, title, note, due_date, status, result, done_at, branch_id, customers(id, full_name, phone), doer:profiles!care_reminders_done_by_fkey(full_name)")
+    .select("id, kind, title, note, due_date, status, result, done_at, branch_id, customers(id, full_name), doer:profiles!care_reminders_done_by_fkey(full_name)")
     .limit(300);
   if (tab === "den-han") query = query.eq("status", "open").lte("due_date", today).order("due_date");
   else if (tab === "sap-toi") query = query.eq("status", "open").gt("due_date", today).lte("due_date", todayVn(14)).order("due_date");
@@ -76,6 +77,7 @@ export default async function CarePage({ searchParams }: { searchParams: Promise
   if (kind) query = query.eq("kind", kind);
   const { data, error } = await query;
   const list = (data ?? []) as unknown as Rem[];
+  await fillPhones(supabase, list.map((r) => r.customers));
 
   const { count: dueCount } = await supabase.from("care_reminders").select("id", { count: "exact", head: true }).eq("status", "open").lte("due_date", today);
 

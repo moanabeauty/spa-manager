@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { fetchSellers, canCheckout } from "@/lib/staff";
 import { fetchWallet, type Wallet } from "@/lib/billing";
@@ -29,7 +30,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
     const { data } = await supabase
       .from("appointments")
       .select(
-        "id, branch_id, start_at, status, customer_id, customers(id, full_name, phone, note), appointment_services(id, service_id, technician_id, start_at, customer_package_item_id)",
+        "id, branch_id, start_at, status, customer_id, customers(id, full_name, note), appointment_services(id, service_id, technician_id, start_at, customer_package_item_id)",
       )
       .eq("id", sp.lich)
       .maybeSingle();
@@ -68,9 +69,10 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
     };
     customer = d.customers;
   } else if (sp.kh) {
-    const { data } = await supabase.from("customers").select("id, full_name, phone, note").eq("id", sp.kh).maybeSingle();
+    const { data } = await supabase.from("customers").select("id, full_name, note").eq("id", sp.kh).maybeSingle();
     customer = (data as CustomerInfo) ?? null;
   }
+  if (customer) await fillPhones(supabase, [customer]);
 
   // yêu cầu giảm giá gần nhất (chưa dùng) của lịch / khách này
   let dq = supabase

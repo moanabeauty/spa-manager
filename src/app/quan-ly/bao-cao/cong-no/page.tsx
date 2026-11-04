@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatShortDate, formatVnd, todayVn } from "@/lib/format";
 
@@ -23,9 +24,11 @@ export default async function DebtReportPage({ searchParams }: { searchParams: P
   const debts = (data ?? []) as Debt[];
   const ids = [...new Set(debts.map((d) => d.customer_id).filter(Boolean))] as string[];
   const { data: custData } = ids.length
-    ? await supabase.from("customers").select("id, full_name, phone").in("id", ids)
+    ? await supabase.from("customers").select("id, full_name").in("id", ids)
     : { data: [] as { id: string; full_name: string; phone: string | null }[] };
-  const cust = new Map((custData ?? []).map((c) => [c.id, c]));
+  const custList = (custData ?? []) as { id: string; full_name: string; phone: string | null }[];
+  await fillPhones(supabase, custList);
+  const cust = new Map(custList.map((c) => [c.id, c]));
   const today = new Date(`${todayVn()}T12:00:00+07:00`).getTime();
   const age = (iso: string) => Math.floor((today - new Date(iso).getTime()) / 86400000);
 
