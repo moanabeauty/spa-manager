@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 
-// Phiếu theo dõi da 3 màu
+// Phiếu theo dõi da 3 màu (khoá trong cơ sở dữ liệu vẫn là green / yellow / red)
 export type SkinColor = "green" | "yellow" | "red";
 
 export const SKIN_COLORS: { key: SkinColor; label: string; short: string; dot: string; bar: string; soft: string; text: string }[] = [
-  { key: "green", label: "Xanh – da tốt, ổn định", short: "Xanh", dot: "bg-[#3E9B4F]", bar: "border-l-[#3E9B4F]", soft: "bg-[#E3F3E5] border-[#9CD3A5]", text: "text-[#22612A]" },
-  { key: "yellow", label: "Vàng – cần theo dõi, cải thiện", short: "Vàng", dot: "bg-[#E0A526]", bar: "border-l-[#E0A526]", soft: "bg-[#FFF3D6] border-[#F0CF85]", text: "text-[#7A5600]" },
+  // Xanh chàm và nâu vàng theo bảng màu guideline Moana (#2B2D64, #A0845E); đỏ thêm ngoài bảng
+  { key: "green", label: "Xanh – da tốt, ổn định", short: "Xanh", dot: "bg-[#2B2D64]", bar: "border-l-[#2B2D64]", soft: "bg-[#E9EAF3] border-[#A9AACB]", text: "text-[#2B2D64]" },
+  { key: "yellow", label: "Vàng – cần theo dõi, cải thiện", short: "Vàng", dot: "bg-[#A0845E]", bar: "border-l-[#A0845E]", soft: "bg-[#F3ECE1] border-[#D3C1A3]", text: "text-[#6E5A3E]" },
   { key: "red", label: "Đỏ – có vấn đề, cần xử lý", short: "Đỏ", dot: "bg-[#C94A4A]", bar: "border-l-[#C94A4A]", soft: "bg-[#FCE4E4] border-[#E8A5A5]", text: "text-[#8A2323]" },
 ];
 export const SKIN_COLOR = new Map(SKIN_COLORS.map((c) => [c.key, c]));

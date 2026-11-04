@@ -408,13 +408,13 @@ export default function BookingForm({
                       : full
                         ? "cursor-not-allowed bg-[#FCE4E4] text-[#8A2323]/60"
                         : busyDay
-                          ? "bg-[#FFF3D6] hover:ring-2 hover:ring-navy"
+                          ? "bg-[#F3ECE1] hover:ring-2 hover:ring-navy"
                           : "bg-cream hover:ring-2 hover:ring-navy"
                 }`}
               >
                 <span className={g.date === minDay && !sel ? "font-bold text-navy underline" : ""}>{Number(g.date.slice(8))}</span>
                 {!out && full && <span className="text-[9px] leading-none">Kín</span>}
-                {!out && busyDay && !sel && <span className="text-[9px] leading-none text-[#7A5600]">Đông</span>}
+                {!out && busyDay && !sel && <span className="text-[9px] leading-none text-[#6E5A3E]">Đông</span>}
               </button>
             );
           })}

@@ -27,7 +27,7 @@ export type StaffService = {
   branch_id: string | null;
 };
 type Customer = { id: string; full_name: string; phone: string | null; note: string | null };
-type Item = { key: number; serviceId: string; technicianId: string };
+type Item = { key: number; serviceId: string; technicianId: string; minutes?: number };
 
 const MAX_ITEMS = 10;
 
@@ -172,7 +172,7 @@ export default function StaffBookingForm({
     if (!date || !time) return [];
     let cursor = vnDateTime(date, time).getTime();
     return items.map((it) => {
-      const dur = byId.get(it.serviceId)?.duration_minutes ?? 60;
+      const dur = it.minutes ?? byId.get(it.serviceId)?.duration_minutes ?? 60;
       const start = new Date(cursor).toISOString();
       cursor += dur * 60000;
       return { start, end: new Date(cursor).toISOString() };
@@ -180,7 +180,7 @@ export default function StaffBookingForm({
   }, [items, date, time, byId]);
 
   const chosen = items.map((it) => byId.get(it.serviceId)).filter((s): s is StaffService => !!s);
-  const totalMinutes = chosen.reduce((a, s) => a + s.duration_minutes, 0);
+  const totalMinutes = items.reduce((a, it) => a + (it.minutes ?? byId.get(it.serviceId)?.duration_minutes ?? 0), 0);
   const knownTotal = chosen.reduce((a, s) => a + (s.price ?? 0), 0);
   const hasQuote = chosen.some((s) => s.price === null);
   const cap = branches.find((b) => b.id === branchId)?.max_per_slot ?? DEFAULT_CAPACITY;
@@ -223,7 +223,7 @@ export default function StaffBookingForm({
       p_branch_id: branchId,
       p_start_at: vnDateTime(date, time).toISOString(),
       p_source: source,
-      p_items: items.map((it) => ({ service_id: it.serviceId, technician_id: it.technicianId || null })),
+      p_items: items.map((it) => ({ service_id: it.serviceId, technician_id: it.technicianId || null, ...(it.minutes ? { minutes: it.minutes } : {}) })),
       p_customer_id: customer?.id ?? null,
       p_customer_name: customer ? null : newName.trim(),
       p_customer_phone: customer ? null : digits,
@@ -382,8 +382,24 @@ export default function StaffBookingForm({
                       <p className="text-sm font-medium">{s?.name}</p>
                       <p className="text-xs text-ink/60">
                         {tl ? `${formatTime(tl.start)} – ${formatTime(tl.end)} · ` : ""}
-                        {formatDuration(s?.duration_minutes ?? 0)} · {formatVnd(s?.price)}
+                        {formatDuration(it.minutes ?? s?.duration_minutes ?? 0)}
+                        {it.minutes && it.minutes !== s?.duration_minutes ? " (đã đổi)" : ""} · {formatVnd(s?.price)}
                       </p>
+                      {canOverbook && (
+                        <label className="mt-1 flex items-center gap-1.5 text-xs text-ink/70">
+                          Thời gian làm
+                          <input
+                            className="w-16 rounded-lg border border-beige-dark px-2 py-1 text-sm"
+                            inputMode="numeric"
+                            value={it.minutes ?? s?.duration_minutes ?? ""}
+                            onChange={(e) => {
+                              const v = Number(e.target.value.replace(/\D/g, "")) || undefined;
+                              setItems((p) => p.map((x) => (x.key === it.key ? { ...x, minutes: v } : x)));
+                            }}
+                          />
+                          phút
+                        </label>
+                      )}
                     </div>
                     <div className="flex shrink-0 gap-1 text-sm">
                       <button type="button" className="px-1.5 text-ink/50" onClick={() => move(i, -1)} aria-label="Lên">↑</button>

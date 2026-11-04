@@ -5,6 +5,7 @@ import { STATUS_LABEL, STATUS_STYLE, formatDate, formatTime, formatVnd, todayVn,
 import StatusActions from "./StatusActions";
 import TechnicianPicker from "./TechnicianPicker";
 import CapacityEditor from "./CapacityEditor";
+import DurationEditor from "./DurationEditor";
 import { canCheckout, fetchBusy, fetchTechnicians } from "@/lib/staff";
 import {
   DEFAULT_CAPACITY,
@@ -59,8 +60,8 @@ const BLOCK_STYLE: Record<string, string> = {
 
 const LEVEL_STYLE = {
   empty: "bg-white",
-  light: "bg-[#EFF7F0]",
-  busy: "bg-[#FFF3D6]",
+  light: "bg-[#E9EAF3]",
+  busy: "bg-[#F3ECE1]",
   full: "bg-[#FCE4E4]",
 };
 
@@ -267,8 +268,8 @@ export default async function StaffAppointmentsPage({
           })}
         </div>
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink/60">
-          <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-[#EFF7F0] ring-1 ring-beige-dark" /> Còn chỗ</span>
-          <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-[#FFF3D6] ring-1 ring-beige-dark" /> Có giờ đã kín</span>
+          <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-[#E9EAF3] ring-1 ring-beige-dark" /> Còn chỗ</span>
+          <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-[#F3ECE1] ring-1 ring-beige-dark" /> Có giờ đã kín</span>
           <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-[#FCE4E4] ring-1 ring-beige-dark" /> Kín cả ngày</span>
           <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#E0A526]" /> Có lịch chờ xác nhận</span>
         </div>
@@ -433,6 +434,13 @@ export default async function StaffAppointmentsPage({
                       </span>
                       <span className="shrink-0 text-ink/60">{formatVnd(s.price)}</span>
                     </div>
+                    {manager && !["cancelled", "no_show"].includes(r.status) ? (
+                      <DurationEditor serviceRowId={s.id} minutes={Math.round((new Date(s.end_at).getTime() - new Date(s.start_at).getTime()) / 60000)} />
+                    ) : (
+                      <span className="text-xs text-ink/50">
+                        {formatTime(s.start_at)} – {formatTime(s.end_at)}
+                      </span>
+                    )}
                     {canAssign && (
                       <TechnicianPicker
                         serviceRowId={s.id}
