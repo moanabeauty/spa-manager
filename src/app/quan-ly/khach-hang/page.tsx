@@ -15,6 +15,7 @@ import {
   type Group,
 } from "@/lib/crm";
 import RefundButton from "./RefundButton";
+import { SkinDot, SkinRecordCard, shortDay, type SkinRecord } from "@/lib/skin";
 import CrmProfileForm from "./CrmProfileForm";
 import MenuUnlockToggle from "./MenuUnlockToggle";
 import ReminderActions, { AddReminderForm } from "../cham-soc/ReminderActions";
@@ -83,7 +84,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
 
     const wallet = await fetchWallet(supabase, c.id);
     const cardIds = wallet.cards.map((x) => x.card_id);
-    const [{ data: txns }, { data: invs }, { data: refunds }] = await Promise.all([
+    const [{ data: txns }, { data: invs }, { data: refunds }, { data: skinData }] = await Promise.all([
       cardIds.length
         ? supabase.from("card_transactions").select("id, txn_type, amount, note, created_at").in("card_id", cardIds).order("created_at", { ascending: false }).limit(30)
         : Promise.resolve({ data: [] }),
@@ -99,7 +100,15 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         .select("id, kind, refund_amount, computed_amount, method, reason, created_at")
         .eq("customer_id", c.id)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("skin_records")
+        .select("*, author:profiles!skin_records_created_by_fkey(full_name)")
+        .eq("customer_id", c.id)
+        .order("record_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(30),
     ]);
+    const skins = (skinData ?? []) as unknown as (SkinRecord & { author: { full_name: string | null } | null })[];
     const balance = cardBalance(wallet);
     type Rem = { id: string; kind: string; title: string; note: string | null; due_date: string; status: string; result: string | null; done_at: string | null; doer: { full_name: string | null } | null };
     const reminders = (rems ?? []) as unknown as Rem[];
@@ -203,6 +212,48 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           memberOf={st?.group_ids ?? []}
           branches={branches}
         />
+
+        <div className="card">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="font-semibold text-navy">Theo dõi da</h2>
+            <Link href={`/quan-ly/phieu-da?kh=${c.id}`} className="btn-outline py-1.5 text-xs">+ Phiếu da</Link>
+          </div>
+          {skins.length === 0 ? (
+            <p className="text-sm text-ink/60">Chưa có phiếu theo dõi da. KTV ghi phiếu sau mỗi buổi ở trang Lịch hẹn.</p>
+          ) : (
+            <>
+              <div className="mb-3 flex items-center gap-1 overflow-x-auto pb-1" title="Màu da qua các buổi (cũ → mới)">
+                {[...skins].reverse().map((r) => (
+                  <span key={r.id} className="flex flex-col items-center gap-0.5 px-1">
+                    <SkinDot color={r.overall} size="h-4 w-4" />
+                    <span className="text-[10px] text-ink/50">{shortDay(r.record_date).slice(0, 5)}</span>
+                  </span>
+                ))}
+              </div>
+              <div className="space-y-2">
+                {skins.slice(0, 3).map((r) => (
+                  <SkinRecordCard
+                    key={r.id}
+                    r={r}
+                    showInternal
+                    heading={<>{shortDay(r.record_date)}{r.author?.full_name && ` · ${r.author.full_name}`}</>}
+                    footer={<div className="mt-1 text-right"><Link href={`/quan-ly/phieu-da?id=${r.id}&back=${encodeURIComponent(`/quan-ly/khach-hang?id=${c.id}`)}`} className="text-xs text-navy underline">Mở phiếu</Link></div>}
+                  />
+                ))}
+              </div>
+              {skins.length > 3 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-sm font-semibold text-navy">Các buổi trước ({skins.length - 3})</summary>
+                  <div className="mt-2 space-y-2">
+                    {skins.slice(3).map((r) => (
+                      <SkinRecordCard key={r.id} r={r} showInternal heading={<>{shortDay(r.record_date)}{r.author?.full_name && ` · ${r.author.full_name}`}</>} />
+                    ))}
+                  </div>
+                </details>
+              )}
+            </>
+          )}
+        </div>
 
         <div className="card">
           <h2 className="mb-2 font-semibold text-navy">Nhắc chăm sóc</h2>

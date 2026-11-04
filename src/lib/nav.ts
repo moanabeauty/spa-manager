@@ -46,6 +46,7 @@ export function buildNav(role: Role, c: NavCounts): NavGroup[] {
       icon: "users",
       items: [
         ...item(!W, "/quan-ly/khach-hang", "Danh sách khách"),
+        ...item(!W, "/quan-ly/phieu-da", "Phiếu theo dõi da"),
         ...item(!W, "/quan-ly/cham-soc", "Chăm sóc lại", c.care),
         ...item(!W, "/quan-ly/khuyen-mai", "Đăng ký khuyến mãi", c.promos),
         ...item(M, "/quan-ly/khach-hang/nhom", "Nhóm khách"),

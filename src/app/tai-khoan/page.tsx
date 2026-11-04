@@ -7,6 +7,7 @@ import { cardBalance, fetchWallet, isPackageUsable, itemLeft, itemText, type Wal
 import { REG_STATUS_LABEL, REG_STATUS_STYLE, canRedeem, dmy, regDeadline, sortedItems, type PromoItem } from "@/lib/promotions";
 import { todayVn } from "@/lib/format";
 import CancelRegButton from "../khuyen-mai/CancelRegButton";
+import { SKIN_COLORS, SkinDot, SkinRecordCard, shortDay, type SkinRecord } from "@/lib/skin";
 
 type MyReg = {
   id: string;
@@ -59,6 +60,9 @@ export default async function MyAppointmentsPage() {
     (r) => r.status === "pending" || r.status === "confirmed" || Date.now() - new Date(r.created_at).getTime() < 60 * 86400000,
   );
 
+  const { data: skinData } = customer ? await supabase.rpc("my_skin_records") : { data: [] };
+  const skins = (skinData ?? []) as (Pick<SkinRecord, "id" | "record_date" | "overall" | "criteria" | "need_tags" | "recommendation" | "homecare" | "next_visit_days"> & { branch_name: string | null })[];
+
   const now = Date.now();
   const upcoming = appts.filter((a) => new Date(a.start_at).getTime() >= now - 3 * 3600000 && !["cancelled", "no_show", "completed"].includes(a.status)).reverse();
   const past = appts.filter((a) => !upcoming.includes(a));
@@ -81,6 +85,7 @@ export default async function MyAppointmentsPage() {
           ["#lich-hen", "Lịch hẹn"],
           ["#goi-the", "Gói & thẻ"],
           ["#uu-dai", "Ưu đãi"],
+          ["#theo-doi-da", "Theo dõi da"],
           ["/doi-mat-khau", "Đổi mật khẩu"],
         ].map(([h, l]) => (
           <a key={h} href={h} className="shrink-0 rounded-full bg-white px-3 py-1.5 font-semibold text-navy ring-1 ring-beige-dark">{l}</a>
@@ -177,6 +182,24 @@ export default async function MyAppointmentsPage() {
         </section>
       )}
 
+
+      <section id="theo-doi-da" className="scroll-mt-20 space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-brown">Theo dõi da của tôi</h2>
+        {skins.length === 0 ? (
+          <p className="card text-sm text-ink/60">Sau mỗi buổi làm, kỹ thuật viên Moana sẽ ghi lại tình trạng da và lời khuyên cho bạn tại đây.</p>
+        ) : (
+          <>
+            <div className="card flex flex-wrap items-center gap-x-4 gap-y-1 p-3 text-xs text-ink/70">
+              {SKIN_COLORS.map((c) => (
+                <span key={c.key} className="inline-flex items-center gap-1.5"><SkinDot color={c.key} /> {c.label}</span>
+              ))}
+            </div>
+            {skins.slice(0, 10).map((r) => (
+              <SkinRecordCard key={r.id} r={r} heading={<>{shortDay(r.record_date)}{r.branch_name && ` · ${r.branch_name}`}</>} />
+            ))}
+          </>
+        )}
+      </section>
 
       {past.length > 0 && (
         <section className="space-y-3">

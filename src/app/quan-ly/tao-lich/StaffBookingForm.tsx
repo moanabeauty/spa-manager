@@ -15,6 +15,7 @@ import {
   vnError,
 } from "@/lib/format";
 import { fetchBusy, isBusy, techLabel, type Busy, type Technician } from "@/lib/staff";
+import { DEFAULT_CAPACITY, addDays, peakLoad, toIntervals, type Interval } from "@/lib/calendar";
 
 export type StaffService = {
   id: string;
@@ -46,6 +47,9 @@ function nowRounded(): string {
 export default function StaffBookingForm({
   defaultBranchId,
   initialPhone,
+  initialDate,
+  initialTime,
+  canOverbook,
   branches,
   categories,
   services,
@@ -53,7 +57,10 @@ export default function StaffBookingForm({
 }: {
   defaultBranchId: string;
   initialPhone: string;
-  branches: { id: string; name: string }[];
+  initialDate?: string;
+  initialTime?: string;
+  canOverbook: boolean;
+  branches: { id: string; name: string; max_per_slot?: number | null }[];
   categories: { id: string; name: string; sort_order: number }[];
   services: StaffService[];
   technicians: Technician[];
@@ -75,8 +82,9 @@ export default function StaffBookingForm({
   const [nextKey, setNextKey] = useState(1);
 
   // giờ
-  const [date, setDate] = useState(todayVn());
-  const [time, setTime] = useState("");
+  const [date, setDate] = useState(initialDate ?? todayVn());
+  const [time, setTime] = useState(initialTime ?? "");
+  const [branchLoad, setBranchLoad] = useState<Interval[] | null>(null);
   const [busy, setBusy] = useState<Busy[]>([]);
   const [note, setNote] = useState("");
 
@@ -124,6 +132,25 @@ export default function StaffBookingForm({
     fetchBusy(supabase, from, to).then(setBusy);
   }, [date, supabase]);
 
+  // số khách đã có ở chi nhánh trong ngày (để báo đủ chỗ)
+  useEffect(() => {
+    if (!date || !branchId) return;
+    let off = false;
+    supabase
+      .from("appointments")
+      .select("start_at, end_at")
+      .eq("branch_id", branchId)
+      .not("status", "in", "(cancelled,no_show)")
+      .gte("start_at", vnDateTime(date, "00:00").toISOString())
+      .lt("start_at", vnDateTime(addDays(date, 1), "00:00").toISOString())
+      .then(({ data }) => {
+        if (!off) setBranchLoad(toIntervals((data ?? []) as { start_at: string; end_at: string | null }[]));
+      });
+    return () => {
+      off = true;
+    };
+  }, [date, branchId, supabase]);
+
   useEffect(() => {
     if (source === "walk_in") {
       setDate(todayVn());
@@ -156,6 +183,11 @@ export default function StaffBookingForm({
   const totalMinutes = chosen.reduce((a, s) => a + s.duration_minutes, 0);
   const knownTotal = chosen.reduce((a, s) => a + (s.price ?? 0), 0);
   const hasQuote = chosen.some((s) => s.price === null);
+  const cap = branches.find((b) => b.id === branchId)?.max_per_slot ?? DEFAULT_CAPACITY;
+  const slotLoad =
+    branchLoad && date && /^\d{2}:\d{2}/.test(time)
+      ? peakLoad(branchLoad, vnDateTime(date, time.slice(0, 5)).getTime(), vnDateTime(date, time.slice(0, 5)).getTime() + (totalMinutes || 60) * 60000)
+      : null;
 
   function addService(id: string) {
     setError(null);
@@ -322,6 +354,17 @@ export default function StaffBookingForm({
           <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
           <input type="time" step={300} className="input" value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
+        {slotLoad !== null && (
+          <p
+            className={`mt-2 rounded-lg px-3 py-2 text-sm ${
+              slotLoad >= cap ? "bg-[#FCE4E4] text-[#8A2323]" : slotLoad === cap - 1 ? "bg-[#FFF3D6] text-[#7A5600]" : "bg-[#E3F3E5] text-[#22612A]"
+            }`}
+          >
+            {slotLoad >= cap
+              ? `Khung giờ này đã đủ ${cap} khách${canOverbook ? " – bạn là chủ / quản lý nên vẫn xếp thêm được." : ". Vui lòng chọn giờ khác hoặc nhờ quản lý xếp thêm."}`
+              : `Khung giờ này đang có ${slotLoad}/${cap} khách cùng lúc – còn ${cap - slotLoad} chỗ.`}
+          </p>
+        )}
       </section>
 
       {/* Dịch vụ + KTV */}

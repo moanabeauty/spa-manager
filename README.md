@@ -207,3 +207,20 @@ Cơ sở dữ liệu (`20261104000032…34`):
 - **Kho**: `stock_counts` + `submit_stock_count` / `review_stock_count` (lệch số chờ chủ duyệt; `adjust_stock` cũ cũng đi qua phiếu kiểm kho), `transfer_stock` (bán lẻ ⇄ liệu trình cùng chi nhánh), `products.expiry_date`.
 - **Chăm sóc lại**: `care_lapsed()` – khách theo số ngày từ lần làm dịch vụ gần nhất.
 - **Bài viết**: `posts` (liệu trình mới / góc chăm da), ảnh ở bucket `post-images`.
+
+## Giai đoạn 10: phiếu theo dõi da 3 màu + lịch tháng / timeline
+
+| Trang | Ai dùng | Việc |
+|---|---|---|
+| `/quan-ly/lich-hen` | lễ tân, KTV, quản lý, chủ | **Lịch tháng** (như quyển lịch): mỗi ô ngày hiện số khách, tô màu theo mức kín chỗ (xanh còn chỗ / vàng có giờ đã kín / đỏ kín cả ngày), chấm vàng = có lịch chờ xác nhận. Bấm ngày → **timeline trong ngày**: trục giờ 9:00 – 21:00, mỗi lịch là 1 khối theo giờ bắt đầu – kết thúc, xếp theo cột (tối đa số khách / ca), số "3/4" ở từng nửa tiếng, nửa tiếng đã kín tô đỏ, vạch đỏ = giờ hiện tại. Bấm ô trống để tạo lịch giờ đó, bấm khối để xuống chi tiết (xác nhận, xếp KTV, thu tiền, **phiếu da**). Chủ spa sửa số khách / ca ngay dưới timeline |
+| `/dat-lich` | khách | Chọn ngày trên **lịch tháng** (ngày kín hiện "Kín", ngày đông hiện "Đông"); giờ hết chỗ hiện "Hết chỗ" – tính theo tổng thời gian các dịch vụ đã chọn |
+| `/quan-ly/tao-lich` | nhân viên | Báo "đang có x/4 khách cùng lúc" theo giờ chọn; đủ chỗ thì chỉ chủ / quản lý xếp thêm được |
+| `/quan-ly/phieu-da` | lễ tân, KTV, quản lý, chủ | Danh sách khách hôm nay **chưa có phiếu da** + phiếu gần đây, lọc theo màu. Phiếu: màu tổng thể **Xanh** (da tốt, ổn định) / **Vàng** (cần theo dõi, cải thiện) / **Đỏ** (có vấn đề, cần xử lý); màu từng vấn đề (mụn, thâm – nám, độ ẩm, dầu, nhạy cảm, lỗ chân lông, lão hoá, sẹo); **nhu cầu khách** (chọn nhanh + ghi thêm); phản ứng da, đề xuất buổi sau, chăm sóc tại nhà, hẹn quay lại sau N ngày, ghi chú nội bộ |
+| `/quan-ly/khach-hang?id=…` | nhân viên | Mục **Theo dõi da**: dải chấm màu qua các buổi + 3 phiếu gần nhất |
+| `/tai-khoan` | khách | **Theo dõi da của tôi**: màu da, đề xuất, hướng dẫn tại nhà (không thấy phản ứng da / ghi chú nội bộ) |
+
+Cơ sở dữ liệu (`20261104000038_skin_records_calendar.sql`):
+- `branches.max_per_slot` (mặc định **4** khách cùng lúc). Trigger `appointments_capacity_check`: thêm / dời / kéo dài lịch làm số khách cùng lúc vượt mức thì báo lỗi; chủ / quản lý được xếp thêm. Lịch đã huỷ / không đến không tính.
+- `branch_busy_intervals`, `branch_month_load` (chỉ trả giờ bận, không có thông tin khách) cho trang đặt lịch online; `set_branch_capacity` (chủ).
+- `skin_records`: 1 phiếu / lịch hẹn (hoặc phiếu lẻ từ hồ sơ khách). Người lập, quản lý, chủ sửa được; quản lý / chủ xoá. Phiếu **đỏ** tự tạo nhắc "hỏi thăm" ngày hôm sau ở trang Chăm sóc; có "hẹn quay lại sau N ngày" thì tự tạo nhắc "mời quay lại". Khách đọc qua `my_skin_records()`.
+- Lịch hẹn hiện **phiếu da buổi trước** (màu + nhu cầu + đề xuất) để KTV xem trước khi làm.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -11,8 +11,20 @@ import {
   SLOT_MINUTES,
 } from "@/lib/config";
 import { formatDate, formatDuration, formatTime, formatVnd, todayVn, vnDateTime, vnError } from "@/lib/format";
+import {
+  DEFAULT_CAPACITY,
+  WEEKDAYS,
+  addDays,
+  monthGrid,
+  monthLabel,
+  monthOf,
+  peakLoad,
+  shiftMonth,
+  toIntervals,
+  type Interval,
+} from "@/lib/calendar";
 
-export type Branch = { id: string; name: string; address: string };
+export type Branch = { id: string; name: string; address: string; max_per_slot?: number | null };
 export type Category = { id: string; name: string; sort_order: number };
 export type Service = {
   id: string;
@@ -67,6 +79,55 @@ export default function BookingForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ start: string } | null>(null);
+  const [ym, setYm] = useState<string>(monthOf(todayVn()));
+  const [monthLoad, setMonthLoad] = useState<Map<string, { full: number; slots: number }>>(new Map());
+  const [dayBusy, setDayBusy] = useState<Interval[] | null>(null);
+  const supabase = useMemo(() => createClient(), []);
+  const cap = branches.find((b) => b.id === branchId)?.max_per_slot ?? DEFAULT_CAPACITY;
+  const minDay = todayVn();
+  const maxDay = todayVn(MAX_DAYS_AHEAD);
+
+  // mức kín chỗ từng ngày trong tháng đang xem
+  useEffect(() => {
+    if (!branchId) return;
+    let off = false;
+    const grid = monthGrid(ym);
+    const from = grid[0][0].date < minDay ? minDay : grid[0][0].date;
+    const lastCell = grid[grid.length - 1][6].date;
+    const to = lastCell > maxDay ? maxDay : lastCell;
+    if (from > to) {
+      setMonthLoad(new Map());
+      return;
+    }
+    supabase.rpc("branch_month_load", { p_branch: branchId, p_from: from, p_to: to }).then(({ data }) => {
+      if (off) return;
+      const m = new Map<string, { full: number; slots: number }>();
+      for (const r of (data ?? []) as { day: string; full_slots: number; slots: number }[]) m.set(r.day, { full: r.full_slots, slots: r.slots });
+      setMonthLoad(m);
+    });
+    return () => {
+      off = true;
+    };
+  }, [branchId, ym, supabase, minDay, maxDay]);
+
+  // giờ đã có khách trong ngày đang chọn
+  useEffect(() => {
+    if (!branchId || !date) return;
+    let off = false;
+    setDayBusy(null);
+    supabase
+      .rpc("branch_busy_intervals", {
+        p_branch: branchId,
+        p_from: vnDateTime(date, "00:00").toISOString(),
+        p_to: vnDateTime(addDays(date, 1), "00:00").toISOString(),
+      })
+      .then(({ data }) => {
+        if (!off) setDayBusy(toIntervals((data ?? []) as { start_at: string; end_at: string | null }[]));
+      });
+    return () => {
+      off = true;
+    };
+  }, [branchId, date, supabase]);
 
   const branchServices = useMemo(
     () => services.filter((s) => s.branch_id === null || s.branch_id === branchId),
@@ -90,7 +151,14 @@ export default function BookingForm({
   const hasQuote = chosen.some((s) => s.price === null);
 
   const earliest = Date.now() + MIN_LEAD_MINUTES * 60000;
-  const slotOk = (t: string) => vnDateTime(date, t).getTime() >= earliest;
+  const durMs = (totalMinutes || 60) * 60000;
+  /** số chỗ còn trống trong suốt thời gian làm nếu bắt đầu lúc t */
+  const freeAt = (t: string) => {
+    if (!dayBusy) return cap;
+    const s = vnDateTime(date, t).getTime();
+    return cap - peakLoad(dayBusy, s, s + durMs);
+  };
+  const slotOk = (t: string) => vnDateTime(date, t).getTime() >= earliest && freeAt(t) > 0;
 
   function changeBranch(id: string) {
     setBranchId(id);
@@ -290,41 +358,102 @@ export default function BookingForm({
       {/* 3. Ngày giờ */}
       <section className="card">
         <h2 className="mb-3 font-semibold text-navy">3. Ngày và giờ</h2>
-        <input
-          type="date"
-          className="input mb-3"
-          value={date}
-          min={todayVn()}
-          max={todayVn(MAX_DAYS_AHEAD)}
-          onChange={(e) => {
-            setDate(e.target.value);
-            setTime("");
-          }}
-        />
+        <div className="mb-2 flex items-center justify-between">
+          <button
+            type="button"
+            className="btn-ghost px-3 py-1.5"
+            disabled={ym <= monthOf(minDay)}
+            onClick={() => setYm(shiftMonth(ym, -1))}
+            aria-label="Tháng trước"
+          >
+            ‹
+          </button>
+          <p className="font-bold text-navy">{monthLabel(ym)}</p>
+          <button
+            type="button"
+            className="btn-ghost px-3 py-1.5"
+            disabled={ym >= monthOf(maxDay)}
+            onClick={() => setYm(shiftMonth(ym, 1))}
+            aria-label="Tháng sau"
+          >
+            ›
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-ink/50">
+          {WEEKDAYS.map((w) => <div key={w} className={w === "CN" ? "text-[#8A2323]" : ""}>{w}</div>)}
+        </div>
+        <div className="mb-4 mt-1 grid grid-cols-7 gap-1">
+          {monthGrid(ym).flat().map((g) => {
+            const out = g.date < minDay || g.date > maxDay;
+            const ld = monthLoad.get(g.date);
+            const full = !!ld && ld.full >= ld.slots;
+            const busyDay = !!ld && ld.full > 0 && !full;
+            const sel = g.date === date;
+            return (
+              <button
+                key={g.date}
+                type="button"
+                disabled={out || full}
+                onClick={() => {
+                  setDate(g.date);
+                  setTime("");
+                }}
+                className={`flex aspect-square flex-col items-center justify-center rounded-lg text-sm transition sm:aspect-auto sm:h-14 ${
+                  !g.inMonth ? "opacity-40" : ""
+                } ${
+                  sel
+                    ? "bg-navy font-bold text-white"
+                    : out
+                      ? "cursor-not-allowed text-ink/25"
+                      : full
+                        ? "cursor-not-allowed bg-[#FCE4E4] text-[#8A2323]/60"
+                        : busyDay
+                          ? "bg-[#FFF3D6] hover:ring-2 hover:ring-navy"
+                          : "bg-cream hover:ring-2 hover:ring-navy"
+                }`}
+              >
+                <span className={g.date === minDay && !sel ? "font-bold text-navy underline" : ""}>{Number(g.date.slice(8))}</span>
+                {!out && full && <span className="text-[9px] leading-none">Kín</span>}
+                {!out && busyDay && !sel && <span className="text-[9px] leading-none text-[#7A5600]">Đông</span>}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mb-2 text-sm font-semibold capitalize text-navy">{formatDate(vnDateTime(date, "12:00").toISOString())}</p>
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
           {SLOTS.map((t) => {
-            const ok = date !== "" && slotOk(t);
+            const late = vnDateTime(date, t).getTime() < earliest;
+            const free = freeAt(t);
+            const ok = date !== "" && !late && free > 0;
             return (
               <button
                 key={t}
                 type="button"
                 disabled={!ok}
                 onClick={() => setTime(t)}
-                className={`rounded-lg border py-2 text-sm transition ${
+                className={`flex flex-col items-center rounded-lg border py-1.5 text-sm transition ${
                   time === t
                     ? "border-navy bg-navy text-white"
                     : ok
                       ? "border-beige-dark bg-white hover:border-navy"
-                      : "cursor-not-allowed border-transparent bg-cream text-ink/30 line-through"
+                      : "cursor-not-allowed border-transparent bg-cream text-ink/30"
                 }`}
               >
-                {t}
+                <span className={late ? "line-through" : ""}>{t}</span>
+                {!late && dayBusy && (
+                  <span className={`text-[10px] leading-tight ${time === t ? "text-beige" : free <= 0 ? "text-[#8A2323]/70" : free === 1 ? "text-[#7A5600]" : "text-ink/40"}`}>
+                    {free <= 0 ? "Hết chỗ" : free === 1 ? "Còn 1 chỗ" : "Còn chỗ"}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
-        {date !== "" && SLOTS.every((t) => !slotOk(t)) && (
-          <p className="mt-2 text-sm text-ink/60">Hôm nay đã hết giờ nhận đặt online, vui lòng chọn ngày khác.</p>
+        {date !== "" && dayBusy && SLOTS.every((t) => !slotOk(t)) && (
+          <p className="mt-2 text-sm text-ink/60">Ngày này đã hết giờ nhận đặt online, vui lòng chọn ngày khác.</p>
+        )}
+        {chosen.length > 0 && (
+          <p className="mt-2 text-xs text-ink/50">Giờ còn chỗ đã tính theo thời gian làm {formatDuration(totalMinutes)}.</p>
         )}
       </section>
 
