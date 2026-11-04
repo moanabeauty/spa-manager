@@ -3,15 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { cleanBarcode } from "@/lib/inventory";
 
-type Detector = { detect: (src: HTMLVideoElement | ImageBitmap | HTMLCanvasElement) => Promise<{ rawValue: string }[]> };
+type Detector = { detect: (src: HTMLVideoElement | ImageBitmap | HTMLCanvasElement) => Promise<{ rawValue: string; format?: string }[]> };
 type DetectorCtor = {
   new (opts?: { formats: string[] }): Detector;
   getSupportedFormats?: () => Promise<string[]>;
 };
 
-// Các loại mã hay gặp trên mỹ phẩm: EAN-13 / EAN-8 / UPC (mã sản phẩm), Code 128, QR, DataMatrix.
-// Không đọc ITF / Code 39: hai loại này không có số kiểm tra nên hay đọc nhầm một phần mã EAN thành số khác.
-const NATIVE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "qr_code", "data_matrix"];
+// Các loại mã hay gặp trên mỹ phẩm: EAN-13 / EAN-8 / UPC (mã sản phẩm), Code 128, QR, DataMatrix,
+// và mã nội bộ của hãng: Code 39 / Code 93 / Codabar / ITF (vd Lait VIP O2 in mã 9 số 119913586).
+const NATIVE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "code_93", "codabar", "itf", "qr_code", "data_matrix"];
+// Loại mã "yếu": không có số kiểm tra bắt buộc nên dễ đọc nhầm → cần đọc trùng nhiều lần hơn
+const WEAK = /^(code_?39|code_?93|codabar|itf)$/i;
 
 /** Mã toàn số dài 8 / 12 / 13 (EAN / UPC) phải đúng số kiểm tra cuối — chặn đọc nhầm */
 function checkOk(digits: string, check: number): boolean {
@@ -51,11 +53,13 @@ async function nativeDetector(): Promise<Detector | null> {
   }
 }
 
+let zxFormatName: (f: number) => string = () => "";
 async function zxingReader() {
   const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([
     import("@zxing/browser"),
     import("@zxing/library"),
   ]);
+  zxFormatName = (f) => String(BarcodeFormat[f] ?? "");
   const hints = new Map();
   hints.set(DecodeHintType.TRY_HARDER, true);
   hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -64,6 +68,10 @@ async function zxingReader() {
     BarcodeFormat.UPC_A,
     BarcodeFormat.UPC_E,
     BarcodeFormat.CODE_128,
+    BarcodeFormat.CODE_39,
+    BarcodeFormat.CODE_93,
+    BarcodeFormat.CODABAR,
+    BarcodeFormat.ITF,
     BarcodeFormat.QR_CODE,
     BarcodeFormat.DATA_MATRIX,
   ]);
@@ -91,6 +99,9 @@ const FULL = { x: 0, y: 0, w: 1, h: 1 };
 const BAND = { x: 0.05, y: 0.3, w: 0.9, h: 0.4 }; // dải giữa khung hình, đúng chỗ khung trắng
 
 /** Mã ngắn 8 số (EAN-8 / UPC-E) — loại hay bị đọc nhầm từ một phần mã 13 số khi ảnh mờ */
+/** Tên loại mã của ZXing (CODE_39) / trình duyệt (code_39) → có phải loại "yếu" */
+const weakFormat = (format: string | number | undefined, zxingName?: (f: number) => string) =>
+  WEAK.test(typeof format === "number" ? (zxingName?.(format) ?? "") : (format ?? ""));
 const isShort = (code: string) => /^\d{8}$/.test(code);
 
 /**
@@ -101,7 +112,7 @@ const isShort = (code: string) => /^\d{8}$/.test(code);
 function makeVoter(windowMs = 4000) {
   const votes = new Map<string, { n: number; regions: Set<string>; t: number }>();
   return {
-    add(code: string, region: string): string | null {
+    add(code: string, region: string, weak = false): string | null {
       const now = Date.now();
       for (const [k, v] of votes) if (now - v.t > windowMs) votes.delete(k);
       const v = votes.get(code) ?? { n: 0, regions: new Set<string>(), t: now };
@@ -110,7 +121,11 @@ function makeVoter(windowMs = 4000) {
       v.t = now;
       votes.set(code, v);
       const longSeen = [...votes.keys()].some((k) => !isShort(k));
-      const ok = isShort(code) ? !longSeen && v.n >= 3 && v.regions.size >= 2 : v.n >= 2;
+      const ok = isShort(code)
+        ? !longSeen && v.n >= 3 && v.regions.size >= 2
+        : weak
+          ? v.n >= 3 && v.regions.size >= 2
+          : v.n >= 2;
       if (!ok) return null;
       votes.clear();
       return code;
@@ -140,7 +155,7 @@ async function decodePhoto(file: File): Promise<string | null> {
   const native = await nativeDetector();
   if (native) {
     try {
-      const codes = (await native.detect(bitmap)).map((f) => cleanBarcode(f.rawValue)).filter(plausible);
+      const codes = (await native.detect(bitmap)).map((f) => cleanBarcode(f.rawValue)).filter((c) => c && plausible(c));
       const best = codes.find((c) => !isShort(c)) ?? codes[0];
       if (best) return best;
     } catch {
@@ -151,16 +166,20 @@ async function decodePhoto(file: File): Promise<string | null> {
   // thử hết các vùng / cỡ rồi chọn: mã dài đọc được ở đâu cũng ưu tiên; mã ngắn 8 số phải ra ít nhất 2 lần
   const tries: [typeof FULL, number][] = [[FULL, 1600], [BAND, 1600], [FULL, 1000], [BAND, 1000], [FULL, 2400], [FULL, 700]];
   const tally = new Map<string, number>();
+  const weak = new Set<string>();
   for (const [region, size] of tries) {
     try {
-      const code = cleanBarcode(reader.decodeFromCanvas(crop(bitmap, bitmap.width, bitmap.height, region, size)).getText());
-      if (plausible(code)) tally.set(code, (tally.get(code) ?? 0) + 1);
+      const r = reader.decodeFromCanvas(crop(bitmap, bitmap.width, bitmap.height, region, size));
+      const code = cleanBarcode(r.getText());
+      if (!code || !plausible(code)) continue;
+      tally.set(code, (tally.get(code) ?? 0) + 1);
+      if (weakFormat(r.getBarcodeFormat(), zxFormatName)) weak.add(code);
     } catch {
       // vùng / cỡ này không đọc được, thử tiếp
     }
   }
   const ranked = [...tally.entries()].sort((a, b) => b[1] - a[1]);
-  const long = ranked.find(([c]) => !isShort(c));
+  const long = ranked.find(([c, n]) => !isShort(c) && (!weak.has(c) || n >= 2));
   if (long) return long[0];
   const short = ranked.find(([, n]) => n >= 2);
   return short ? short[0] : null;
@@ -202,10 +221,10 @@ export default function CameraScanner({ onScan, onClose }: { onScan: (code: stri
     };
     emitRef.current = emit;
     const voter = makeVoter();
-    const vote = (raw: string, region: string) => {
+    const vote = (raw: string, region: string, weak: boolean) => {
       const code = cleanBarcode(raw);
       if (!code || !plausible(code)) return;
-      const ok = voter.add(code, region);
+      const ok = voter.add(code, region, weak);
       if (ok) emit(ok);
     };
     const slowTimer = window.setTimeout(() => setSlow(true), 8000);
@@ -232,12 +251,13 @@ export default function CameraScanner({ onScan, onClose }: { onScan: (code: stri
             if (video.readyState >= 2 && video.videoWidth) {
               if (native) {
                 const found = await native.detect(video);
-                for (const f of found) vote(f.rawValue, `n${turn++ % 2}`);
+                for (const f of found) vote(f.rawValue, `n${turn++ % 2}`, weakFormat(f.format));
               } else if (reader) {
                 const i = turn++ % regions.length;
                 const [region, size] = regions[i];
                 try {
-                  vote(reader.decodeFromCanvas(crop(video, video.videoWidth, video.videoHeight, region, size, canvas)).getText(), `z${i}`);
+                  const r = reader.decodeFromCanvas(crop(video, video.videoWidth, video.videoHeight, region, size, canvas));
+                  vote(r.getText(), `z${i}`, weakFormat(r.getBarcodeFormat(), zxFormatName));
                 } catch {
                   // khung hình này chưa thấy mã
                 }
