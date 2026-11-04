@@ -89,7 +89,34 @@ function crop(
 }
 const FULL = { x: 0, y: 0, w: 1, h: 1 };
 const BAND = { x: 0.05, y: 0.3, w: 0.9, h: 0.4 }; // dải giữa khung hình, đúng chỗ khung trắng
-const CENTER = { x: 0.2, y: 0.35, w: 0.6, h: 0.3 }; // vùng giữa nhỏ hơn = phóng to mã nhỏ
+
+/** Mã ngắn 8 số (EAN-8 / UPC-E) — loại hay bị đọc nhầm từ một phần mã 13 số khi ảnh mờ */
+const isShort = (code: string) => /^\d{8}$/.test(code);
+
+/**
+ * Bỏ phiếu giữa các lần đọc: chỉ nhận khi cùng một mã đọc ra nhiều lần.
+ * Mã thường cần 2 lần; mã ngắn 8 số cần 3 lần ở ít nhất 2 vùng / cỡ khác nhau,
+ * và không nhận mã ngắn nếu gần đó đã đọc thấy một mã dài (mã ngắn khi đó gần như chắc là đọc nhầm).
+ */
+function makeVoter(windowMs = 4000) {
+  const votes = new Map<string, { n: number; regions: Set<string>; t: number }>();
+  return {
+    add(code: string, region: string): string | null {
+      const now = Date.now();
+      for (const [k, v] of votes) if (now - v.t > windowMs) votes.delete(k);
+      const v = votes.get(code) ?? { n: 0, regions: new Set<string>(), t: now };
+      v.n += 1;
+      v.regions.add(region);
+      v.t = now;
+      votes.set(code, v);
+      const longSeen = [...votes.keys()].some((k) => !isShort(k));
+      const ok = isShort(code) ? !longSeen && v.n >= 3 && v.regions.size >= 2 : v.n >= 2;
+      if (!ok) return null;
+      votes.clear();
+      return code;
+    },
+  };
+}
 
 const CAMERA: MediaStreamConstraints = {
   video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
@@ -113,23 +140,30 @@ async function decodePhoto(file: File): Promise<string | null> {
   const native = await nativeDetector();
   if (native) {
     try {
-      const found = (await native.detect(bitmap)).find((f) => plausible(f.rawValue.replace(/\s/g, "")));
-      if (found) return found.rawValue;
+      const codes = (await native.detect(bitmap)).map((f) => cleanBarcode(f.rawValue)).filter(plausible);
+      const best = codes.find((c) => !isShort(c)) ?? codes[0];
+      if (best) return best;
     } catch {
       // thử tiếp bằng ZXing
     }
   }
   const reader = await zxingReader();
-  const tries: [typeof FULL, number][] = [[FULL, 1600], [BAND, 1600], [FULL, 1000], [CENTER, 1200], [FULL, 2400], [FULL, 700]];
+  // thử hết các vùng / cỡ rồi chọn: mã dài đọc được ở đâu cũng ưu tiên; mã ngắn 8 số phải ra ít nhất 2 lần
+  const tries: [typeof FULL, number][] = [[FULL, 1600], [BAND, 1600], [FULL, 1000], [BAND, 1000], [FULL, 2400], [FULL, 700]];
+  const tally = new Map<string, number>();
   for (const [region, size] of tries) {
     try {
-      const text = reader.decodeFromCanvas(crop(bitmap, bitmap.width, bitmap.height, region, size)).getText();
-      if (plausible(text.replace(/\s/g, ""))) return text;
+      const code = cleanBarcode(reader.decodeFromCanvas(crop(bitmap, bitmap.width, bitmap.height, region, size)).getText());
+      if (plausible(code)) tally.set(code, (tally.get(code) ?? 0) + 1);
     } catch {
       // vùng / cỡ này không đọc được, thử tiếp
     }
   }
-  return null;
+  const ranked = [...tally.entries()].sort((a, b) => b[1] - a[1]);
+  const long = ranked.find(([c]) => !isShort(c));
+  if (long) return long[0];
+  const short = ranked.find(([, n]) => n >= 2);
+  return short ? short[0] : null;
 }
 
 /**
@@ -167,6 +201,13 @@ export default function CameraScanner({ onScan, onClose }: { onScan: (code: stri
       onScanRef.current(code);
     };
     emitRef.current = emit;
+    const voter = makeVoter();
+    const vote = (raw: string, region: string) => {
+      const code = cleanBarcode(raw);
+      if (!code || !plausible(code)) return;
+      const ok = voter.add(code, region);
+      if (ok) emit(ok);
+    };
     const slowTimer = window.setTimeout(() => setSlow(true), 8000);
 
     (async () => {
@@ -182,8 +223,8 @@ export default function CameraScanner({ onScan, onClose }: { onScan: (code: stri
         tuneCamera(stream);
         const reader = native ? null : await zxingReader();
         const canvas = document.createElement("canvas");
-        // ZXing: mỗi lượt đọc một vùng khác nhau của khung hình (dải giữa, vùng giữa phóng to, cả khung)
-        const regions: [typeof FULL, number][] = [[BAND, 1280], [CENTER, 1000], [FULL, 1280]];
+        // ZXing: mỗi lượt đọc một vùng / cỡ khác nhau của khung hình (dải giữa và cả khung, giữ đủ hai đầu mã vạch)
+        const regions: [typeof FULL, number][] = [[BAND, 1280], [FULL, 1280], [BAND, 900], [FULL, 900]];
         let turn = 0;
         let timer = 0;
         const tick = async () => {
@@ -191,11 +232,12 @@ export default function CameraScanner({ onScan, onClose }: { onScan: (code: stri
             if (video.readyState >= 2 && video.videoWidth) {
               if (native) {
                 const found = await native.detect(video);
-                for (const f of found) emit(f.rawValue);
+                for (const f of found) vote(f.rawValue, `n${turn++ % 2}`);
               } else if (reader) {
-                const [region, size] = regions[turn++ % regions.length];
+                const i = turn++ % regions.length;
+                const [region, size] = regions[i];
                 try {
-                  emit(reader.decodeFromCanvas(crop(video, video.videoWidth, video.videoHeight, region, size, canvas)).getText());
+                  vote(reader.decodeFromCanvas(crop(video, video.videoWidth, video.videoHeight, region, size, canvas)).getText(), `z${i}`);
                 } catch {
                   // khung hình này chưa thấy mã
                 }
