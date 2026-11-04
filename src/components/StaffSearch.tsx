@@ -118,7 +118,7 @@ export default function StaffSearch() {
           <button className="ml-2 text-xs font-semibold text-navy underline" onClick={() => setScanMsg(null)}>Đóng</button>
         </div>
       )}
-      {scanning && <CameraScanner onScan={onScan} onClose={() => setScanning(false)} />}
+      {scanning && <CameraScanner closeOnScan onScan={onScan} onClose={() => setScanning(false)} />}
       {open && q.trim().length >= 2 && (
         <div className="absolute inset-x-0 top-full z-50 mt-1 max-h-[70vh] overflow-y-auto rounded-xl border border-beige-dark bg-white shadow-lg">
           {busy && !hits && <p className="px-4 py-3 text-sm text-ink/60">Đang tìm…</p>}

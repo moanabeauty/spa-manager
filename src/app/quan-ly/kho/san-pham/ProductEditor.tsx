@@ -63,7 +63,13 @@ export default function ProductEditor({
               (scope === "retail" && p.for_retail) ||
               (scope === "nobarcode" && !p.barcode)),
       )
-      .filter((p) => !q || normalizeText(`${p.brand ?? ""} ${p.name} ${p.category ?? ""} ${p.barcode ?? ""}`).includes(q));
+      .filter((p) => {
+        if (!q) return true;
+        const hay = normalizeText(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""} ${p.category ?? ""} ${p.barcode ?? ""}`);
+        // bỏ qua dấu chấm / khoảng trắng / gạch: gõ "lait sr 250" vẫn ra "LAIT S.R. · 250 ML"
+        const strip = (x: string) => x.replace(/[^a-z0-9]/g, "");
+        return hay.includes(q) || (strip(q).length >= 2 && strip(hay).includes(strip(q)));
+      });
   }, [products, query, scope]);
 
   return (
@@ -124,7 +130,7 @@ export default function ProductEditor({
           ))}
         </ul>
       </div>
-      {scanning && <CameraScanner onScan={handleScan} onClose={() => setScanning(false)} />}
+      {scanning && <CameraScanner closeOnScan onScan={handleScan} onClose={() => setScanning(false)} />}
     </div>
   );
 }
@@ -214,6 +220,8 @@ export function ProductForm({
     f.name.trim() && (product || (f.brand.trim() && f.capacity.trim())) && (pctNum === null || (pctNum >= 0 && pctNum <= 100));
 
   async function save() {
+    // tắt "Đang dùng" sẽ ẩn sản phẩm khỏi danh sách, tìm kiếm và quét mã → hỏi lại cho chắc
+    if (product?.is_active && !f.is_active && !window.confirm("Chuyển sản phẩm này sang Ngừng dùng? Sản phẩm sẽ bị ẩn khỏi danh sách, tìm kiếm và quét mã.")) return;
     setBusy(true);
     setError(null);
     const row = {
@@ -254,7 +262,7 @@ export function ProductForm({
           <button type="button" className="btn-primary shrink-0 py-1.5" onClick={() => setScanning(true)}>📷 Quét</button>
         </div>
         {scanning && (
-          <CameraScanner
+          <CameraScanner closeOnScan
             onScan={(code) => {
               set({ barcode: code.replace(/\s/g, "") });
               setScanning(false);
@@ -301,6 +309,7 @@ export function ProductForm({
         <label className="flex items-center gap-1"><input type="checkbox" checked={f.for_treatment} onChange={(e) => set({ for_treatment: e.target.checked })} /> Hàng liệu trình</label>
         <label className="flex items-center gap-1"><input type="checkbox" checked={f.for_retail} onChange={(e) => set({ for_retail: e.target.checked })} /> Hàng bán lẻ</label>
         <label className="flex items-center gap-1"><input type="checkbox" checked={f.is_active} onChange={(e) => set({ is_active: e.target.checked })} /> Đang dùng</label>
+        {!f.is_active && <span className="w-full text-[#8A2323]">Đang để Ngừng dùng: sản phẩm sẽ bị ẩn khỏi danh sách, tìm kiếm và quét mã.</span>}
       </div>
       {error && <p className="text-[#8A2323] sm:col-span-2">{error}</p>}
       <div className="flex justify-end gap-2 sm:col-span-2">

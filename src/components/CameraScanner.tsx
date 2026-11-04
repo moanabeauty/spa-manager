@@ -206,11 +206,24 @@ async function decodePhoto(file: File): Promise<string | null> {
  * Quét mã vạch bằng camera điện thoại (camera sau). Quét liên tục, cùng 1 mã chỉ nhận lại sau 2 giây.
  * Không quét được thì có thể chụp ảnh mã vạch hoặc gõ số in dưới mã vạch.
  */
-export default function CameraScanner({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) {
+export default function CameraScanner({
+  onScan,
+  onClose,
+  closeOnScan = false,
+}: {
+  onScan: (code: string) => void;
+  onClose: () => void;
+  /** đọc được 1 mã là xong: hiện mã khoảng 0,8 giây rồi mới đóng, để cú chạm tiếp theo không rơi xuống form bên dưới (iPhone) */
+  closeOnScan?: boolean;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
+  const closeOnScanRef = useRef(closeOnScan);
+  closeOnScanRef.current = closeOnScan;
+  const doneRef = useRef(false);
+  const [holding, setHolding] = useState(false);
   const emitRef = useRef<(code: string) => void>(() => {});
   const [error, setError] = useState<string | null>(null);
   const [last, setLast] = useState<string | null>(null);
@@ -234,7 +247,12 @@ export default function CameraScanner({ onScan, onClose }: { onScan: (code: stri
       setLast(code);
       setSlow(false);
       if (navigator.vibrate) navigator.vibrate(80);
-      onScanRef.current(code);
+      if (closeOnScanRef.current) {
+        if (doneRef.current) return;
+        doneRef.current = true;
+        setHolding(true);
+        window.setTimeout(() => onScanRef.current(code), 800);
+      } else onScanRef.current(code);
     };
     emitRef.current = emit;
     const voter = makeVoter();
@@ -334,6 +352,13 @@ export default function CameraScanner({ onScan, onClose }: { onScan: (code: stri
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-black/90 p-4 text-white">
+      {holding && (
+        <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/80 text-center">
+          <p className="text-4xl">✓</p>
+          <p className="mt-2 text-lg font-semibold">Đã đọc mã</p>
+          <p className="mt-1 font-mono text-xl">{last}</p>
+        </div>
+      )}
       <div className="mx-auto flex w-full max-w-md items-center justify-between">
         <p className="font-semibold">Đưa mã vạch vào khung</p>
         <button className="rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold" onClick={onClose}>
