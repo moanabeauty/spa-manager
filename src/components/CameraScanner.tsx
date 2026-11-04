@@ -147,6 +147,22 @@ function makeVoter(windowMs = 4000) {
   };
 }
 
+const CAMERA: MediaStreamConstraints = {
+  video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+  audio: false,
+};
+
+/** Bật lấy nét liên tục + phóng to nhẹ nếu camera hỗ trợ (cầm xa hơn vẫn nét, đọc được mã nhỏ trên chai lọ) */
+function tuneCamera(stream: MediaStream | null) {
+  const track = stream?.getVideoTracks()[0];
+  if (!track) return;
+  const caps = (track.getCapabilities?.() ?? {}) as { focusMode?: string[]; zoom?: { min: number; max: number } };
+  const adv: Record<string, unknown>[] = [];
+  if (caps.focusMode?.includes("continuous")) adv.push({ focusMode: "continuous" });
+  if (caps.zoom && caps.zoom.max >= 1.5) adv.push({ zoom: Math.min(2, caps.zoom.max) });
+  if (adv.length) track.applyConstraints({ advanced: adv } as unknown as MediaTrackConstraints).catch(() => {});
+}
+
 /** Đọc mã từ ảnh chụp: thu nhỏ ảnh về vài cỡ rồi thử lần lượt (ảnh 12MP đọc trực tiếp rất chậm và hay trượt) */
 async function decodePhoto(file: File): Promise<string | null> {
   const bitmap = await createImageBitmap(file);
