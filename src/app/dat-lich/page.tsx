@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import BookingForm, { type Branch, type Category, type Service } from "./BookingForm";
+import { fetchPackageOptions } from "@/lib/packageBooking";
 
 export const metadata = { title: "Đặt lịch – Moana Beauty" };
 
@@ -30,8 +31,11 @@ export default async function BookingPage() {
     );
   }
 
+  const packageOptions = await fetchPackageOptions(supabase, customer.id);
+
   return (
     <BookingForm
+      packageOptions={packageOptions}
       customerId={customer.id}
       customerName={customer.full_name}
       branches={(branches ?? []) as Branch[]}

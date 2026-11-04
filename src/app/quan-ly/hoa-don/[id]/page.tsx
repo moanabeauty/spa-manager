@@ -23,7 +23,7 @@ type Inv = {
   voided_at: string | null;
   appointment_id: string | null;
   branches: { name: string; address: string } | null;
-  customers: { id: string; full_name: string; phone: string | null } | null;
+  customers: { id: string; code?: string; full_name: string; phone: string | null; profile_id?: string | null } | null;
   creator: { full_name: string | null } | null;
   invoice_items: {
     id: string;
@@ -59,7 +59,7 @@ export default async function InvoicePage({
     .from("invoices")
     .select(
       `id, code, status, paid_at, created_at, note, void_reason, discount_reason, voided_at, appointment_id,
-       branches(name, address), customers(id, full_name, phone), creator:profiles!invoices_created_by_fkey(full_name),
+       branches(name, address), customers(id, code, full_name, phone, profile_id), creator:profiles!invoices_created_by_fkey(full_name),
        invoice_items(id, item_type, description, quantity, unit_price, discount, amount, paid_with_card, customer_package_id,
          invoice_item_sellers(amount, profiles(full_name))),
        payments(id, method, amount), channel, debt_amount, debt_reason,
@@ -84,7 +84,16 @@ export default async function InvoicePage({
     <div className="space-y-4">
       {sp.moi && !cancelled && (
         <div className="card flex flex-wrap items-center justify-between gap-2 border-l-4 border-l-[#22612A] p-4 text-sm print:hidden">
-          <span>✓ Đã thu tiền và chốt hoá đơn.</span>
+          <span>
+            ✓ Đã thu tiền và chốt hoá đơn.
+            {inv.invoice_items.some((i) => i.item_type === "package" || i.item_type === "card_topup") && (
+              <span className="block text-xs text-ink/70">
+                {inv.customers?.profile_id
+                  ? "Đã gửi thông báo “Đăng ký thành công” vào tài khoản Moana của khách; chủ spa / quản lý cũng nhận được thông báo."
+                  : "Đã báo chủ spa / quản lý. Khách chưa có tài khoản Moana online nên chưa nhận được thông báo trong app – nhắn khách qua Zalo / SMS nếu cần."}
+              </span>
+            )}
+          </span>
           <span className="flex gap-2">
             <Link href={inv.appointment_id ? "/quan-ly/lich-hen" : "/quan-ly/thu-tien"} className="btn-outline py-2">
               {inv.appointment_id ? "Về lịch hẹn" : "Thu hoá đơn khác"}

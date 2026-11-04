@@ -7,6 +7,8 @@ import { cardBalance, fetchWallet, isPackageUsable, itemLeft, itemText, type Wal
 import { REG_STATUS_LABEL, REG_STATUS_STYLE, canRedeem, dmy, regDeadline, sortedItems, type PromoItem } from "@/lib/promotions";
 import { todayVn } from "@/lib/format";
 import CancelRegButton from "../khuyen-mai/CancelRegButton";
+import Notifications from "@/components/Notifications";
+import PushToggle from "@/components/PushToggle";
 
 type MyReg = {
   id: string;
@@ -27,8 +29,17 @@ type Appt = {
   end_at: string | null;
   status: string;
   note: string | null;
+  needs_consult: boolean;
   branches: { name: string; address: string } | null;
-  appointment_services: { id: string; start_at: string; price: number | null; services: { name: string } | null }[];
+  appointment_services: {
+    id: string;
+    start_at: string;
+    price: number | null;
+    staff_choose: boolean;
+    customer_package_item_id: string | null;
+    services: { name: string } | null;
+    customer_package_items: { label: string } | null;
+  }[];
 };
 
 export default async function MyAppointmentsPage() {
@@ -39,7 +50,7 @@ export default async function MyAppointmentsPage() {
   const { data } = customer
     ? await supabase
         .from("appointments")
-        .select("id, start_at, end_at, status, note, branches(name, address), appointment_services(id, start_at, price, services(name))")
+        .select("id, start_at, end_at, status, note, needs_consult, branches(name, address), appointment_services(id, start_at, price, staff_choose, customer_package_item_id, services(name), customer_package_items(label))")
         .eq("customer_id", customer.id)
         .order("start_at", { ascending: false })
         .limit(50)
@@ -59,6 +70,7 @@ export default async function MyAppointmentsPage() {
     (r) => r.status === "pending" || r.status === "confirmed" || Date.now() - new Date(r.created_at).getTime() < 60 * 86400000,
   );
 
+  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
   const now = Date.now();
   const upcoming = appts.filter((a) => new Date(a.start_at).getTime() >= now - 3 * 3600000 && !["cancelled", "no_show", "completed"].includes(a.status)).reverse();
   const past = appts.filter((a) => !upcoming.includes(a));
@@ -76,6 +88,9 @@ export default async function MyAppointmentsPage() {
         </div>
         <Link href="/dat-lich" className="btn-primary">+ Đặt lịch</Link>
       </div>
+      <Notifications supabase={supabase} title="Thông báo từ Moana" limit={5} />
+      {vapidKey && <PushToggle publicKey={vapidKey} hideWhenOn title="Nhận thông báo của Moana trên điện thoại (đăng ký gói / thẻ, lịch hẹn)" />}
+
       <nav className="-mx-4 flex gap-1.5 overflow-x-auto px-4 text-sm">
         {[
           ["#lich-hen", "Lịch hẹn"],
@@ -208,10 +223,13 @@ function ApptCard({ a, canCancel }: { a: Appt; canCancel: boolean }) {
         </span>
       </div>
       <ul className="mt-3 space-y-1 border-t border-beige pt-3 text-sm">
+        {items.length === 0 && <li className="text-ink/70">Chưa chọn dịch vụ – Moana sẽ tư vấn khi bạn đến</li>}
         {items.map((s) => (
           <li key={s.id} className="flex justify-between gap-3">
-            <span>{s.services?.name}</span>
-            <span className="text-ink/60">{formatVnd(s.price)}</span>
+            <span>{s.staff_choose && s.customer_package_items ? `${s.customer_package_items.label} (KTV tư vấn chọn loại)` : s.services?.name}</span>
+            <span className={s.customer_package_item_id ? "font-semibold text-[#22612A]" : "text-ink/60"}>
+              {s.customer_package_item_id ? "Trừ buổi gói" : formatVnd(s.price)}
+            </span>
           </li>
         ))}
       </ul>

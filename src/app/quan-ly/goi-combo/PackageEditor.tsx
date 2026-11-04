@@ -18,11 +18,12 @@ export type Pkg = {
     quantity: number | null;
     unit_price: number | null;
     sort_order: number;
+    staff_choice?: boolean;
     package_item_services: { service_id: string }[];
   }[];
 };
 type Svc = { id: string; name: string; name_en: string | null; price: number | null };
-type Part = { key: number; label: string; unlimited: boolean; quantity: number; unit_price: number; service_ids: string[] };
+type Part = { key: number; label: string; unlimited: boolean; quantity: number; unit_price: number; service_ids: string[]; staff_choice: boolean };
 type Draft = {
   id: string | null;
   name: string;
@@ -34,7 +35,7 @@ type Draft = {
 };
 
 let seq = 1;
-const newPart = (): Part => ({ key: seq++, label: "", unlimited: false, quantity: 1, unit_price: 0, service_ids: [] });
+const newPart = (): Part => ({ key: seq++, label: "", unlimited: false, quantity: 1, unit_price: 0, service_ids: [], staff_choice: false });
 
 function ServicePicker({ services, onPick, exclude }: { services: Svc[]; onPick: (s: Svc) => void; exclude: string[] }) {
   const [query, setQuery] = useState("");
@@ -95,6 +96,7 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
           quantity: i.quantity ?? 1,
           unit_price: Number(i.unit_price ?? 0),
           service_ids: i.package_item_services.map((x) => x.service_id),
+          staff_choice: !!i.staff_choice,
         })),
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -121,6 +123,7 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
         quantity: p.unlimited ? null : p.quantity,
         unit_price: p.unit_price || null,
         service_ids: p.service_ids,
+        staff_choice: p.staff_choice && p.service_ids.length > 1,
       })),
     });
     setSaving(false);
@@ -199,6 +202,12 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
                     <input type="checkbox" checked={p.unlimited} onChange={(e) => setPart(p.key, { unlimited: e.target.checked })} />
                     Không giới hạn
                   </label>
+                  {p.service_ids.length > 1 && (
+                    <label className="flex items-center gap-1" title="Khách đặt lịch chỉ thấy tên phần, KTV chọn loại cụ thể khi khách đến">
+                      <input type="checkbox" checked={p.staff_choice} onChange={(e) => setPart(p.key, { staff_choice: e.target.checked })} />
+                      KTV chọn loại (khách không thấy danh sách)
+                    </label>
+                  )}
                   <label className="flex items-center gap-1">
                     Giá lẻ / buổi
                     <MoneyInput value={p.unit_price} onChange={(n) => setPart(p.key, { unit_price: n })} className="w-28" ariaLabel="Giá lẻ mỗi buổi" />

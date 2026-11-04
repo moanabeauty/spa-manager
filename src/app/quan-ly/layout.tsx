@@ -45,7 +45,13 @@ export default async function ManagerLayout({ children }: { children: React.Reac
   return (
     <div className="space-y-4 pb-20 sm:pb-0">
       {role !== "owner" && <CheckInBar today={attendance} otStart={otStart} />}
-      {role === "owner" && vapidKey && <PushToggle publicKey={vapidKey} hideWhenOn />}
+      {(role === "owner" || role === "manager") && vapidKey && (
+        <PushToggle
+          publicKey={vapidKey}
+          hideWhenOn
+          title={role === "owner" ? "Báo lên điện thoại: yêu cầu giảm giá, khách mua gói / nạp thẻ" : "Báo lên điện thoại khi khách mua gói / nạp thẻ"}
+        />
+      )}
       <StaffNav groups={groups} />
       {children}
     </div>

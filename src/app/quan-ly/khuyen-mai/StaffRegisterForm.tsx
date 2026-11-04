@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { normalizePhone, todayVn, vnDateTime, vnError } from "@/lib/format";
+import { todayVn, vnDateTime, vnError } from "@/lib/format";
+import CustomerSearch from "@/components/CustomerSearch";
 import { TIME_SLOTS } from "@/app/khuyen-mai/RegisterForm";
 
 type PromoOpt = {
@@ -32,8 +33,6 @@ export default function StaffRegisterForm({
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [open, setOpen] = useState(false);
-  const [phone, setPhone] = useState("");
-  const [matches, setMatches] = useState<Cust[] | null>(null);
   const [customer, setCustomer] = useState<Cust | null>(null);
   const [promoId, setPromoId] = useState("");
   const [branchId, setBranchId] = useState(defaultBranchId);
@@ -43,23 +42,6 @@ export default function StaffRegisterForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
-
-  const digits = normalizePhone(phone);
-  useEffect(() => {
-    if (customer || digits.length < 4) {
-      setMatches(null);
-      return;
-    }
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      const { data } = await supabase.from("customers").select("id, full_name, phone").ilike("phone", `%${digits}%`).order("full_name").limit(8);
-      if (!cancelled) setMatches((data ?? []) as Cust[]);
-    }, 300);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [digits, customer, supabase]);
 
   const promo = promotions.find((p) => p.id === promoId);
   const branchOpts = promo?.branch_id ? branches.filter((b) => b.id === promo.branch_id) : branches;
@@ -82,7 +64,6 @@ export default function StaffRegisterForm({
     if (error) return setError(vnError(error.message));
     setOkMsg(`Đã đăng ký "${promo.name}" cho ${customer.full_name} (đã xác nhận).`);
     setCustomer(null);
-    setPhone("");
     setPromoId("");
     setDate("");
     setTime("");
@@ -116,26 +97,18 @@ export default function StaffRegisterForm({
         </div>
       ) : (
         <div>
-          <span className="label">Khách hàng (gõ SĐT)</span>
-          <input className="input py-2" inputMode="tel" placeholder="09…" value={phone} onChange={(e) => setPhone(e.target.value)} />
-          {matches && (
-            <ul className="mt-2 divide-y divide-beige rounded-xl border border-beige-dark">
-              {matches.length === 0 && (
-                <li className="px-3 py-2 text-ink/60">
-                  Chưa có khách này. Tạo hồ sơ ở trang{" "}
-                  <Link href={`/quan-ly/tao-lich?sdt=${digits}`} className="text-navy underline">Tạo lịch</Link>.
-                </li>
-              )}
-              {matches.map((c) => (
-                <li key={c.id}>
-                  <button className="flex w-full justify-between px-3 py-2 text-left hover:bg-cream" onClick={() => { setCustomer(c); setOkMsg(null); }}>
-                    <span className="font-medium">{c.full_name}</span>
-                    <span className="text-ink/60">{c.phone}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <CustomerSearch
+            label="Khách hàng (SĐT, mã KH hoặc tên)"
+            onPick={(c) => {
+              setCustomer({ id: c.id, full_name: c.full_name, phone: c.phone });
+              setOkMsg(null);
+            }}
+            emptyHint={
+              <>
+                Chưa có khách này. Tạo hồ sơ ở trang <Link href="/quan-ly/tao-lich" className="text-navy underline">Tạo lịch</Link>.
+              </>
+            }
+          />
         </div>
       )}
 

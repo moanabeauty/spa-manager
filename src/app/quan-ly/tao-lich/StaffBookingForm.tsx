@@ -15,6 +15,17 @@ import {
   vnError,
 } from "@/lib/format";
 import { fetchBusy, isBusy, techLabel, type Busy, type Technician } from "@/lib/staff";
+import CustomerSearch, { type CustomerHit } from "@/components/CustomerSearch";
+import {
+  bestPart,
+  fetchPackageOptions,
+  partLeft,
+  partLeftText,
+  partName,
+  shortDmy,
+  usageOf,
+  type PackageOption,
+} from "@/lib/packageBooking";
 
 export type StaffService = {
   id: string;
@@ -25,8 +36,9 @@ export type StaffService = {
   price: number | null;
   branch_id: string | null;
 };
-type Customer = { id: string; full_name: string; phone: string | null; note: string | null };
-type Item = { key: number; serviceId: string; technicianId: string };
+type Customer = Pick<CustomerHit, "id" | "full_name" | "phone" | "note"> & Partial<CustomerHit>;
+/** serviceId = "" + partId: KTV chọn loại cụ thể khi khách đến (phần gói "các loại") */
+type Item = { key: number; serviceId: string; technicianId: string; partId: string | null; staffChoose: boolean };
 
 const MAX_ITEMS = 10;
 
@@ -63,15 +75,16 @@ export default function StaffBookingForm({
   const [branchId, setBranchId] = useState(defaultBranchId);
 
   // khách
-  const [phone, setPhone] = useState(initialPhone);
-  const [matches, setMatches] = useState<Customer[] | null>(null);
-  const [searching, setSearching] = useState(false);
+  const [query, setCustQuery] = useState(initialPhone);
+  const [hits, setHits] = useState<CustomerHit[] | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [newName, setNewName] = useState("");
+  const [parts, setParts] = useState<PackageOption[]>([]);
+  const [consult, setConsult] = useState(false);
 
   // dịch vụ
   const [items, setItems] = useState<Item[]>([]);
-  const [query, setQuery] = useState("");
+  const [svcQuery, setQuery] = useState("");
   const [nextKey, setNextKey] = useState(1);
 
   // giờ
@@ -85,36 +98,34 @@ export default function StaffBookingForm({
   const [done, setDone] = useState<{ id: string; start: string; name: string } | null>(null);
 
   const byId = useMemo(() => new Map(services.map((s) => [s.id, s])), [services]);
-  const digits = normalizePhone(phone);
+  const digits = normalizePhone(query);
+  const partById = useMemo(() => new Map(parts.map((o) => [o.item_id, o])), [parts]);
 
-  // tìm khách theo SĐT (gõ từ 4 số)
+  // gói khách đang có → gợi ý trừ buổi
   useEffect(() => {
-    setCustomer(null);
-    if (digits.length < 4) {
-      setMatches(null);
+    if (!customer) {
+      setParts([]);
+      setItems((prev) => prev.map((it) => ({ ...it, partId: null, staffChoose: false })).filter((it) => it.serviceId));
       return;
     }
     let cancelled = false;
-    setSearching(true);
-    const t = setTimeout(async () => {
-      const { data } = await supabase
-        .from("customers")
-        .select("id, full_name, phone, note")
-        .ilike("phone", `%${digits}%`)
-        .order("full_name")
-        .limit(8);
+    fetchPackageOptions(supabase, customer.id).then((o) => {
       if (cancelled) return;
-      const list = (data ?? []) as Customer[];
-      setMatches(list);
-      setSearching(false);
-      const exact = list.find((c) => c.phone === digits);
-      if (exact) setCustomer(exact);
-    }, 300);
+      setParts(o);
+      // dịch vụ đã chọn trước khi chọn khách: tự gắn phần gói có lợi nhất
+      setItems((prev) => {
+        const next: Item[] = [];
+        for (const it of prev) {
+          const best = it.serviceId ? bestPart(o, it.serviceId, usageOf(next)) : null;
+          next.push({ ...it, partId: best?.item_id ?? null, staffChoose: false });
+        }
+        return next;
+      });
+    });
     return () => {
       cancelled = true;
-      clearTimeout(t);
     };
-  }, [digits, supabase]);
+  }, [customer, supabase]);
 
   // lịch bận của KTV trong ngày
   useEffect(() => {
@@ -132,37 +143,50 @@ export default function StaffBookingForm({
   }, [source]);
 
   const filtered = useMemo(() => {
-    const q = normalizeText(query.trim());
+    const q = normalizeText(svcQuery.trim());
     if (!q) return [];
     return services
       .filter((s) => s.branch_id === null || s.branch_id === branchId)
       .filter((s) => normalizeText(`${s.name} ${s.name_en ?? ""}`).includes(q))
       .slice(0, 12);
-  }, [services, query, branchId]);
+  }, [services, svcQuery, branchId]);
 
   // giờ bắt đầu / kết thúc của từng dịch vụ (làm lần lượt)
   const timeline = useMemo(() => {
     if (!date || !time) return [];
     let cursor = vnDateTime(date, time).getTime();
     return items.map((it) => {
-      const dur = byId.get(it.serviceId)?.duration_minutes ?? 60;
+      const dur = (it.serviceId && byId.get(it.serviceId)?.duration_minutes) || 60;
       const start = new Date(cursor).toISOString();
       cursor += dur * 60000;
       return { start, end: new Date(cursor).toISOString() };
     });
   }, [items, date, time, byId]);
 
-  const chosen = items.map((it) => byId.get(it.serviceId)).filter((s): s is StaffService => !!s);
-  const totalMinutes = chosen.reduce((a, s) => a + s.duration_minutes, 0);
-  const knownTotal = chosen.reduce((a, s) => a + (s.price ?? 0), 0);
-  const hasQuote = chosen.some((s) => s.price === null);
+  const totalMinutes = items.reduce((a, it) => a + ((it.serviceId && byId.get(it.serviceId)?.duration_minutes) || 60), 0);
+  const paid = items.filter((it) => !it.partId).map((it) => byId.get(it.serviceId)).filter((s): s is StaffService => !!s);
+  const knownTotal = paid.reduce((a, s) => a + (s.price ?? 0), 0);
+  const hasQuote = paid.some((s) => s.price === null);
+  const fromPackage = items.filter((it) => it.partId).length;
 
   function addService(id: string) {
     setError(null);
     if (items.length >= MAX_ITEMS) return setError(`Mỗi lịch tối đa ${MAX_ITEMS} dịch vụ.`);
-    setItems((prev) => [...prev, { key: nextKey, serviceId: id, technicianId: "" }]);
+    const best = bestPart(parts, id, usageOf(items));
+    setItems((prev) => [...prev, { key: nextKey, serviceId: id, technicianId: "", partId: best?.item_id ?? null, staffChoose: false }]);
     setNextKey((k) => k + 1);
     setQuery("");
+  }
+  function addFromPart(o: PackageOption, serviceId: string) {
+    setError(null);
+    if (items.length >= MAX_ITEMS) return setError(`Mỗi lịch tối đa ${MAX_ITEMS} dịch vụ.`);
+    setItems((prev) => [...prev, { key: nextKey, serviceId, technicianId: "", partId: o.item_id, staffChoose: serviceId === "" }]);
+    setNextKey((k) => k + 1);
+  }
+  function itemName(it: Item) {
+    if (it.serviceId) return byId.get(it.serviceId)?.name ?? "Dịch vụ";
+    const o = it.partId ? partById.get(it.partId) : null;
+    return o ? `${o.label} – KTV chọn loại khi khách đến` : "Dịch vụ";
   }
   function move(i: number, d: -1 | 1) {
     setItems((prev) => {
@@ -174,7 +198,7 @@ export default function StaffBookingForm({
     });
   }
 
-  const isNew = !customer && digits.length >= 9 && matches !== null && !matches.some((c) => c.phone === digits);
+  const isNew = !customer && digits.length >= 9 && digits.length === query.replace(/[\s.+-]/g, "").length && hits !== null && !hits.some((c) => c.phone === digits);
 
   async function submit() {
     setError(null);
@@ -183,15 +207,21 @@ export default function StaffBookingForm({
       if (digits.length < 9 || digits.length > 11) return setError("Vui lòng nhập số điện thoại khách (9–11 số).");
       if (!newName.trim()) return setError("Khách mới: vui lòng nhập tên khách.");
     }
-    if (items.length === 0) return setError("Vui lòng chọn ít nhất 1 dịch vụ.");
+    if (items.length === 0 && !consult) return setError("Vui lòng chọn ít nhất 1 dịch vụ, hoặc bật “Chưa chọn dịch vụ – tư vấn khi khách đến”.");
     if (!date || !time) return setError("Vui lòng chọn ngày giờ.");
 
     setSaving(true);
-    const { data, error: e } = await supabase.rpc("create_staff_booking", {
+    const { data, error: e } = await supabase.rpc("create_staff_booking_v2", {
       p_branch_id: branchId,
       p_start_at: vnDateTime(date, time).toISOString(),
       p_source: source,
-      p_items: items.map((it) => ({ service_id: it.serviceId, technician_id: it.technicianId || null })),
+      p_items: items.map((it) => ({
+        service_id: it.serviceId || null,
+        technician_id: it.technicianId || null,
+        customer_package_item_id: it.partId,
+        staff_choose: it.staffChoose,
+      })),
+      p_consult: consult,
       p_customer_id: customer?.id ?? null,
       p_customer_name: customer ? null : newName.trim(),
       p_customer_phone: customer ? null : digits,
@@ -204,7 +234,8 @@ export default function StaffBookingForm({
 
   function reset() {
     setDone(null);
-    setPhone("");
+    setCustQuery("");
+    setConsult(false);
     setNewName("");
     setCustomer(null);
     setItems([]);
@@ -270,47 +301,75 @@ export default function StaffBookingForm({
       {/* Khách */}
       <section className="card">
         <h2 className="mb-3 font-semibold text-navy">1. Khách hàng</h2>
-        <label className="label" htmlFor="phone">Số điện thoại</label>
-        <input
-          id="phone"
-          className="input"
-          inputMode="tel"
-          placeholder="Nhập SĐT khách để tìm"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          autoFocus
-        />
-        {searching && digits.length >= 4 && <p className="mt-2 text-xs text-ink/50">Đang tìm…</p>}
-
         {customer ? (
-          <div className="mt-3 flex items-start justify-between gap-3 rounded-xl bg-[#D6EDD8]/60 p-3">
+          <div className="flex items-start justify-between gap-3 rounded-xl bg-[#D6EDD8]/60 p-3">
             <div>
-              <p className="font-semibold">{customer.full_name}</p>
+              <p className="font-semibold">
+                {customer.full_name} {customer.code && <span className="ml-1 font-mono text-xs text-brown">{customer.code}</span>}
+              </p>
               <p className="text-sm text-ink/70">{customer.phone}</p>
               {customer.note && <p className="mt-1 text-xs text-ink/70">Ghi chú: {customer.note}</p>}
             </div>
             <button type="button" className="text-sm text-navy underline" onClick={() => setCustomer(null)}>Đổi</button>
           </div>
         ) : (
-          matches &&
-          matches.length > 0 && (
-            <ul className="mt-3 divide-y divide-beige rounded-xl border border-beige-dark/70">
-              {matches.map((c) => (
-                <li key={c.id}>
-                  <button type="button" onClick={() => setCustomer(c)} className="flex w-full justify-between px-4 py-2.5 text-left text-sm hover:bg-cream">
-                    <span className="font-medium">{c.full_name}</span>
-                    <span className="text-ink/60">{c.phone}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )
+          <CustomerSearch
+            label="Tìm khách: SĐT, mã KH hoặc tên"
+            initialQuery={initialPhone}
+            autoFocus
+            onPick={(c) => setCustomer(c)}
+            onQueryChange={(q, h) => {
+              setCustQuery(q);
+              setHits(h);
+            }}
+            emptyHint={digits.length >= 9 ? <>Chưa có khách với SĐT {digits} – nhập tên bên dưới để tạo hồ sơ mới.</> : <>Không tìm thấy. Khách mới: gõ đủ SĐT để tạo hồ sơ.</>}
+          />
         )}
 
         {isNew && (
           <div className="mt-3 rounded-xl bg-cream p-3">
             <p className="mb-2 text-sm"><b>Khách mới</b> – chưa có hồ sơ với SĐT {digits}. Nhập tên để tạo hồ sơ:</p>
             <input className="input" placeholder="Họ tên khách" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          </div>
+        )}
+
+        {customer && parts.length > 0 && (
+          <div className="mt-3 rounded-xl border border-[#22612A]/30 bg-[#D6EDD8]/30 p-3 text-sm">
+            <p className="mb-1 font-semibold text-[#22612A]">Gói khách đang có – bấm để thêm buổi vào lịch</p>
+            <ul className="space-y-1.5">
+              {parts.map((o) => {
+                const left = partLeft(o, usageOf(items).get(o.item_id) ?? 0);
+                const svcs = o.service_ids.map((id) => byId.get(id)).filter((x): x is StaffService => !!x && (x.branch_id === null || x.branch_id === branchId));
+                return (
+                  <li key={o.item_id} className="flex flex-wrap items-center gap-2">
+                    <span className="min-w-0 flex-1">
+                      {partName(o)}{" "}
+                      <span className="text-xs text-ink/60">
+                        · {partLeftText(o, usageOf(items).get(o.item_id) ?? 0)}
+                        {o.reserved > 0 && ` (${o.reserved} đã đặt)`}
+                        {o.expires_at && ` · hạn ${shortDmy(o.expires_at)}`}
+                      </span>
+                    </span>
+                    {left > 0 &&
+                      (svcs.length === 1 ? (
+                        <button type="button" className="btn-outline py-1 text-xs" onClick={() => addFromPart(o, svcs[0].id)}>+ Thêm</button>
+                      ) : (
+                        <select
+                          className="rounded-lg border border-beige-dark bg-white px-2 py-1 text-xs"
+                          value="-"
+                          onChange={(e) => e.target.value !== "-" && addFromPart(o, e.target.value === "_" ? "" : e.target.value)}
+                        >
+                          <option value="-">+ Thêm buổi…</option>
+                          {o.staff_choice && <option value="_">KTV chọn loại khi khách đến</option>}
+                          {svcs.map((v) => (
+                            <option key={v.id} value={v.id}>{v.name}</option>
+                          ))}
+                        </select>
+                      ))}
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         )}
       </section>
@@ -327,6 +386,13 @@ export default function StaffBookingForm({
       {/* Dịch vụ + KTV */}
       <section className="card">
         <h2 className="mb-3 font-semibold text-navy">3. Dịch vụ và kỹ thuật viên</h2>
+        <label className={`mb-3 flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${consult ? "border-navy bg-beige" : "border-beige-dark bg-cream"}`}>
+          <input type="checkbox" className="mt-1" checked={consult} onChange={(e) => setConsult(e.target.checked)} />
+          <span>
+            <b>Chưa chọn dịch vụ – quản lý tư vấn khi khách đến</b>
+            <span className="block text-xs text-ink/60">Có thể tạo lịch không có dịch vụ; khi khách đến quản lý bấm “Đổi dịch vụ” trên lịch hẹn.</span>
+          </span>
+        </label>
         {items.length > 0 && (
           <ul className="mb-3 space-y-2">
             {items.map((it, i) => {
@@ -336,10 +402,10 @@ export default function StaffBookingForm({
                 <li key={it.key} className="rounded-xl border border-beige-dark/70 p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="text-sm font-medium">{s?.name}</p>
+                      <p className="text-sm font-medium">{itemName(it)}</p>
                       <p className="text-xs text-ink/60">
                         {tl ? `${formatTime(tl.start)} – ${formatTime(tl.end)} · ` : ""}
-                        {formatDuration(s?.duration_minutes ?? 0)} · {formatVnd(s?.price)}
+                        {formatDuration(s?.duration_minutes ?? 60)} · {it.partId ? <b className="text-[#22612A]">trừ buổi gói</b> : formatVnd(s?.price)}
                       </p>
                     </div>
                     <div className="flex shrink-0 gap-1 text-sm">
@@ -348,6 +414,26 @@ export default function StaffBookingForm({
                       <button type="button" className="px-1.5 text-[#8A2323]" onClick={() => setItems((p) => p.filter((x) => x.key !== it.key))} aria-label="Bỏ">✕</button>
                     </div>
                   </div>
+                  {it.serviceId && (() => {
+                    const others = usageOf(items, i);
+                    const opts = parts.filter((o) => o.service_ids.includes(it.serviceId) && (o.item_id === it.partId || partLeft(o, others.get(o.item_id) ?? 0) > 0));
+                    if (opts.length === 0) return null;
+                    return (
+                      <select
+                        className={`input mt-2 py-1.5 text-xs ${it.partId ? "border-[#22612A]/50 bg-[#D6EDD8]/40" : ""}`}
+                        value={it.partId ?? ""}
+                        onChange={(e) => setItems((p) => p.map((x) => (x.key === it.key ? { ...x, partId: e.target.value || null } : x)))}
+                      >
+                        {opts.map((o) => (
+                          <option key={o.item_id} value={o.item_id}>
+                            Trừ buổi: {partName(o)} ({partLeftText(o, others.get(o.item_id) ?? 0)}
+                            {o.expires_at ? `, hạn ${shortDmy(o.expires_at)}` : ""})
+                          </option>
+                        ))}
+                        <option value="">Không trừ gói – thanh toán thường</option>
+                      </select>
+                    );
+                  })()}
                   <select
                     className="input mt-2 py-2 text-sm"
                     value={it.technicianId}
@@ -375,7 +461,7 @@ export default function StaffBookingForm({
         <input
           className="input"
           placeholder={items.length ? "Thêm dịch vụ khác…" : "Gõ tên dịch vụ để thêm (vd: peel, mụn, gội…)"}
-          value={query}
+          value={svcQuery}
           onChange={(e) => setQuery(e.target.value)}
         />
         {filtered.length > 0 && (
@@ -395,7 +481,7 @@ export default function StaffBookingForm({
             ))}
           </ul>
         )}
-        {query.trim() && filtered.length === 0 && <p className="mt-2 text-sm text-ink/60">Không tìm thấy dịch vụ.</p>}
+        {svcQuery.trim() && filtered.length === 0 && <p className="mt-2 text-sm text-ink/60">Không tìm thấy dịch vụ.</p>}
       </section>
 
       <section className="card">
@@ -406,13 +492,14 @@ export default function StaffBookingForm({
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-beige-dark bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <div className="flex-1 text-sm">
-            {chosen.length === 0 ? (
-              <span className="text-ink/60">Chưa chọn dịch vụ</span>
+            {items.length === 0 ? (
+              <span className="text-ink/60">{consult ? "Lịch tư vấn – chưa chọn dịch vụ" : "Chưa chọn dịch vụ"}</span>
             ) : (
               <>
-                <b className="text-navy">{chosen.length} dịch vụ · {formatDuration(totalMinutes)}</b>
+                <b className="text-navy">{items.length} dịch vụ · {formatDuration(totalMinutes)}</b>
                 <br />
                 <span className="text-ink/70">
+                  {fromPackage > 0 && `${fromPackage} trừ gói · `}
                   Tạm tính {formatVnd(knownTotal)}
                   {hasQuote && " + báo giá"}
                 </span>

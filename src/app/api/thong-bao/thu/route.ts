@@ -14,7 +14,7 @@ export async function POST() {
   let sent = 0;
   for (const s of data ?? []) {
     try {
-      const status = await sendPush(s, { title: "Moana: thông báo đã bật", body: "Khi nhân viên xin giảm giá, điện thoại sẽ báo như thế này.", url: "/quan-ly/duyet-giam-gia" });
+      const status = await sendPush(s, { title: "Moana: thông báo đã bật", body: "Khi có việc cần báo, điện thoại sẽ hiện như thế này.", url: "/" });
       if (status >= 200 && status < 300) sent++;
       else if (status === 404 || status === 410) await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
     } catch {

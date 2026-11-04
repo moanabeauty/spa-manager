@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import CustomerSearch from "@/components/CustomerSearch";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate, formatTime, formatVnd, normalizePhone, normalizeText, vnError } from "@/lib/format";
+import { formatDate, formatTime, formatVnd, normalizeText, vnError } from "@/lib/format";
 import {
   allocateDiscount,
   cardBalance,
@@ -40,7 +41,7 @@ export type CheckoutPackage = {
   validity_days: number | null;
   package_items: { label: string; quantity: number | null; sort_order: number }[];
 };
-export type CustomerInfo = { id: string; full_name: string; phone: string | null; note: string | null };
+export type CustomerInfo = { id: string; code?: string; full_name: string; phone: string | null; note: string | null };
 export type DiscountRequest = {
   id: string;
   amount: number;
@@ -261,11 +262,11 @@ export default function CheckoutForm({
   const rows = lines.map((l) => {
     const unit = unitPrice(l);
     const gross = unit * l.qty;
-    const disc = !canDiscount || l.pkgId || l.promoItemId || l.type === "card_topup" ? 0 : Math.min(l.discount, gross);
+    const disc = !canDiscount || l.pkgId || l.promoItemId || l.type === "card_topup" || l.type === "package" ? 0 : Math.min(l.discount, gross);
     return { unit, gross, disc, net: gross - disc };
   });
-  // giảm cả hoá đơn không áp dụng cho nạp thẻ và sản phẩm bán lẻ (sản phẩm chỉ giảm trong mức % cho phép)
-  const commonOk = (l: Line) => l.type !== "card_topup" && l.type !== "product" && !l.promoItemId;
+  // giảm cả hoá đơn không áp dụng cho gói combo, nạp thẻ và sản phẩm bán lẻ (sản phẩm chỉ giảm trong mức % cho phép)
+  const commonOk = (l: Line) => l.type !== "card_topup" && l.type !== "package" && l.type !== "product" && !l.promoItemId;
   const eligibleSum = rows.reduce((a, r, i) => a + (commonOk(lines[i]) ? r.net : 0), 0);
   const approved = !canDiscount && request?.status === "approved" ? Number(request.amount) : 0;
   const overall = Math.min(
@@ -313,34 +314,8 @@ export default function CheckoutForm({
   }
 
   // ---- khách (khi bán gói / nạp thẻ không theo lịch) ----
-  const [phone, setPhone] = useState("");
-  const [matches, setMatches] = useState<CustomerInfo[] | null>(null);
-  const digits = normalizePhone(phone);
-  useEffect(() => {
-    if (appt || digits.length < 4) {
-      setMatches(null);
-      return;
-    }
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      const { data } = await supabase
-        .from("customers")
-        .select("id, full_name, phone, note")
-        .ilike("phone", `%${digits}%`)
-        .order("full_name")
-        .limit(8);
-      if (!cancelled) setMatches((data ?? []) as CustomerInfo[]);
-    }, 300);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [digits, appt, supabase]);
-
   async function chooseCustomer(c: CustomerInfo | null) {
     setCustomer(c);
-    setPhone("");
-    setMatches(null);
     const w: Wallet = c ? await fetchWallet(supabase, c.id) : { cards: [], packages: [] };
     const pr: CustomerPromo[] = c ? await fetchCustomerPromos(supabase, c.id) : [];
     setWallet(w);
@@ -498,7 +473,7 @@ export default function CheckoutForm({
       technician_id: l.technicianId ?? null,
       unit_price: l.customPrice,
       quantity: l.qty,
-      discount: !canDiscount || l.pkgId || l.promoItemId || l.type === "card_topup" ? 0 : l.discount,
+      discount: !canDiscount || l.pkgId || l.promoItemId || l.type === "card_topup" || l.type === "package" ? 0 : l.discount,
       paid_with_card: l.promoItemId ? false : l.card,
       customer_package_item_id: l.pkgId || null,
       promotion_registration_id: l.promoRegId ?? null,
@@ -529,6 +504,15 @@ export default function CheckoutForm({
     if (error) {
       setSaving(false);
       return setError(vnError(error.message));
+    }
+    if (lines.some((l) => l.type === "package" || l.type === "card_topup")) {
+      // báo khách + chủ spa / quản lý: đăng ký gói / thẻ thành công
+      fetch("/api/thong-bao/hoa-don", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoiceId: data }),
+        keepalive: true,
+      }).catch(() => {});
     }
     router.push(`/quan-ly/hoa-don/${data}?moi=1`);
   }
@@ -646,7 +630,10 @@ export default function CheckoutForm({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-semibold">{customer.full_name}</p>
-              <p className="text-sm text-ink/60">{customer.phone ?? "(chưa có SĐT)"}</p>
+              <p className="text-sm text-ink/60">
+                {customer.code && <span className="mr-2 font-mono text-brown">{customer.code}</span>}
+                {customer.phone ?? "(chưa có SĐT)"}
+              </p>
               {customer.note && <p className="mt-1 rounded-lg bg-[#FFE8BA]/60 px-2 py-1 text-xs">{customer.note}</p>}
             </div>
             <div className="text-right text-sm">
@@ -661,26 +648,16 @@ export default function CheckoutForm({
           </div>
         ) : (
           <div>
-            <span className="label">Khách hàng (gõ SĐT) — bỏ trống nếu khách lẻ chỉ làm dịch vụ</span>
-            <input className="input" inputMode="tel" placeholder="09…" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            {matches && (
-              <ul className="mt-2 divide-y divide-beige rounded-xl border border-beige-dark">
-                {matches.length === 0 && (
-                  <li className="px-3 py-2 text-sm text-ink/60">
-                    Chưa có khách này. Tạo hồ sơ ở trang{" "}
-                    <Link href={`/quan-ly/tao-lich?sdt=${digits}`} className="text-navy underline">Tạo lịch</Link>.
-                  </li>
-                )}
-                {matches.map((c) => (
-                  <li key={c.id}>
-                    <button className="flex w-full justify-between px-3 py-2 text-left text-sm hover:bg-cream" onClick={() => chooseCustomer(c)}>
-                      <span className="font-medium">{c.full_name}</span>
-                      <span className="text-ink/60">{c.phone}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <CustomerSearch
+              label="Khách hàng (SĐT, mã KH hoặc tên) — bỏ trống nếu khách lẻ chỉ làm dịch vụ"
+              onPick={(c) => chooseCustomer({ id: c.id, code: c.code, full_name: c.full_name, phone: c.phone, note: c.note })}
+              emptyHint={
+                <>
+                  Chưa có khách này. Tạo hồ sơ ở trang{" "}
+                  <Link href="/quan-ly/tao-lich" className="text-navy underline">Tạo lịch</Link>.
+                </>
+              }
+            />
           </div>
         )}
         {customer && lockedPackages.length > 0 && (
@@ -918,7 +895,11 @@ export default function CheckoutForm({
           <span>Tạm tính</span>
           <span>{formatVnd(rows.reduce((a, r) => a + r.net, 0))}</span>
         </div>
-        {canDiscount ? (
+        {lines.length > 0 && eligibleSum === 0 && rows.every((r) => r.disc === 0) ? (
+          lines.some((l) => l.type === "package" || l.type === "card_topup") && (
+            <p className="rounded-lg bg-cream px-3 py-2 text-xs text-ink/70">Gói combo và nạp thẻ tài khoản không áp dụng giảm giá.</p>
+          )
+        ) : canDiscount ? (
           <>
             <div className="flex items-center justify-between gap-2 text-sm">
               <span className="flex items-center gap-2">
@@ -1358,7 +1339,7 @@ function LineRow({
               />
             </label>
           )}
-          {l.type !== "card_topup" && canDiscount && !isPromo && (
+          {l.type !== "card_topup" && l.type !== "package" && canDiscount && !isPromo && (
             <label className="flex items-center gap-1">
               Giảm
               <MoneyInput value={l.discount} onChange={(n) => onChange({ discount: n })} className="w-28" ariaLabel="Giảm giá dòng" />

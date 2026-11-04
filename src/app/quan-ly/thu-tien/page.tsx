@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ChoosePartService from "../lich-hen/ChoosePartService";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { fetchSellers, canCheckout } from "@/lib/staff";
 import { fetchWallet, type Wallet } from "@/lib/billing";
@@ -29,7 +30,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
     const { data } = await supabase
       .from("appointments")
       .select(
-        "id, branch_id, start_at, status, customer_id, customers(id, full_name, phone, note), appointment_services(id, service_id, technician_id, start_at, customer_package_item_id)",
+        "id, branch_id, start_at, status, customer_id, customers(id, code, full_name, phone, note), appointment_services(id, service_id, technician_id, start_at, customer_package_item_id, staff_choose, customer_package_items(label, customer_package_item_services(service_id, services(name))))",
       )
       .eq("id", sp.lich)
       .maybeSingle();
@@ -67,8 +68,32 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       services: [...d.appointment_services].sort((a, b) => a.start_at.localeCompare(b.start_at)),
     };
     customer = d.customers;
+    // phần gói "các loại" chưa chọn loại cụ thể → chọn trước khi thu tiền
+    type Pending = {
+      id: string;
+      staff_choose: boolean;
+      customer_package_items: { label: string; customer_package_item_services: { service_id: string; services: { name: string } | null }[] } | null;
+    };
+    const pending = (d.appointment_services as unknown as Pending[]).filter((x) => x.staff_choose && x.customer_package_items);
+    if (pending.length > 0) {
+      return (
+        <div className="card space-y-3 text-sm">
+          <h1 className="text-lg font-bold text-navy">Chọn loại dịch vụ cụ thể trước khi thu tiền</h1>
+          <p className="text-ink/70">Khách đặt buổi trong gói nhưng chưa chọn loại cụ thể. Chọn đúng loại KTV đã làm cho khách:</p>
+          {pending.map((x) => (
+            <div key={x.id}>
+              <p className="font-medium">{x.customer_package_items!.label}</p>
+              <ChoosePartService
+                rowId={x.id}
+                options={x.customer_package_items!.customer_package_item_services.map((v) => ({ id: v.service_id, name: v.services?.name ?? "" }))}
+              />
+            </div>
+          ))}
+        </div>
+      );
+    }
   } else if (sp.kh) {
-    const { data } = await supabase.from("customers").select("id, full_name, phone, note").eq("id", sp.kh).maybeSingle();
+    const { data } = await supabase.from("customers").select("id, code, full_name, phone, note").eq("id", sp.kh).maybeSingle();
     customer = (data as CustomerInfo) ?? null;
   }
 

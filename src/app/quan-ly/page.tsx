@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import { STATUS_LABEL, STATUS_STYLE, formatDate, formatTime, formatVnd, todayVn, vnDateTime } from "@/lib/format";
 import { loadNavCounts } from "@/lib/navCounts";
+import Notifications from "@/components/Notifications";
 
 export const metadata = { title: "Tổng quan – Moana Beauty" };
 
@@ -101,6 +102,8 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         <p className="text-sm capitalize text-ink/70">{formatDate(vnDateTime(today, "12:00").toISOString())}</p>
       </div>
 
+      {M && <Notifications supabase={supabase} title="Gói / thẻ vừa bán" limit={5} />}
+
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {actions.map((a) => (
           <Link key={a.href} href={a.href} className="card p-3 text-center text-sm font-semibold text-navy hover:border-navy">
@@ -171,7 +174,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                 <li key={a.id} className="flex items-center justify-between gap-2 py-2">
                   <span className="min-w-0">
                     <b>{formatTime(a.start_at)}</b> {a.customers?.full_name ?? "Khách"}
-                    <span className="block truncate text-xs text-ink/60">{a.appointment_services.map((s) => s.services?.name).filter(Boolean).join(", ")}</span>
+                    <span className="block truncate text-xs text-ink/60">{a.appointment_services.map((s) => s.services?.name).filter(Boolean).join(", ") || "Chưa chọn dịch vụ – tư vấn"}</span>
                   </span>
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[a.status] ?? ""}`}>{STATUS_LABEL[a.status] ?? a.status}</span>
                 </li>

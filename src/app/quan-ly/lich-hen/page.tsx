@@ -5,6 +5,23 @@ import { STATUS_LABEL, STATUS_STYLE, formatDate, formatTime, formatVnd, todayVn,
 import StatusActions from "./StatusActions";
 import TechnicianPicker from "./TechnicianPicker";
 import { canCheckout, fetchBusy, fetchTechnicians } from "@/lib/staff";
+import ServiceEditor, { type EditorService } from "./ServiceEditor";
+import ChoosePartService from "./ChoosePartService";
+
+type CustPkg = {
+  id: string;
+  customer_id: string;
+  is_active: boolean;
+  expires_at: string | null;
+  packages: { name: string } | null;
+  customer_package_items: {
+    id: string;
+    label: string;
+    total_qty: number | null;
+    used_qty: number;
+    customer_package_item_services: { service_id: string; services: { name: string } | null }[];
+  }[];
+};
 
 export const metadata = { title: "Lịch hẹn spa – Moana Beauty" };
 
@@ -15,15 +32,22 @@ type Row = {
   status: string;
   source: string;
   note: string | null;
-  customers: { full_name: string; phone: string | null; note: string | null } | null;
+  customer_id: string;
+  branch_id: string;
+  needs_consult: boolean;
+  customers: { code: string; full_name: string; phone: string | null; note: string | null } | null;
   appointment_services: {
     id: string;
     start_at: string;
     end_at: string;
     price: number | null;
     technician_id: string | null;
+    service_id: string;
+    customer_package_item_id: string | null;
+    staff_choose: boolean;
     services: { name: string } | null;
   }[];
+  appointment_changes: { id: string; before_text: string | null; after_text: string | null; reason: string | null; created_at: string; changer: { full_name: string | null } | null }[];
 };
 
 const SOURCE_LABEL: Record<string, string> = { online: "Online", walk_in: "Khách vãng lai", phone: "Điện thoại", staff: "Nhân viên" };
@@ -62,7 +86,7 @@ export default async function StaffAppointmentsPage({
   let q = supabase
     .from("appointments")
     .select(
-      "id, start_at, end_at, status, source, note, customers(full_name, phone, note), appointment_services(id, start_at, end_at, price, technician_id, services(name))",
+      "id, start_at, end_at, status, source, note, customer_id, branch_id, needs_consult, customers(code, full_name, phone, note), appointment_services(id, start_at, end_at, price, technician_id, service_id, customer_package_item_id, staff_choose, services(name)), appointment_changes(id, before_text, after_text, reason, created_at, changer:profiles(full_name))",
     )
     .eq("branch_id", branchId)
     .gte("start_at", from)
@@ -81,6 +105,37 @@ export default async function StaffAppointmentsPage({
         .neq("status", "cancelled")
     : { data: [] };
   const invoiceOf = new Map(((invs ?? []) as { id: string; code: string; appointment_id: string }[]).map((i) => [i.appointment_id, i]));
+
+  // gói của khách trong ngày: hiện trên màn xác nhận + biết dịch vụ đặt nằm trong gói nào
+  const canEdit = profile?.role === "owner" || profile?.role === "manager";
+  const customerIds = [...new Set(rows.map((r) => r.customer_id))];
+  const [{ data: pk }, { data: cardBal }, { data: svcList }] = await Promise.all([
+    customerIds.length
+      ? supabase
+          .from("customer_packages")
+          .select("id, customer_id, is_active, expires_at, packages(name), customer_package_items(id, label, total_qty, used_qty, customer_package_item_services(service_id, services(name)))")
+          .in("customer_id", customerIds)
+      : Promise.resolve({ data: [] }),
+    customerIds.length ? supabase.from("service_card_balances").select("customer_id, balance").in("customer_id", customerIds) : Promise.resolve({ data: [] }),
+    canEdit
+      ? supabase.from("services").select("id, name, name_en, price, duration_minutes, branch_id").eq("is_active", true).order("name")
+      : Promise.resolve({ data: [] }),
+  ]);
+  const pkgs = (pk ?? []) as unknown as CustPkg[];
+  const nowMs = Date.now();
+  const usable = (p: CustPkg) => p.is_active && (!p.expires_at || new Date(p.expires_at).getTime() >= nowMs);
+  const partInfo = new Map<string, { pkg: string; label: string; left: number | null; services: { id: string; name: string }[] }>();
+  for (const p of pkgs)
+    for (const i of p.customer_package_items)
+      partInfo.set(i.id, {
+        pkg: p.packages?.name ?? "Gói",
+        label: i.label,
+        left: i.total_qty === null ? null : i.total_qty - i.used_qty,
+        services: i.customer_package_item_services.map((x) => ({ id: x.service_id, name: x.services?.name ?? "" })),
+      });
+  const pkgsOf = (cid: string) => pkgs.filter((p) => p.customer_id === cid && usable(p));
+  const balanceOf = (cid: string) => ((cardBal ?? []) as { customer_id: string; balance: number }[]).filter((c) => c.customer_id === cid).reduce((a, c) => a + Number(c.balance), 0);
+  const editorServices = (svcList ?? []) as EditorService[];
 
   const link = (p: { ngay?: string; cn?: string; tt?: string }) => {
     const params = new URLSearchParams({ ngay: p.ngay ?? date, cn: p.cn ?? branchId, tt: p.tt ?? filter });
@@ -133,7 +188,7 @@ export default async function StaffAppointmentsPage({
       <div className="space-y-3">
         {rows.map((r) => {
           const items = [...r.appointment_services].sort((x, y) => x.start_at.localeCompare(y.start_at));
-          const total = items.reduce((a, s) => a + (s.price ?? 0), 0);
+          const total = items.reduce((a, s) => a + (s.customer_package_item_id ? 0 : s.price ?? 0), 0);
           return (
             <div key={r.id} className={`card ${r.status === "pending" ? "border-l-4 border-l-[#E0A526]" : ""}`}>
               <div className="flex items-start justify-between gap-3">
@@ -143,7 +198,10 @@ export default async function StaffAppointmentsPage({
                     {r.end_at && <p className="text-xs text-ink/50">{formatTime(r.end_at)}</p>}
                   </div>
                   <div>
-                    <p className="font-semibold">{r.customers?.full_name ?? "—"}</p>
+                    <p className="font-semibold">
+                      {r.customers?.full_name ?? "—"}
+                      {r.customers?.code && <span className="ml-1.5 font-mono text-xs font-normal text-brown">{r.customers.code}</span>}
+                    </p>
                     {r.customers?.phone && (
                       <a href={`tel:${r.customers.phone}`} className="text-sm text-navy underline">{r.customers.phone}</a>
                     )}
@@ -154,15 +212,60 @@ export default async function StaffAppointmentsPage({
                   {STATUS_LABEL[r.status] ?? r.status}
                 </span>
               </div>
+              {(pkgsOf(r.customer_id).length > 0 || balanceOf(r.customer_id) > 0) && (
+                <div className="mt-3 rounded-lg bg-[#D6EDD8]/40 px-3 py-2 text-xs">
+                  <p className="font-semibold text-[#22612A]">Khách đang có</p>
+                  {pkgsOf(r.customer_id).map((p) => (
+                    <p key={p.id}>
+                      <b>{p.packages?.name}</b>
+                      {p.expires_at && <span className="text-ink/50"> (hạn {formatDate(p.expires_at)})</span>}:{" "}
+                      {p.customer_package_items
+                        .map((i) => `${i.label} ${i.total_qty === null ? "không giới hạn" : `còn ${i.total_qty - i.used_qty}/${i.total_qty}`}`)
+                        .join(" · ")}
+                    </p>
+                  ))}
+                  {balanceOf(r.customer_id) > 0 && <p>Thẻ tài khoản: <b>{formatVnd(balanceOf(r.customer_id))}</b></p>}
+                </div>
+              )}
               <ul className="mt-3 space-y-1 border-t border-beige pt-3 text-sm">
-                {items.map((s) => (
+                {items.length === 0 && (
+                  <li className="rounded-lg bg-[#FFE8BA]/60 px-3 py-2 text-sm">
+                    <b>Chưa chọn dịch vụ</b> – khách đặt lịch tư vấn. Quản lý tư vấn khi khách đến rồi bấm “Chọn dịch vụ sau tư vấn”.
+                  </li>
+                )}
+                {items.map((s) => {
+                  const part = s.customer_package_item_id ? partInfo.get(s.customer_package_item_id) : null;
+                  const inPkg = !part
+                    ? pkgsOf(r.customer_id).flatMap((p) =>
+                        p.customer_package_items
+                          .filter((i) => (i.total_qty === null || i.total_qty > i.used_qty) && i.customer_package_item_services.some((x) => x.service_id === s.service_id))
+                          .map((i) => `${p.packages?.name} – ${i.label}`),
+                      )
+                    : [];
+                  return (
                   <li key={s.id} className="py-1">
                     <div className="flex justify-between gap-3">
                       <span>
-                        <span className="text-ink/50">{formatTime(s.start_at)}</span> {s.services?.name}
+                        <span className="text-ink/50">{formatTime(s.start_at)}</span>{" "}
+                        {s.staff_choose && part ? `${part.label} (chưa chọn loại)` : s.services?.name}
                       </span>
-                      <span className="shrink-0 text-ink/60">{formatVnd(s.price)}</span>
+                      <span className={`shrink-0 ${part ? "font-semibold text-[#22612A]" : "text-ink/60"}`}>{part ? "Trừ gói" : formatVnd(s.price)}</span>
                     </div>
+                    {part && (
+                      <p className="text-xs text-[#22612A]">
+                        Thuộc gói: {part.pkg}
+                        {part.label !== part.pkg && ` – ${part.label}`}
+                        {part.left !== null && ` (còn ${part.left} buổi trước lịch này)`}
+                      </p>
+                    )}
+                    {inPkg.length > 0 && (
+                      <p className="text-xs text-[#7A5600]">
+                        ⓘ Dịch vụ này có trong gói của khách ({inPkg.join("; ")}) – lịch đang tính tiền thường{canEdit ? ", bấm Đổi dịch vụ để chuyển sang trừ buổi" : ", có thể chọn trừ buổi khi thu tiền"}.
+                      </p>
+                    )}
+                    {s.staff_choose && part && !["cancelled", "no_show", "completed"].includes(r.status) && (
+                      <ChoosePartService rowId={s.id} options={part.services} />
+                    )}
                     {canAssign && (
                       <TechnicianPicker
                         serviceRowId={s.id}
@@ -176,7 +279,8 @@ export default async function StaffAppointmentsPage({
                       />
                     )}
                   </li>
-                ))}
+                  );
+                })}
                 {items.length > 1 && (
                   <li className="flex justify-between pt-1 font-semibold">
                     <span>Tạm tính</span>
@@ -184,6 +288,18 @@ export default async function StaffAppointmentsPage({
                   </li>
                 )}
               </ul>
+              {r.appointment_changes?.length > 0 && (
+                <div className="mt-2 space-y-0.5 rounded-lg bg-cream px-3 py-2 text-xs text-ink/70">
+                  {[...r.appointment_changes]
+                    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+                    .map((c) => (
+                      <p key={c.id}>
+                        ✎ {formatTime(c.created_at)} {c.changer?.full_name ?? ""} đổi dịch vụ: <s>{c.before_text}</s> → <b>{c.after_text}</b>
+                        {c.reason && ` · ${c.reason}`}
+                      </p>
+                    ))}
+                </div>
+              )}
               {r.note && <p className="mt-2 rounded-lg bg-cream px-3 py-2 text-sm">Khách ghi chú: {r.note}</p>}
               {r.customers?.note && <p className="mt-2 rounded-lg bg-[#FFE8BA]/60 px-3 py-2 text-xs">Hồ sơ khách: {r.customers.note}</p>}
               {invoiceOf.get(r.id) ? (
@@ -193,6 +309,20 @@ export default async function StaffAppointmentsPage({
                 </p>
               ) : (
                 <>
+                  {canEdit && !["cancelled", "no_show", "completed"].includes(r.status) && (
+                    <div className="mt-3 flex flex-wrap justify-end">
+                      <ServiceEditor
+                        appointmentId={r.id}
+                        customerId={r.customer_id}
+                        branchId={r.branch_id}
+                        consult={items.length === 0}
+                        current={items.map((x) => ({ serviceId: x.service_id, technicianId: x.technician_id, partId: x.customer_package_item_id, staffChoose: x.staff_choose }))}
+                        services={editorServices}
+                        technicians={technicians}
+                        branches={branches ?? []}
+                      />
+                    </div>
+                  )}
                   <StatusActions id={r.id} status={r.status} />
                   {cashier && ["confirmed", "in_progress", "completed"].includes(r.status) && (
                     <div className="mt-2 flex justify-end">
