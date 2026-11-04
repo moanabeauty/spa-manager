@@ -288,7 +288,8 @@ export default function CheckoutForm({
   const paid = cash + bank + pos;
   const online = channel === "online" && !appt;
   const codPart = online ? cod : 0;
-  const debt = (debtOn || codPart > 0) && paid + codPart <= need ? need - paid : 0; // phần khách chưa trả (gồm COD)
+  // phần khách chưa trả (gồm COD): bật "ghi nợ" thì nợ toàn bộ phần còn thiếu; chỉ có COD thì COD phải vừa đủ phần còn lại
+  const debt = debtOn ? Math.max(0, need - paid) : codPart > 0 && paid + codPart === need ? codPart : 0;
   const ownDebt = Math.max(0, debt - codPart); // phần nợ không phải ship thu hộ
   const diff = paid + debt - need;
 
