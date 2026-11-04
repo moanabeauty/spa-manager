@@ -20,9 +20,8 @@ export default async function SkinPage({ searchParams }: { searchParams: Promise
   // ---------- Form tạo / sửa ----------
   if (sp.lich || sp.kh || sp.id) {
     let existing: SkinRecord | null = null;
-    let appt:
-      | { id: string; start_at: string; branch_id: string; customer_id: string; appointment_services: { services: { name: string } | null }[] }
-      | null = null;
+    type Appt = { id: string; start_at: string; branch_id: string; customer_id: string; appointment_services: { services: { name: string } | null }[] };
+    let appt: Appt | null = null;
     if (sp.id) {
       const { data } = await supabase.from("skin_records").select("*").eq("id", sp.id).maybeSingle<SkinRecord>();
       existing = data ?? null;
@@ -37,7 +36,7 @@ export default async function SkinPage({ searchParams }: { searchParams: Promise
         .select("id, start_at, branch_id, customer_id, appointment_services(services(name))")
         .eq("id", apptId)
         .maybeSingle();
-      appt = (data as typeof appt) ?? null;
+      appt = (data as unknown as Appt | null) ?? null;
     }
     const customerId = existing?.customer_id ?? appt?.customer_id ?? sp.kh ?? "";
     const [{ data: cust }, { data: crm }, { data: prev }] = await Promise.all([
