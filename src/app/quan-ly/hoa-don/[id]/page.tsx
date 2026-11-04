@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatDate, formatShortDate, formatTime, formatVnd } from "@/lib/format";
 import { METHOD_LABEL } from "@/lib/billing";
@@ -59,7 +60,7 @@ export default async function InvoicePage({
     .from("invoices")
     .select(
       `id, code, status, paid_at, created_at, note, void_reason, discount_reason, voided_at, appointment_id,
-       branches(name, address), customers(id, full_name, phone), creator:profiles!invoices_created_by_fkey(full_name),
+       branches(name, address), customers(id, full_name), creator:profiles!invoices_created_by_fkey(full_name),
        invoice_items(id, item_type, description, quantity, unit_price, discount, amount, paid_with_card, customer_package_id,
          invoice_item_sellers(amount, profiles(full_name))),
        payments(id, method, amount), channel, debt_amount, debt_reason,
@@ -70,6 +71,7 @@ export default async function InvoicePage({
     .maybeSingle();
   if (!data) return <p className="card text-sm">Không tìm thấy hoá đơn.</p>;
   const inv = data as unknown as Inv;
+  if (inv) await fillPhones(supabase, [inv.customers]);
   const total = inv.invoice_items.reduce((a, i) => a + Number(i.amount), 0);
   const gross = inv.invoice_items.reduce((a, i) => a + Number(i.unit_price) * i.quantity, 0);
   const discount = gross - total;

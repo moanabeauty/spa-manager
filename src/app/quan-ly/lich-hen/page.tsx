@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fillPhones } from "@/lib/phones";
 import { redirect } from "next/navigation";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import { STATUS_LABEL, STATUS_STYLE, formatDate, formatTime, formatVnd, todayVn, vnDateTime } from "@/lib/format";
@@ -35,7 +36,7 @@ type Row = {
   status: string;
   source: string;
   note: string | null;
-  customers: { full_name: string; phone: string | null; note: string | null } | null;
+  customers: { id: string; full_name: string; phone: string | null; note: string | null } | null;
   appointment_services: {
     id: string;
     start_at: string;
@@ -120,7 +121,7 @@ export default async function StaffAppointmentsPage({
   let q = supabase
     .from("appointments")
     .select(
-      "id, customer_id, start_at, end_at, status, source, note, customers(full_name, phone, note), appointment_services(id, start_at, end_at, price, technician_id, services(name))",
+      "id, customer_id, start_at, end_at, status, source, note, customers(id, full_name, note), appointment_services(id, start_at, end_at, price, technician_id, services(name))",
     )
     .eq("branch_id", branchId)
     .gte("start_at", from)
@@ -129,6 +130,7 @@ export default async function StaffAppointmentsPage({
   if (filter === "active") q = q.not("status", "in", "(cancelled,no_show)");
   const [{ data, error }, technicians, busy] = await Promise.all([q, fetchTechnicians(supabase), fetchBusy(supabase, from, to)]);
   const rows = (data ?? []) as unknown as Row[];
+  await fillPhones(supabase, rows.map((r) => r.customers));
   const canAssign = profile?.role !== "customer";
   const cashier = canCheckout(profile?.role);
   const ids = rows.map((r) => r.id);

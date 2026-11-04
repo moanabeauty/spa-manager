@@ -219,10 +219,10 @@ Cơ sở dữ liệu (`20261104000032…34`):
 | `/quan-ly/khach-hang?id=…` | nhân viên | Mục **Theo dõi da**: dải chấm màu qua các buổi + 3 phiếu gần nhất |
 | `/tai-khoan` | khách | **Theo dõi da của tôi**: màu da, đề xuất, hướng dẫn tại nhà (không thấy phản ứng da / ghi chú nội bộ) |
 
-Cơ sở dữ liệu (`20261104000038_skin_records_calendar.sql`):
+Cơ sở dữ liệu (`20261104000039_skin_records_calendar.sql`):
 - `branches.max_per_slot` (mặc định **4** khách cùng lúc). Trigger `appointments_capacity_check`: thêm / dời / kéo dài lịch làm số khách cùng lúc vượt mức thì báo lỗi; chủ / quản lý được xếp thêm. Lịch đã huỷ / không đến không tính.
 - `branch_busy_intervals`, `branch_month_load` (chỉ trả giờ bận, không có thông tin khách) cho trang đặt lịch online; `set_branch_capacity` (chủ).
 - `skin_records`: 1 phiếu / lịch hẹn (hoặc phiếu lẻ từ hồ sơ khách). Người lập, quản lý, chủ sửa được; quản lý / chủ xoá. Phiếu **đỏ** tự tạo nhắc "hỏi thăm" ngày hôm sau ở trang Chăm sóc; có "hẹn quay lại sau N ngày" thì tự tạo nhắc "mời quay lại". Khách đọc qua `my_skin_records()`.
 - Màu phiếu da: **Xanh** = xanh chàm `#2B2D64`, **Vàng** = nâu vàng `#A0845E` (theo bảng màu guideline Moana), **Đỏ** `#C94A4A` (thêm ngoài bảng).
-- **Đổi thời gian làm** (`20261104000039_service_duration_edit.sql`): chủ / quản lý bấm "⏱ … · đổi" dưới từng dịch vụ ở trang Lịch hẹn (30 / 45 / 60 / 75 / 90 / 120 phút hoặc số khác) – `set_appointment_service_minutes`; các dịch vụ làm sau trong lịch tự dời giờ, giờ kết thúc lịch và số khách / ca tự tính lại. Khi tạo lịch tại quầy, chủ / quản lý sửa được số phút từng dịch vụ (`create_staff_booking` nhận `minutes`).
+- **Đổi thời gian làm** (`20261104000040_service_duration_edit.sql`): chủ / quản lý bấm "⏱ … · đổi" dưới từng dịch vụ ở trang Lịch hẹn (30 / 45 / 60 / 75 / 90 / 120 phút hoặc số khác) – `set_appointment_service_minutes`; các dịch vụ làm sau trong lịch tự dời giờ, giờ kết thúc lịch và số khách / ca tự tính lại. Khi tạo lịch tại quầy, chủ / quản lý sửa được số phút từng dịch vụ (`create_staff_booking` nhận `minutes`).
 - Lịch hẹn hiện **phiếu da buổi trước** (màu + nhu cầu + đề xuất) để KTV xem trước khi làm.

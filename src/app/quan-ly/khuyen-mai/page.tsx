@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { canCheckout } from "@/lib/staff";
 import { formatDate, formatTime } from "@/lib/format";
@@ -78,7 +79,7 @@ export default async function PromotionRegistrationsPage({ searchParams }: { sea
   let q = supabase
     .from("promotion_registrations")
     .select(
-      "id, status, source, note, staff_note, cancel_reason, preferred_at, created_at, handled_at, invoice_id, branch_id, extended_until, extend_reason, customers(id, full_name, phone), promotions(id, name, end_date, redeem_until, branch_id), handler:profiles!promotion_registrations_handled_by_fkey(full_name)",
+      "id, status, source, note, staff_note, cancel_reason, preferred_at, created_at, handled_at, invoice_id, branch_id, extended_until, extend_reason, customers(id, full_name), promotions(id, name, end_date, redeem_until, branch_id), handler:profiles!promotion_registrations_handled_by_fkey(full_name)",
     )
     .eq("status", status)
     .order(status === "pending" ? "created_at" : "handled_at", { ascending: status === "pending", nullsFirst: false })
@@ -86,6 +87,7 @@ export default async function PromotionRegistrationsPage({ searchParams }: { sea
   if (branchId) q = q.eq("branch_id", branchId);
   const { data, error } = await q;
   const regs = (data ?? []) as unknown as Reg[];
+  await fillPhones(supabase, regs.map((r) => r.customers));
 
   const counts = new Map<string, number>();
   for (const t of ["pending", "confirmed"]) {

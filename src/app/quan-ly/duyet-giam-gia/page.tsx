@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatTime, formatVnd } from "@/lib/format";
 import ReviewButtons from "./ReviewButtons";
@@ -35,11 +36,12 @@ export default async function DiscountApprovalPage() {
   const { data } = await supabase
     .from("discount_requests")
     .select(
-      "id, kind, amount, reason, status, review_note, created_at, appointment_id, invoice_id, branches(name), customers(id, full_name, phone), requester:profiles!discount_requests_requested_by_fkey(full_name)",
+      "id, kind, amount, reason, status, review_note, created_at, appointment_id, invoice_id, branches(name), customers(id, full_name), requester:profiles!discount_requests_requested_by_fkey(full_name)",
     )
     .order("created_at", { ascending: false })
     .limit(60);
   const rows = (data ?? []) as unknown as Req[];
+  await fillPhones(supabase, rows.map((r) => r.customers));
   const pending = rows.filter((r) => r.status === "pending");
   const done = rows.filter((r) => r.status !== "pending");
   const isOwner = profile?.role === "owner";

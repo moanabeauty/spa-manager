@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { canViewCustomerPhone, fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatTime, formatVnd, todayVn } from "@/lib/format";
 import { CARD_TXN_LABEL, METHOD_LABEL, cardBalance, fetchWallet, isPackageUsable, itemLeft, itemText } from "@/lib/billing";
@@ -47,6 +48,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const q = (sp.q ?? "").trim();
   const checkout = canCheckout(role);
   const manager = role === "owner" || role === "manager";
+  const seePhone = canViewCustomerPhone(role);
   const today = todayVn();
 
   const [{ data: groupData }, { data: branchData }] = await Promise.all([
@@ -59,9 +61,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
 
   // ---------- Chi tiết 1 khách ----------
   if (sp.id) {
-    const [{ data: statRows }, { data: c }, { data: crm }, { data: rems }, { data: visits }] = await Promise.all([
+    const [{ data: statRows }, { data: cRaw }, { data: crm }, { data: rems }, { data: visits }] = await Promise.all([
       supabase.rpc("crm_customers", { p_id: sp.id, p_limit: 1 }),
-      supabase.from("customers").select("id, full_name, phone, email, birthday, gender, note, home_branch_id, created_at").eq("id", sp.id).maybeSingle(),
+      supabase.from("customers").select("id, full_name, email, birthday, gender, note, home_branch_id, created_at").eq("id", sp.id).maybeSingle(),
       supabase.from("customer_crm").select("*").eq("customer_id", sp.id).maybeSingle<CrmProfile>(),
       supabase
         .from("care_reminders")
@@ -79,7 +81,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         .order("start_at", { ascending: false })
         .limit(40),
     ]);
+    const c = cRaw as (NonNullable<typeof cRaw> & { phone: string | null }) | null;
     if (!c) return <p className="card text-sm">Không tìm thấy khách.</p>;
+    await fillPhones(supabase, [c]);
     const st: CrmCustomer | null = (statRows ?? []).length ? toCrmCustomer((statRows as Record<string, unknown>[])[0]) : null;
 
     const wallet = await fetchWallet(supabase, c.id);
@@ -136,7 +140,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             <div className="min-w-0">
               <h1 className="text-xl font-bold text-navy">{c.full_name}</h1>
               <p className="text-sm text-ink/70">
-                {c.phone ? <a href={`tel:${c.phone}`} className="font-medium text-navy underline">{c.phone}</a> : "(chưa có SĐT)"} {c.email && `· ${c.email}`}
+                {c.phone ? <a href={`tel:${c.phone}`} className="font-medium text-navy underline">{c.phone}</a> : seePhone ? "(chưa có SĐT)" : "(SĐT ẩn)"} {c.email && `· ${c.email}`}
               </p>
               <p className="text-xs text-ink/50">
                 Khách từ {shortDate(c.created_at)}
@@ -211,6 +215,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           groups={groups}
           memberOf={st?.group_ids ?? []}
           branches={branches}
+          canSeePhone={seePhone}
         />
 
         <div className="card">

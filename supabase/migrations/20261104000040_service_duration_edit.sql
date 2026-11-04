@@ -45,7 +45,9 @@ end $$;
 revoke execute on function public.set_appointment_service_minutes(uuid, int) from public, anon;
 grant execute on function public.set_appointment_service_minutes(uuid, int) to authenticated;
 
--- Tạo lịch tại quầy: chủ / quản lý nhập được số phút riêng cho từng dịch vụ (item.minutes)
+-- Tạo lịch tại quầy: chủ / quản lý nhập được số phút riêng cho từng dịch vụ (item.minutes).
+-- Tra khách theo SĐT qua _customer_id_by_phone (cột phone không đọc trực tiếp được – xem ..._hide_customer_phone),
+-- nên hàm chạy security definer; quyền vẫn kiểm tra bằng has_role ở đầu hàm.
 create or replace function public.create_staff_booking(
   p_branch_id uuid,
   p_start_at timestamptz,
@@ -56,7 +58,7 @@ create or replace function public.create_staff_booking(
   p_customer_phone text default null,
   p_note text default null
 )
-returns uuid language plpgsql security invoker set search_path = '' as $$
+returns uuid language plpgsql security definer set search_path = '' as $$
 declare
   v_customer uuid := p_customer_id;
   v_phone text := public.normalize_phone(p_customer_phone);
@@ -84,7 +86,7 @@ begin
     if v_phone is null or length(v_phone) < 9 or length(v_phone) > 11 then
       raise exception 'Số điện thoại không hợp lệ';
     end if;
-    select id into v_customer from public.customers where phone = v_phone;
+    v_customer := public._customer_id_by_phone(v_phone);
     if v_customer is null then
       if nullif(trim(p_customer_name), '') is null then
         raise exception 'Vui lòng nhập tên khách mới';

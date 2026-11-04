@@ -41,7 +41,7 @@ export default async function SkinPage({ searchParams }: { searchParams: Promise
     }
     const customerId = existing?.customer_id ?? appt?.customer_id ?? sp.kh ?? "";
     const [{ data: cust }, { data: crm }, { data: prev }] = await Promise.all([
-      supabase.from("customers").select("id, full_name, phone").eq("id", customerId).maybeSingle(),
+      supabase.from("customers").select("id, full_name, code").eq("id", customerId).maybeSingle(),
       supabase.from("customer_crm").select("skin_type, skin_concerns, health_note").eq("customer_id", customerId).maybeSingle(),
       supabase
         .from("skin_records")
@@ -63,7 +63,7 @@ export default async function SkinPage({ searchParams }: { searchParams: Promise
           <h1 className="mt-1 text-2xl font-bold text-navy">{existing ? "Phiếu theo dõi da" : "Phiếu theo dõi da mới"}</h1>
           <p className="text-sm text-ink/70">
             <Link href={`/quan-ly/khach-hang?id=${cust.id}`} className="font-semibold text-navy underline">{cust.full_name}</Link>
-            {cust.phone && ` · ${cust.phone}`}
+            {cust.code && ` · ${cust.code}`}
             {appt && ` · ${formatTime(appt.start_at)} ${shortDay(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(appt.start_at)))}`}
           </p>
           {appt && appt.appointment_services.length > 0 && (
@@ -129,7 +129,7 @@ export default async function SkinPage({ searchParams }: { searchParams: Promise
     (() => {
       let q = supabase
         .from("skin_records")
-        .select("*, customers(full_name, phone), author:profiles!skin_records_created_by_fkey(full_name)")
+        .select("*, customers(full_name), author:profiles!skin_records_created_by_fkey(full_name)")
         .eq("branch_id", branchId)
         .order("record_date", { ascending: false })
         .order("created_at", { ascending: false })
@@ -142,7 +142,7 @@ export default async function SkinPage({ searchParams }: { searchParams: Promise
   const ta = (todayAppts ?? []) as unknown as TA[];
   const recOf = (a: TA) => (Array.isArray(a.skin_records) ? a.skin_records[0] : a.skin_records) ?? null;
   const missing = ta.filter((a) => !recOf(a));
-  type RR = SkinRecord & { customers: { full_name: string; phone: string | null } | null; author: { full_name: string | null } | null };
+  type RR = SkinRecord & { customers: { full_name: string } | null; author: { full_name: string | null } | null };
   const recent = (recentRes.data ?? []) as unknown as RR[];
   const link = (p: { cn?: string; mau?: string | null }) => {
     const u = new URLSearchParams({ cn: p.cn ?? branchId });

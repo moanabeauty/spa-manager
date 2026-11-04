@@ -52,7 +52,7 @@ export default function StaffRegisterForm({
     }
     let cancelled = false;
     const t = setTimeout(async () => {
-      const { data } = await supabase.from("customers").select("id, full_name, phone").ilike("phone", `%${digits}%`).order("full_name").limit(8);
+      const { data } = await supabase.rpc("search_customers", { p_q: digits, p_limit: 8 });
       if (!cancelled) setMatches((data ?? []) as Cust[]);
     }, 300);
     return () => {
