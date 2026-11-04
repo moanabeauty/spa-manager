@@ -81,11 +81,11 @@ returns table (day date, appointments int, full_slots int, slots int, capacity i
 language sql stable security definer set search_path = '' as $$
   with cap as (select coalesce(max_per_slot, 4) c from public.branches where id = p_branch),
   days as (
-    select d::date day from generate_series(p_from, least(p_to, p_from + 62), interval '1 day') d
+    select d::date as day from generate_series(p_from, least(p_to, p_from + 62), interval '1 day') d
     where (select auth.uid()) is not null
   ),
   appts as (
-    select (a.start_at at time zone 'Asia/Ho_Chi_Minh')::date day, a.start_at s,
+    select (a.start_at at time zone 'Asia/Ho_Chi_Minh')::date as day, a.start_at s,
            coalesce(a.end_at, a.start_at + interval '60 minutes') e
       from public.appointments a
      where a.branch_id = p_branch and a.status not in ('cancelled','no_show')
@@ -93,8 +93,8 @@ language sql stable security definer set search_path = '' as $$
        and a.start_at < ((least(p_to, p_from + 62) + 1)::timestamp at time zone 'Asia/Ho_Chi_Minh')
   ),
   slot as (
-    select d.day, ((d.day + t)::timestamp at time zone 'Asia/Ho_Chi_Minh') st
-      from days d, generate_series(time '09:00', time '19:30', interval '30 minutes') t
+    select d.day, ((d.day + time '09:00' + i * interval '30 minutes') at time zone 'Asia/Ho_Chi_Minh') st
+      from days d, generate_series(0, 21) i
   )
   select d.day,
          (select count(*) from appts x where x.day = d.day)::int,
