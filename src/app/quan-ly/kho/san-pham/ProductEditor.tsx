@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { formatVnd, normalizeText, vnError } from "@/lib/format";
-import { UNITS, productLabel, retailMinPrice, type Product } from "@/lib/inventory";
+import { UNITS, cleanBarcode, productLabel, retailMinPrice, type Product } from "@/lib/inventory";
 import MoneyInput from "@/components/MoneyInput";
 import CameraScanner from "@/components/CameraScanner";
 
@@ -34,7 +34,7 @@ export default function ProductEditor({
 
   // Quét mã vạch: có trong danh mục thì mở sản phẩm đó, chưa có thì mở form tạo mới với mã vạch điền sẵn
   function handleScan(raw: string) {
-    const code = raw.replace(/\s/g, "");
+    const code = cleanBarcode(raw);
     setScanning(false);
     if (!code) return;
     const found = products.find((p) => p.barcode === code);

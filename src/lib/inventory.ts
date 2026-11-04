@@ -65,9 +65,10 @@ export function productLabel(p: Pick<Product, "name" | "capacity">): string {
   return p.capacity && !p.name.toLowerCase().includes(p.capacity.toLowerCase()) ? `${p.name} · ${p.capacity}` : p.name;
 }
 
-/** Bỏ khoảng trắng trong mã vạch (giống cơ sở dữ liệu) */
+/** Bỏ khoảng trắng trong mã vạch; mã UPC-A 12 số đổi thành EAN-13 (thêm số 0 đầu) — giống cơ sở dữ liệu */
 export function cleanBarcode(s: string): string {
-  return s.replace(/\s/g, "");
+  const c = s.replace(/\s/g, "");
+  return /^\d{12}$/.test(c) ? "0" + c : c;
 }
 
 /** Giá bán lẻ thấp nhất nhân viên được bán — giống hàm retail_min_price */

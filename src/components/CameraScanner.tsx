@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { cleanBarcode } from "@/lib/inventory";
 
 type Detector = { detect: (src: HTMLVideoElement | ImageBitmap | HTMLCanvasElement) => Promise<{ rawValue: string }[]> };
 type DetectorCtor = {
@@ -8,8 +9,31 @@ type DetectorCtor = {
   getSupportedFormats?: () => Promise<string[]>;
 };
 
-// Các loại mã hay gặp trên mỹ phẩm: EAN-13 / EAN-8 / UPC (mã sản phẩm), Code 128 / 39, ITF, QR, DataMatrix
-const NATIVE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "itf", "qr_code", "data_matrix"];
+// Các loại mã hay gặp trên mỹ phẩm: EAN-13 / EAN-8 / UPC (mã sản phẩm), Code 128, QR, DataMatrix.
+// Không đọc ITF / Code 39: hai loại này không có số kiểm tra nên hay đọc nhầm một phần mã EAN thành số khác.
+const NATIVE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "qr_code", "data_matrix"];
+
+/** Mã toàn số dài 8 / 12 / 13 (EAN / UPC) phải đúng số kiểm tra cuối — chặn đọc nhầm */
+function checkOk(digits: string, check: number): boolean {
+  const sum = digits.split("").map(Number).reverse().reduce((a, x, i) => a + x * (i % 2 === 0 ? 3 : 1), 0);
+  return (10 - (sum % 10)) % 10 === check;
+}
+/** UPC-E 8 số: số kiểm tra tính trên mã UPC-A mở rộng */
+function upcEBody(code: string): string | null {
+  if (!/^[01]\d{7}$/.test(code)) return null;
+  const [n, a, b, c, d, e, f] = code.slice(0, 7).split("");
+  if (f <= "2") return `${n}${a}${b}${f}0000${c}${d}${e}`;
+  if (f === "3") return `${n}${a}${b}${c}00000${d}${e}`;
+  if (f === "4") return `${n}${a}${b}${c}${d}00000${e}`;
+  return `${n}${a}${b}${c}${d}${e}0000${f}`;
+}
+function plausible(code: string): boolean {
+  if (!/^\d+$/.test(code) || ![8, 12, 13].includes(code.length)) return true;
+  const check = Number(code[code.length - 1]);
+  if (checkOk(code.slice(0, -1), check)) return true;
+  const e = code.length === 8 ? upcEBody(code) : null;
+  return !!e && checkOk(e, check);
+}
 
 /**
  * Bộ đọc mã của trình duyệt (BarcodeDetector) chỉ dùng khi nó thật sự đọc được mã sản phẩm EAN-13.
@@ -40,24 +64,47 @@ async function zxingReader() {
     BarcodeFormat.UPC_A,
     BarcodeFormat.UPC_E,
     BarcodeFormat.CODE_128,
-    BarcodeFormat.CODE_39,
-    BarcodeFormat.ITF,
     BarcodeFormat.QR_CODE,
     BarcodeFormat.DATA_MATRIX,
   ]);
-  return new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 150 });
+  return new BrowserMultiFormatReader(hints);
 }
+
+/** Vẽ một vùng của ảnh / khung hình vào canvas, thu về chiều rộng tối đa `maxW` */
+function crop(
+  src: CanvasImageSource,
+  sw: number,
+  sh: number,
+  region: { x: number; y: number; w: number; h: number },
+  maxW: number,
+  canvas = document.createElement("canvas"),
+) {
+  const rw = sw * region.w;
+  const rh = sh * region.h;
+  const scale = Math.min(1, maxW / rw);
+  canvas.width = Math.max(1, Math.round(rw * scale));
+  canvas.height = Math.max(1, Math.round(rh * scale));
+  canvas.getContext("2d", { willReadFrequently: true })!.drawImage(src, sw * region.x, sh * region.y, rw, rh, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+const FULL = { x: 0, y: 0, w: 1, h: 1 };
+const BAND = { x: 0.05, y: 0.3, w: 0.9, h: 0.4 }; // dải giữa khung hình, đúng chỗ khung trắng
+const CENTER = { x: 0.2, y: 0.35, w: 0.6, h: 0.3 }; // vùng giữa nhỏ hơn = phóng to mã nhỏ
 
 const CAMERA: MediaStreamConstraints = {
   video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
   audio: false,
 };
 
-/** Bật lấy nét liên tục nếu camera hỗ trợ (giúp đọc mã nhỏ trên chai lọ) */
-function tryAutofocus(stream: MediaStream | null) {
+/** Bật lấy nét liên tục + phóng to nhẹ nếu camera hỗ trợ (cầm xa hơn vẫn nét, đọc được mã nhỏ trên chai lọ) */
+function tuneCamera(stream: MediaStream | null) {
   const track = stream?.getVideoTracks()[0];
   if (!track) return;
-  track.applyConstraints({ advanced: [{ focusMode: "continuous" }] } as unknown as MediaTrackConstraints).catch(() => {});
+  const caps = (track.getCapabilities?.() ?? {}) as { focusMode?: string[]; zoom?: { min: number; max: number } };
+  const adv: Record<string, unknown>[] = [];
+  if (caps.focusMode?.includes("continuous")) adv.push({ focusMode: "continuous" });
+  if (caps.zoom && caps.zoom.max >= 1.5) adv.push({ zoom: Math.min(2, caps.zoom.max) });
+  if (adv.length) track.applyConstraints({ advanced: adv } as unknown as MediaTrackConstraints).catch(() => {});
 }
 
 /** Đọc mã từ ảnh chụp: thu nhỏ ảnh về vài cỡ rồi thử lần lượt (ảnh 12MP đọc trực tiếp rất chậm và hay trượt) */
@@ -66,26 +113,21 @@ async function decodePhoto(file: File): Promise<string | null> {
   const native = await nativeDetector();
   if (native) {
     try {
-      const found = await native.detect(bitmap);
-      if (found[0]?.rawValue) return found[0].rawValue;
+      const found = (await native.detect(bitmap)).find((f) => plausible(f.rawValue.replace(/\s/g, "")));
+      if (found) return found.rawValue;
     } catch {
       // thử tiếp bằng ZXing
     }
   }
   const reader = await zxingReader();
-  const longest = Math.max(bitmap.width, bitmap.height);
-  for (const size of [1600, 1000, 2400, 700]) {
-    const scale = Math.min(1, size / longest);
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const tries: [typeof FULL, number][] = [[FULL, 1600], [BAND, 1600], [FULL, 1000], [CENTER, 1200], [FULL, 2400], [FULL, 700]];
+  for (const [region, size] of tries) {
     try {
-      return reader.decodeFromCanvas(canvas).getText();
+      const text = reader.decodeFromCanvas(crop(bitmap, bitmap.width, bitmap.height, region, size)).getText();
+      if (plausible(text.replace(/\s/g, ""))) return text;
     } catch {
-      // cỡ này không đọc được, thử cỡ khác
+      // vùng / cỡ này không đọc được, thử tiếp
     }
-    if (scale === 1 && size >= longest) break;
   }
   return null;
 }
@@ -113,8 +155,8 @@ export default function CameraScanner({ onScan, onClose }: { onScan: (code: stri
     let lastCode = "";
     let lastAt = 0;
     const emit = (raw: string) => {
-      const code = raw.replace(/\s/g, "");
-      if (!code) return;
+      const code = cleanBarcode(raw);
+      if (!code || !plausible(code)) return;
       const now = Date.now();
       if (code === lastCode && now - lastAt < 2000) return;
       lastCode = code;
@@ -133,39 +175,42 @@ export default function CameraScanner({ onScan, onClose }: { onScan: (code: stri
         if (!video) return;
         const native = await nativeDetector();
         if (cancelled) return;
-        if (native) {
-          const stream = await navigator.mediaDevices.getUserMedia(CAMERA);
-          if (cancelled) return stream.getTracks().forEach((t) => t.stop());
-          video.srcObject = stream;
-          await video.play();
-          tryAutofocus(stream);
-          let timer = 0;
-          const tick = async () => {
-            try {
-              if (video.readyState >= 2) {
+        const stream = await navigator.mediaDevices.getUserMedia(CAMERA);
+        if (cancelled) return stream.getTracks().forEach((t) => t.stop());
+        video.srcObject = stream;
+        await video.play();
+        tuneCamera(stream);
+        const reader = native ? null : await zxingReader();
+        const canvas = document.createElement("canvas");
+        // ZXing: mỗi lượt đọc một vùng khác nhau của khung hình (dải giữa, vùng giữa phóng to, cả khung)
+        const regions: [typeof FULL, number][] = [[BAND, 1280], [CENTER, 1000], [FULL, 1280]];
+        let turn = 0;
+        let timer = 0;
+        const tick = async () => {
+          try {
+            if (video.readyState >= 2 && video.videoWidth) {
+              if (native) {
                 const found = await native.detect(video);
-                if (found[0]?.rawValue) emit(found[0].rawValue);
+                for (const f of found) emit(f.rawValue);
+              } else if (reader) {
+                const [region, size] = regions[turn++ % regions.length];
+                try {
+                  emit(reader.decodeFromCanvas(crop(video, video.videoWidth, video.videoHeight, region, size, canvas)).getText());
+                } catch {
+                  // khung hình này chưa thấy mã
+                }
               }
-            } catch {
-              // khung hình chưa sẵn sàng
             }
-            if (!cancelled) timer = window.setTimeout(tick, 150);
-          };
-          tick();
-          stop = () => {
-            window.clearTimeout(timer);
-            stream.getTracks().forEach((t) => t.stop());
-          };
-        } else {
-          const reader = await zxingReader();
-          if (cancelled) return;
-          const controls = await reader.decodeFromConstraints(CAMERA, video, (result) => {
-            if (result) emit(result.getText());
-          });
-          if (cancelled) return controls.stop();
-          tryAutofocus(video.srcObject as MediaStream | null);
-          stop = () => controls.stop();
-        }
+          } catch {
+            // khung hình chưa sẵn sàng
+          }
+          if (!cancelled) timer = window.setTimeout(tick, native ? 150 : 60);
+        };
+        tick();
+        stop = () => {
+          window.clearTimeout(timer);
+          stream.getTracks().forEach((t) => t.stop());
+        };
       } catch (e) {
         const msg = e instanceof Error ? e.name + " " + e.message : String(e);
         setError(

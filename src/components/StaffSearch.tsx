@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { cleanBarcode } from "@/lib/inventory";
+import CameraScanner from "./CameraScanner";
 
 type Hit = { kind: "customer" | "invoice" | "product"; id: string; title: string; subtitle: string | null };
 const KIND: Record<Hit["kind"], { label: string; href: (id: string) => string }> = {
@@ -19,6 +21,31 @@ export default function StaffSearch() {
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanBusy, setScanBusy] = useState(false);
+  const [scanMsg, setScanMsg] = useState<string | null>(null);
+
+  // Quét mã vạch: tìm đúng 1 sản phẩm thì mở thẳng trang sản phẩm, còn lại hiện kết quả như gõ tìm
+  async function onScan(raw: string) {
+    const code = cleanBarcode(raw);
+    setScanning(false);
+    if (!code) return;
+    setScanBusy(true);
+    setScanMsg(null);
+    const { data } = await createClient().rpc("staff_search", { p_q: code });
+    setScanBusy(false);
+    const products = ((data ?? []) as Hit[]).filter((h) => h.kind === "product");
+    if (products.length === 1) {
+      setQ("");
+      setOpen(false);
+      router.push(KIND.product.href(products[0].id));
+    } else if (products.length === 0) {
+      setScanMsg(`Mã ${code} chưa gắn cho sản phẩm nào. Vào Sản phẩm → mở sản phẩm → ô Mã vạch để gắn.`);
+    } else {
+      setQ(code);
+      setOpen(true);
+    }
+  }
 
   useEffect(() => {
     const t = q.trim();
@@ -55,7 +82,7 @@ export default function StaffSearch() {
     <div ref={box} className="relative">
       <input
         type="search"
-        className="input py-2 pl-9 text-sm"
+        className="input py-2 pl-9 pr-12 text-sm"
         placeholder="Tìm khách, SĐT, mã hoá đơn, mã vận đơn, sản phẩm…"
         value={q}
         onChange={(e) => {
@@ -72,6 +99,26 @@ export default function StaffSearch() {
         <circle cx="11" cy="11" r="7" />
         <path d="M20 20l-3.5-3.5" />
       </svg>
+      <button
+        type="button"
+        aria-label="Quét mã vạch sản phẩm"
+        title="Quét mã vạch sản phẩm"
+        className="absolute right-1 top-1/2 -translate-y-1/2 rounded-lg px-2.5 py-1 text-lg hover:bg-cream disabled:opacity-50"
+        disabled={scanBusy}
+        onClick={() => {
+          setScanMsg(null);
+          setScanning(true);
+        }}
+      >
+        {scanBusy ? "…" : "📷"}
+      </button>
+      {scanMsg && (
+        <div className="absolute inset-x-0 top-full z-50 mt-1 rounded-xl border border-beige-dark bg-white px-4 py-3 text-sm shadow-lg">
+          {scanMsg}
+          <button className="ml-2 text-xs font-semibold text-navy underline" onClick={() => setScanMsg(null)}>Đóng</button>
+        </div>
+      )}
+      {scanning && <CameraScanner onScan={onScan} onClose={() => setScanning(false)} />}
       {open && q.trim().length >= 2 && (
         <div className="absolute inset-x-0 top-full z-50 mt-1 max-h-[70vh] overflow-y-auto rounded-xl border border-beige-dark bg-white shadow-lg">
           {busy && !hits && <p className="px-4 py-3 text-sm text-ink/60">Đang tìm…</p>}
