@@ -10,12 +10,25 @@ type DetectorCtor = {
 };
 
 // Các loại mã hay gặp trên mỹ phẩm: EAN-13 / EAN-8 / UPC (mã sản phẩm), Code 128, QR, DataMatrix,
-// và mã nội bộ của hãng: Code 39 / Code 93 / Codabar / ITF (vd Lait VIP O2 in mã 9 số 119913586).
+// và mã nội bộ của nhà phân phối: Code 39 / Code 93 / Codabar / ITF (vd tem Lait VIP O2 là Code 39 "11913586").
 const NATIVE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "code_93", "codabar", "itf", "qr_code", "data_matrix"];
 // Loại mã "yếu": không có số kiểm tra bắt buộc nên dễ đọc nhầm → cần đọc trùng nhiều lần hơn
 const WEAK = /^(code_?39|code_?93|codabar|itf)$/i;
 
-/** Mã toàn số dài 8 / 12 / 13 (EAN / UPC) phải đúng số kiểm tra cuối — chặn đọc nhầm */
+/**
+ * Nhóm loại mã: "ean" = EAN-13 / EAN-8 / UPC (có số kiểm tra cuối); "weak" = Code 39 / 93 / Codabar / ITF
+ * (không có số kiểm tra bắt buộc → dễ đọc nhầm, cần đọc trùng nhiều lần); "strong" = Code 128, QR, DataMatrix.
+ * Không biết loại (vd gõ tay) thì đoán: toàn số dài 8 / 12 / 13 coi là EAN.
+ */
+type Kind = "ean" | "weak" | "strong";
+function kindOf(format: string, code: string): Kind {
+  const f = format.toLowerCase();
+  if (/^(ean_?13|ean_?8|upc_?a|upc_?e)$/.test(f)) return "ean";
+  if (WEAK.test(f)) return "weak";
+  if (f) return "strong";
+  return /^\d{8}$|^\d{12,13}$/.test(code) ? "ean" : "strong";
+}
+/** Mã EAN / UPC phải đúng số kiểm tra cuối — chặn đọc nhầm (chỉ áp cho loại EAN / UPC) */
 function checkOk(digits: string, check: number): boolean {
   const sum = digits.split("").map(Number).reverse().reduce((a, x, i) => a + x * (i % 2 === 0 ? 3 : 1), 0);
   return (10 - (sum % 10)) % 10 === check;
@@ -29,8 +42,9 @@ function upcEBody(code: string): string | null {
   if (f === "4") return `${n}${a}${b}${c}${d}00000${e}`;
   return `${n}${a}${b}${c}${d}${e}0000${f}`;
 }
-function plausible(code: string): boolean {
-  if (!/^\d+$/.test(code) || ![8, 12, 13].includes(code.length)) return true;
+function plausible(code: string, kind: Kind): boolean {
+  if (kind !== "ean") return true;
+  if (!/^\d+$/.test(code) || ![8, 12, 13].includes(code.length)) return false;
   const check = Number(code[code.length - 1]);
   if (checkOk(code.slice(0, -1), check)) return true;
   const e = code.length === 8 ? upcEBody(code) : null;
@@ -98,32 +112,32 @@ function crop(
 const FULL = { x: 0, y: 0, w: 1, h: 1 };
 const BAND = { x: 0.05, y: 0.3, w: 0.9, h: 0.4 }; // dải giữa khung hình, đúng chỗ khung trắng
 
-/** Mã ngắn 8 số (EAN-8 / UPC-E) — loại hay bị đọc nhầm từ một phần mã 13 số khi ảnh mờ */
-/** Tên loại mã của ZXing (CODE_39) / trình duyệt (code_39) → có phải loại "yếu" */
-const weakFormat = (format: string | number | undefined, zxingName?: (f: number) => string) =>
-  WEAK.test(typeof format === "number" ? (zxingName?.(format) ?? "") : (format ?? ""));
-const isShort = (code: string) => /^\d{8}$/.test(code);
+/** Tên loại mã: ZXing trả số (BarcodeFormat), trình duyệt trả chuỗi ("code_39") */
+const formatName = (format: string | number | undefined) => (typeof format === "number" ? zxFormatName(format) : (format ?? ""));
+
+/** EAN-8 / UPC-E 8 số — loại hay bị đọc nhầm từ một phần mã khác khi ảnh mờ */
+const isShortEan = (code: string, kind: Kind) => kind === "ean" && code.length === 8;
 
 /**
  * Bỏ phiếu giữa các lần đọc: chỉ nhận khi cùng một mã đọc ra nhiều lần.
- * Mã thường cần 2 lần; mã ngắn 8 số cần 3 lần ở ít nhất 2 vùng / cỡ khác nhau,
- * và không nhận mã ngắn nếu gần đó đã đọc thấy một mã dài (mã ngắn khi đó gần như chắc là đọc nhầm).
+ * EAN-13 / Code 128 / QR: 2 lần. Code 39 / 93 / Codabar / ITF: 3 lần ở ít nhất 2 vùng / cỡ khác nhau.
+ * EAN-8 / UPC-E: 3 lần ở 2 vùng, và không nhận nếu gần đó đã đọc thấy mã khác (khi đó gần như chắc là đọc nhầm).
  */
 function makeVoter(windowMs = 4000) {
-  const votes = new Map<string, { n: number; regions: Set<string>; t: number }>();
+  const votes = new Map<string, { n: number; regions: Set<string>; t: number; kind: Kind }>();
   return {
-    add(code: string, region: string, weak = false): string | null {
+    add(code: string, region: string, kind: Kind): string | null {
       const now = Date.now();
       for (const [k, v] of votes) if (now - v.t > windowMs) votes.delete(k);
-      const v = votes.get(code) ?? { n: 0, regions: new Set<string>(), t: now };
+      const v = votes.get(code) ?? { n: 0, regions: new Set<string>(), t: now, kind };
       v.n += 1;
       v.regions.add(region);
       v.t = now;
       votes.set(code, v);
-      const longSeen = [...votes.keys()].some((k) => !isShort(k));
-      const ok = isShort(code)
-        ? !longSeen && v.n >= 3 && v.regions.size >= 2
-        : weak
+      const otherSeen = [...votes.entries()].some(([k, x]) => k !== code && !isShortEan(k, x.kind));
+      const ok = isShortEan(code, kind)
+        ? !otherSeen && v.n >= 3 && v.regions.size >= 2
+        : kind === "weak"
           ? v.n >= 3 && v.regions.size >= 2
           : v.n >= 2;
       if (!ok) return null;
@@ -133,30 +147,16 @@ function makeVoter(windowMs = 4000) {
   };
 }
 
-const CAMERA: MediaStreamConstraints = {
-  video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-  audio: false,
-};
-
-/** Bật lấy nét liên tục + phóng to nhẹ nếu camera hỗ trợ (cầm xa hơn vẫn nét, đọc được mã nhỏ trên chai lọ) */
-function tuneCamera(stream: MediaStream | null) {
-  const track = stream?.getVideoTracks()[0];
-  if (!track) return;
-  const caps = (track.getCapabilities?.() ?? {}) as { focusMode?: string[]; zoom?: { min: number; max: number } };
-  const adv: Record<string, unknown>[] = [];
-  if (caps.focusMode?.includes("continuous")) adv.push({ focusMode: "continuous" });
-  if (caps.zoom && caps.zoom.max >= 1.5) adv.push({ zoom: Math.min(2, caps.zoom.max) });
-  if (adv.length) track.applyConstraints({ advanced: adv } as unknown as MediaTrackConstraints).catch(() => {});
-}
-
 /** Đọc mã từ ảnh chụp: thu nhỏ ảnh về vài cỡ rồi thử lần lượt (ảnh 12MP đọc trực tiếp rất chậm và hay trượt) */
 async function decodePhoto(file: File): Promise<string | null> {
   const bitmap = await createImageBitmap(file);
   const native = await nativeDetector();
   if (native) {
     try {
-      const codes = (await native.detect(bitmap)).map((f) => cleanBarcode(f.rawValue)).filter((c) => c && plausible(c));
-      const best = codes.find((c) => !isShort(c)) ?? codes[0];
+      const codes = (await native.detect(bitmap))
+        .map((f) => ({ code: cleanBarcode(f.rawValue), kind: kindOf(formatName(f.format), cleanBarcode(f.rawValue)) }))
+        .filter((x) => x.code && plausible(x.code, x.kind));
+      const best = (codes.find((x) => !isShortEan(x.code, x.kind)) ?? codes[0])?.code;
       if (best) return best;
     } catch {
       // thử tiếp bằng ZXing
@@ -166,22 +166,23 @@ async function decodePhoto(file: File): Promise<string | null> {
   // thử hết các vùng / cỡ rồi chọn: mã dài đọc được ở đâu cũng ưu tiên; mã ngắn 8 số phải ra ít nhất 2 lần
   const tries: [typeof FULL, number][] = [[FULL, 1600], [BAND, 1600], [FULL, 1000], [BAND, 1000], [FULL, 2400], [FULL, 700]];
   const tally = new Map<string, number>();
-  const weak = new Set<string>();
+  const kinds = new Map<string, Kind>();
   for (const [region, size] of tries) {
     try {
       const r = reader.decodeFromCanvas(crop(bitmap, bitmap.width, bitmap.height, region, size));
       const code = cleanBarcode(r.getText());
-      if (!code || !plausible(code)) continue;
+      const kind = kindOf(formatName(r.getBarcodeFormat()), code);
+      if (!code || !plausible(code, kind)) continue;
       tally.set(code, (tally.get(code) ?? 0) + 1);
-      if (weakFormat(r.getBarcodeFormat(), zxFormatName)) weak.add(code);
+      kinds.set(code, kind);
     } catch {
       // vùng / cỡ này không đọc được, thử tiếp
     }
   }
   const ranked = [...tally.entries()].sort((a, b) => b[1] - a[1]);
-  const long = ranked.find(([c, n]) => !isShort(c) && (!weak.has(c) || n >= 2));
+  const long = ranked.find(([c, n]) => !isShortEan(c, kinds.get(c)!) && (kinds.get(c) !== "weak" || n >= 2));
   if (long) return long[0];
-  const short = ranked.find(([, n]) => n >= 2);
+  const short = ranked.length === 1 && ranked[0][1] >= 2 ? ranked[0] : null;
   return short ? short[0] : null;
 }
 
@@ -209,7 +210,7 @@ export default function CameraScanner({ onScan, onClose }: { onScan: (code: stri
     let lastAt = 0;
     const emit = (raw: string) => {
       const code = cleanBarcode(raw);
-      if (!code || !plausible(code)) return;
+      if (!code) return;
       const now = Date.now();
       if (code === lastCode && now - lastAt < 2000) return;
       lastCode = code;
@@ -221,10 +222,11 @@ export default function CameraScanner({ onScan, onClose }: { onScan: (code: stri
     };
     emitRef.current = emit;
     const voter = makeVoter();
-    const vote = (raw: string, region: string, weak: boolean) => {
+    const vote = (raw: string, region: string, format: string | number | undefined) => {
       const code = cleanBarcode(raw);
-      if (!code || !plausible(code)) return;
-      const ok = voter.add(code, region, weak);
+      const kind = kindOf(formatName(format), code);
+      if (!code || !plausible(code, kind)) return;
+      const ok = voter.add(code, region, kind);
       if (ok) emit(ok);
     };
     const slowTimer = window.setTimeout(() => setSlow(true), 8000);
@@ -251,13 +253,13 @@ export default function CameraScanner({ onScan, onClose }: { onScan: (code: stri
             if (video.readyState >= 2 && video.videoWidth) {
               if (native) {
                 const found = await native.detect(video);
-                for (const f of found) vote(f.rawValue, `n${turn++ % 2}`, weakFormat(f.format));
+                for (const f of found) vote(f.rawValue, `n${turn++ % 2}`, f.format);
               } else if (reader) {
                 const i = turn++ % regions.length;
                 const [region, size] = regions[i];
                 try {
                   const r = reader.decodeFromCanvas(crop(video, video.videoWidth, video.videoHeight, region, size, canvas));
-                  vote(r.getText(), `z${i}`, weakFormat(r.getBarcodeFormat(), zxFormatName));
+                  vote(r.getText(), `z${i}`, r.getBarcodeFormat());
                 } catch {
                   // khung hình này chưa thấy mã
                 }
