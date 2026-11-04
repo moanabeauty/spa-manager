@@ -89,14 +89,13 @@ export function SkinRecordCard({
   footer,
   heading,
 }: {
-  r: Pick<SkinRecord, "record_date" | "overall" | "criteria" | "need_tags" | "recommendation" | "homecare" | "next_visit_days"> &
-    Partial<Pick<SkinRecord, "reaction" | "customer_needs" | "internal_note">>;
+  r: Pick<SkinRecord, "record_date" | "overall" | "need_tags" | "recommendation" | "homecare" | "next_visit_days"> &
+    Partial<Pick<SkinRecord, "criteria" | "reaction" | "customer_needs" | "internal_note">>;
   showInternal?: boolean;
   footer?: ReactNode;
   heading?: ReactNode;
 }) {
   const c = SKIN_COLOR.get(r.overall)!;
-  const crit = SKIN_CRITERIA.filter((x) => r.criteria?.[x.key]);
   return (
     <div className={`rounded-xl border border-l-4 p-3 text-sm ${c.soft} ${c.bar}`}>
       <div className={`flex flex-wrap items-center gap-2 ${c.text}`}>
@@ -104,15 +103,6 @@ export function SkinRecordCard({
         <b>{c.label}</b>
         <span className="ml-auto text-xs text-ink/60">{heading ?? shortDay(r.record_date)}</span>
       </div>
-      {crit.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {crit.map((x) => (
-            <span key={x.key} className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 text-xs text-ink ring-1 ring-beige-dark">
-              <SkinDot color={r.criteria[x.key]} size="h-2 w-2" /> {x.label}
-            </span>
-          ))}
-        </div>
-      )}
       {(r.need_tags?.length > 0 || r.customer_needs) && (
         <p className="mt-2 text-ink">
           <span className="font-semibold">Nhu cầu khách: </span>
@@ -121,9 +111,8 @@ export function SkinRecordCard({
           {r.customer_needs}
         </p>
       )}
-      {showInternal && r.reaction && <p className="mt-1 text-ink"><span className="font-semibold">Phản ứng da: </span>{r.reaction}</p>}
-      {r.recommendation && <p className="mt-1 text-ink"><span className="font-semibold">Đề xuất: </span>{r.recommendation}</p>}
-      {r.homecare && <p className="mt-1 text-ink"><span className="font-semibold">Chăm sóc tại nhà: </span>{r.homecare}</p>}
+      {r.recommendation && <p className="mt-1 text-ink"><span className="font-semibold">Đề xuất buổi sau: </span>{r.recommendation}</p>}
+      {r.homecare && <p className="mt-1 text-ink"><span className="font-semibold">Chăm sóc da sau liệu trình: </span>{r.homecare}</p>}
       {r.next_visit_days && <p className="mt-1 text-xs text-ink/70">Hẹn quay lại sau {r.next_visit_days} ngày</p>}
       {showInternal && r.internal_note && (
         <p className="mt-1 rounded-lg bg-white/70 px-2 py-1 text-xs text-ink/80">Ghi chú nội bộ: {r.internal_note}</p>
