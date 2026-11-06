@@ -8,7 +8,7 @@ import { formatVnd } from "@/lib/format";
 import CameraScanner from "./CameraScanner";
 
 type Hit = {
-  kind: "customer" | "invoice" | "product";
+  kind: "customer" | "invoice" | "product" | "service";
   id: string;
   title: string;
   subtitle: string | null;
@@ -21,9 +21,10 @@ const KIND: Record<Hit["kind"], { label: string; href: (id: string) => string }>
   customer: { label: "Khách hàng", href: (id) => `/quan-ly/khach-hang?id=${id}` },
   invoice: { label: "Hoá đơn / đơn ship", href: (id) => `/quan-ly/hoa-don/${id}` },
   product: { label: "Sản phẩm", href: (id) => `/quan-ly/kho/san-pham/${id}` },
+  service: { label: "Liệu trình", href: (id) => `/quan-ly/lieu-trinh-goc/${id}` },
 };
 
-/** Ô tìm kiếm chung: tên / SĐT khách, mã hoá đơn, mã vận đơn, sản phẩm (tên, mã, mã vạch) */
+/** Ô tìm kiếm chung: liệu trình, tên / SĐT khách, mã hoá đơn, mã vận đơn, sản phẩm (tên, mã, mã vạch) */
 export default function StaffSearch() {
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -42,7 +43,7 @@ export default function StaffSearch() {
     if (!code) return;
     setScanBusy(true);
     setScanMsg(null);
-    const { data } = await createClient().rpc("staff_search_v2", { p_q: code });
+    const { data } = await createClient().rpc("staff_search_v3", { p_q: code });
     setScanBusy(false);
     const products = ((data ?? []) as Hit[]).filter((h) => h.kind === "product");
     if (products.length === 1) {
@@ -65,7 +66,7 @@ export default function StaffSearch() {
     }
     setBusy(true);
     const id = setTimeout(async () => {
-      const { data } = await createClient().rpc("staff_search_v2", { p_q: t });
+      const { data } = await createClient().rpc("staff_search_v3", { p_q: t });
       setHits((data ?? []) as Hit[]);
       setBusy(false);
     }, 250);
@@ -86,14 +87,14 @@ export default function StaffSearch() {
     router.push(KIND[h.kind].href(h.id));
   }
 
-  const groups = (["customer", "invoice", "product"] as const).map((k) => ({ k, items: (hits ?? []).filter((h) => h.kind === k) }));
+  const groups = (["service", "customer", "invoice", "product"] as const).map((k) => ({ k, items: (hits ?? []).filter((h) => h.kind === k) }));
 
   return (
     <div ref={box} className="relative">
       <input
         type="search"
         className="input py-2 pl-9 pr-12 text-sm"
-        placeholder="Tìm khách, SĐT, mã hoá đơn, mã vận đơn, sản phẩm…"
+        placeholder="Tìm liệu trình, khách, SĐT, mã hoá đơn, sản phẩm…"
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
@@ -141,7 +142,19 @@ export default function StaffSearch() {
                   {g.items.map((h) => (
                     <button key={h.id} onClick={() => go(h)} className="block w-full px-4 py-2 text-left text-sm hover:bg-cream">
                       <span className="font-medium">{h.title}</span>
-                      {h.kind === "product" ? <ProductLine h={h} /> : h.subtitle && <span className="block text-xs text-ink/60">{h.subtitle}</span>}
+                      {h.kind === "product" ? (
+                        <ProductLine h={h} />
+                      ) : (
+                        <>
+                          {h.subtitle && <span className="block text-xs text-ink/60">{h.subtitle}</span>}
+                          {h.kind === "service" && h.list_price != null && (
+                            <span className="block text-xs text-ink/60">
+                              Niêm yết {formatVnd(Number(h.list_price))}
+                              {h.min_price != null ? ` · Member ${formatVnd(Number(h.min_price))}` : ""}
+                            </span>
+                          )}
+                        </>
+                      )}
                     </button>
                   ))}
                 </div>

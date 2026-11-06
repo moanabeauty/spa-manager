@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, vnError } from "@/lib/format";
 import { elapsed } from "@/lib/ktv";
+import ProductPicker from "./ProductPicker";
 
 export type Step = { step_no: number; title: string; products: string[]; instructions: string | null; note: string | null };
 export type Change = { id: string; step_no: number; from_product: string | null; to_product: string; reason: string; status: string; review_note: string | null };
@@ -181,7 +182,7 @@ export default function ProcedureRunner(props: {
               </select>
             )}
             <input className="input py-2 text-sm" placeholder="Sản phẩm gốc (nếu có)" value={ask.from} onChange={(e) => setAsk({ ...ask, from: e.target.value })} />
-            <input className="input py-2 text-sm" placeholder="Đổi sang sản phẩm…" value={to} onChange={(e) => setTo(e.target.value)} autoFocus />
+            <ProductPicker value={to} onChange={setTo} />
             <input className="input py-2 text-sm" placeholder="Lý do (vd da khách đang đỏ)" value={reason} onChange={(e) => setReason(e.target.value)} />
             <div className="flex gap-2">
               <button className="btn-ghost flex-1" onClick={() => setAsk(null)}>Huỷ</button>
