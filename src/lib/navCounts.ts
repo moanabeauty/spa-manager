@@ -20,7 +20,7 @@ export async function loadNavCounts(role: string, branchId: string | null): Prom
   let discQ = supabase.from("discount_requests").select("id", head).eq("status", "pending");
   if (!O) discQ = discQ.eq("kind", "debt");
 
-  const [disc, vouchers, promos, care, stock, counts, att, ot, leaves] = await Promise.all([
+  const [disc, vouchers, promos, care, stock, counts, att, ot, leaves, chg, early, fix] = await Promise.all([
     M ? discQ : zero,
     M ? supabase.from("cashbook_entries").select("id", head).eq("source", "counter").eq("status", "pending") : zero,
     !W ? supabase.from("promotion_registrations").select("id", head).eq("status", "pending") : zero,
@@ -30,6 +30,9 @@ export async function loadNavCounts(role: string, branchId: string | null): Prom
     O ? supabase.from("staff_attendance").select("staff_id", head).eq("approval_status", "pending") : zero,
     M ? supabase.from("staff_attendance").select("staff_id", head).eq("ot_status", "pending") : zero,
     M ? supabase.from("staff_leaves").select("id", head).eq("status", "pending") : zero,
+    M ? supabase.from("procedure_change_requests").select("id", head).eq("status", "pending") : zero,
+    M ? supabase.from("staff_attendance").select("staff_id", head).eq("in_status", "pending") : zero,
+    M ? supabase.from("attendance_fix_requests").select("id", head).eq("status", "pending") : zero,
   ]);
   return {
     discounts: disc.count ?? 0,
@@ -40,6 +43,7 @@ export async function loadNavCounts(role: string, branchId: string | null): Prom
     stockCounts: counts.count ?? 0,
     attendance: (att.count ?? 0) + (ot.count ?? 0),
     leaves: leaves.count ?? 0,
+    ktv: (chg.count ?? 0) + (early.count ?? 0) + (fix.count ?? 0),
   };
 }
 

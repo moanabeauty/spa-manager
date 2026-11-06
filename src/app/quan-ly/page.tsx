@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import { STATUS_LABEL, STATUS_STYLE, formatDate, formatTime, formatVnd, todayVn, vnDateTime } from "@/lib/format";
 import { loadNavCounts } from "@/lib/navCounts";
+import KtvHome from "./ktv/KtvHome";
 
 export const metadata = { title: "Tổng quan – Moana Beauty" };
 
@@ -22,6 +23,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const { supabase, profile } = await getCurrentUser();
   if (!isStaffRole(profile?.role)) return null; // layout đã báo
   const role = profile!.role;
+  if (role === "technician") return <KtvHome profile={profile!} />;
   const M = role === "owner" || role === "manager";
   const O = role === "owner";
   const W = role === "warehouse";
@@ -39,6 +41,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     { n: counts.promos, label: "Khách đăng ký khuyến mãi", href: "/quan-ly/khuyen-mai" },
     { n: counts.attendance, label: "Chấm công / tăng ca", href: "/quan-ly/cham-cong" },
     { n: counts.leaves, label: "Đơn nghỉ phép", href: "/quan-ly/nghi-phep" },
+    { n: counts.ktv, label: "KTV: đổi sản phẩm / chấm công", href: "/quan-ly/theo-doi-ktv" },
   ].filter((a) => a.n > 0 && (M || a.href === "/quan-ly/khuyen-mai" || (W && a.href.startsWith("/quan-ly/kho"))));
 
   let appts: Appt[] = [];

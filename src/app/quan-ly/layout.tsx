@@ -3,6 +3,7 @@ import { createClient, getCurrentUser, isStaffRole } from "@/lib/supabase/server
 import CheckInBar from "@/components/CheckInBar";
 import PushToggle from "@/components/PushToggle";
 import StaffNav from "@/components/StaffNav";
+import KtvNav from "@/components/KtvNav";
 import { todayVn } from "@/lib/format";
 import { buildNav } from "@/lib/nav";
 import { loadNavCounts } from "@/lib/navCounts";
@@ -25,6 +26,15 @@ export default async function ManagerLayout({ children }: { children: React.Reac
     );
   }
   const role = profile!.role;
+  // KTV dùng giao diện app riêng: 5 tab dưới đáy, chấm công nằm ở màn Hôm nay
+  if (role === "technician") {
+    return (
+      <div className="space-y-4 pb-24">
+        <KtvNav />
+        {children}
+      </div>
+    );
+  }
   const supabase = await createClient();
   const [counts, { data: cfg }, { data: attendance }] = await Promise.all([
     loadNavCounts(role, profile!.branch_id),

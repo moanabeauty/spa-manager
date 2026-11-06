@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { fetchTechnicians } from "@/lib/staff";
 import StaffBookingForm, { type StaffService } from "./StaffBookingForm";
@@ -6,6 +7,7 @@ export const metadata = { title: "Tạo lịch hẹn – Moana Beauty" };
 
 export default async function StaffBookingPage({ searchParams }: { searchParams: Promise<{ sdt?: string; cn?: string; ngay?: string; gio?: string }> }) {
   const { supabase, profile } = await getCurrentUser();
+  if (profile?.role === "technician") redirect("/quan-ly/ktv/dat-lich"); // KTV đặt lịch ở app riêng
   const sp = await searchParams;
   const [{ data: branches }, { data: categories }, { data: services }, technicians] = await Promise.all([
     supabase.from("branches").select("id, name, max_per_slot").eq("is_active", true).order("name"),

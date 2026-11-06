@@ -16,6 +16,7 @@ export type NavCounts = {
   stockCounts: number; // phiếu kiểm kho lệch chờ chủ duyệt
   attendance: number; // chấm công + tăng ca chờ duyệt
   leaves: number; // đơn nghỉ phép chờ duyệt
+  ktv: number; // KTV xin đổi sản phẩm + chấm vào sớm + xin sửa công
 };
 
 export function buildNav(role: Role, c: NavCounts): NavGroup[] {
@@ -38,6 +39,7 @@ export function buildNav(role: Role, c: NavCounts): NavGroup[] {
         ...item(!W, "/quan-ly/hoa-don", "Hoá đơn"),
         ...item(true, "/quan-ly/phieu-thu-chi", "Phiếu thu / chi", M ? c.vouchers : 0),
         ...item(M, "/quan-ly/duyet-giam-gia", "Duyệt giảm giá & nợ", c.discounts),
+        ...item(M, "/quan-ly/theo-doi-ktv", "Theo dõi KTV", c.ktv),
       ],
     },
     {

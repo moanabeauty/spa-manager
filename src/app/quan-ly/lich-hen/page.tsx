@@ -36,6 +36,9 @@ type Row = {
   status: string;
   source: string;
   note: string | null;
+  ktv_confirmed_at: string | null;
+  ktv_confirmed_auto: boolean;
+  is_consultation: boolean;
   customers: { id: string; full_name: string; phone: string | null; note: string | null } | null;
   appointment_services: {
     id: string;
@@ -85,6 +88,9 @@ export default async function StaffAppointmentsPage({
   }
 
   if (profile?.role === "warehouse") redirect("/quan-ly/kho");
+  // KTV dùng app riêng: không xem lịch của KTV khác
+  if (profile?.role === "technician") redirect("/quan-ly/ktv/dat-lich");
+  await supabase.rpc("ktv_auto_accept"); // đến giờ hẹn mà KTV chưa xác nhận -> tự nhận
 
   const sp = await searchParams;
   const today = todayVn();
@@ -121,7 +127,7 @@ export default async function StaffAppointmentsPage({
   let q = supabase
     .from("appointments")
     .select(
-      "id, customer_id, start_at, end_at, status, source, note, customers(id, full_name, note), appointment_services(id, start_at, end_at, price, technician_id, services(name))",
+      "id, customer_id, start_at, end_at, status, source, note, ktv_confirmed_at, ktv_confirmed_auto, is_consultation, customers(id, full_name, note), appointment_services(id, start_at, end_at, price, technician_id, services(name))",
     )
     .eq("branch_id", branchId)
     .gte("start_at", from)
@@ -406,7 +412,12 @@ export default async function StaffAppointmentsPage({
                     {r.customers?.phone && (
                       <a href={`tel:${r.customers.phone}`} className="block text-sm text-navy underline">{r.customers.phone}</a>
                     )}
-                    <p className="text-xs text-ink/50">{SOURCE_LABEL[r.source] ?? r.source}</p>
+                    <p className="text-xs text-ink/50">{SOURCE_LABEL[r.source] ?? r.source}{r.is_consultation ? " · hẹn tư vấn" : ""}</p>
+                    {(items.some((s) => s.technician_id) || r.is_consultation) && !["cancelled", "no_show", "completed"].includes(r.status) && (
+                      <p className={`text-xs ${r.ktv_confirmed_at ? "text-[#22612A]" : "text-[#7A5600]"}`}>
+                        {r.ktv_confirmed_at ? (r.ktv_confirmed_auto ? "✓ Hệ thống tự nhận lịch (đến giờ hẹn)" : "✓ KTV đã xác nhận") : "⏳ KTV chưa xác nhận"}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLE[r.status] ?? ""}`}>
