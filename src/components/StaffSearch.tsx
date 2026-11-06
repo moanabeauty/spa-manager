@@ -4,9 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { cleanBarcode } from "@/lib/inventory";
+import { formatVnd } from "@/lib/format";
 import CameraScanner from "./CameraScanner";
 
-type Hit = { kind: "customer" | "invoice" | "product"; id: string; title: string; subtitle: string | null };
+type Hit = {
+  kind: "customer" | "invoice" | "product";
+  id: string;
+  title: string;
+  subtitle: string | null;
+  capacity?: string | null;
+  brand?: string | null;
+  list_price?: number | null;
+  min_price?: number | null;
+};
 const KIND: Record<Hit["kind"], { label: string; href: (id: string) => string }> = {
   customer: { label: "Khách hàng", href: (id) => `/quan-ly/khach-hang?id=${id}` },
   invoice: { label: "Hoá đơn / đơn ship", href: (id) => `/quan-ly/hoa-don/${id}` },
@@ -32,7 +42,7 @@ export default function StaffSearch() {
     if (!code) return;
     setScanBusy(true);
     setScanMsg(null);
-    const { data } = await createClient().rpc("staff_search", { p_q: code });
+    const { data } = await createClient().rpc("staff_search_v2", { p_q: code });
     setScanBusy(false);
     const products = ((data ?? []) as Hit[]).filter((h) => h.kind === "product");
     if (products.length === 1) {
@@ -55,7 +65,7 @@ export default function StaffSearch() {
     }
     setBusy(true);
     const id = setTimeout(async () => {
-      const { data } = await createClient().rpc("staff_search", { p_q: t });
+      const { data } = await createClient().rpc("staff_search_v2", { p_q: t });
       setHits((data ?? []) as Hit[]);
       setBusy(false);
     }, 250);
@@ -131,7 +141,7 @@ export default function StaffSearch() {
                   {g.items.map((h) => (
                     <button key={h.id} onClick={() => go(h)} className="block w-full px-4 py-2 text-left text-sm hover:bg-cream">
                       <span className="font-medium">{h.title}</span>
-                      {h.subtitle && <span className="block text-xs text-ink/60">{h.subtitle}</span>}
+                      {h.kind === "product" ? <ProductLine h={h} /> : h.subtitle && <span className="block text-xs text-ink/60">{h.subtitle}</span>}
                     </button>
                   ))}
                 </div>
@@ -140,5 +150,30 @@ export default function StaffSearch() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Dòng gợi ý sản phẩm: Dung tích · Nhãn hàng, rồi Giá niêm yết · Giá bán thấp nhất của KTV (chỉ hàng bán lẻ) */
+function ProductLine({ h }: { h: Hit }) {
+  const info = [h.capacity, h.brand].filter(Boolean).join(" · ");
+  const hasPrice = h.list_price != null;
+  return (
+    <>
+      {info && <span className="block text-xs text-ink/60">{info}</span>}
+      {hasPrice ? (
+        <span className="mt-0.5 flex flex-wrap gap-x-3 text-xs">
+          <span>
+            Niêm yết: <b className="text-navy">{formatVnd(Number(h.list_price))}</b>
+          </span>
+          {h.min_price != null && (
+            <span>
+              KTV bán thấp nhất: <b className="text-brown">{formatVnd(Number(h.min_price))}</b>
+            </span>
+          )}
+        </span>
+      ) : (
+        h.subtitle && <span className="block text-xs italic text-ink/50">{h.subtitle}</span>
+      )}
+    </>
   );
 }
