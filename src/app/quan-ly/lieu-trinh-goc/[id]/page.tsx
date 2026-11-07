@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatVnd } from "@/lib/format";
+import ServiceGuideSections, { type ServiceGuide } from "@/components/ServiceGuideSections";
+import BackLink from "./BackLink";
 
 export const metadata = { title: "Hướng dẫn liệu trình – Moana Beauty" };
 
@@ -13,7 +15,6 @@ type Service = {
   duration_minutes: number | null;
   service_categories: { name: string } | null;
 };
-type Guide = { indication: string | null; indication_ext: string | null; consult_guide: string | null };
 type Step = { step_no: number; title: string; products: string[]; instructions: string | null; note: string | null };
 
 /** Mở từ ô tìm kiếm: Chỉ định · Chỉ định mở rộng & cơ chế · Hướng dẫn tư vấn · Quy trình liệu trình */
@@ -39,12 +40,13 @@ export default async function ServiceGuidePage({ params }: { params: Promise<{ i
       </div>
     );
   }
-  const g = (guide ?? null) as Guide | null;
+  const g = (guide ?? null) as ServiceGuide | null;
   const list = (steps ?? []) as Step[];
   const title = s.name_en || s.name;
 
   return (
     <div className="space-y-4">
+      <BackLink />
       <div className="space-y-1">
         <p className="text-xs font-semibold uppercase tracking-wide text-brown">{s.service_categories?.name ?? "Liệu trình"}</p>
         <h1 className="text-2xl font-bold text-navy">{title}</h1>
@@ -77,9 +79,7 @@ export default async function ServiceGuidePage({ params }: { params: Promise<{ i
         ))}
       </nav>
 
-      <Section id="chi-dinh" title="Chỉ định" text={g?.indication} />
-      <Section id="mo-rong" title="Chỉ định mở rộng & cơ chế phối hợp sản phẩm" text={g?.indication_ext} />
-      <Section id="tu-van" title="Hướng dẫn tư vấn" text={g?.consult_guide} />
+      <ServiceGuideSections guide={g} />
 
       <section id="quy-trinh" className="card scroll-mt-4 space-y-3">
         <h2 className="text-lg font-bold text-navy">Quy trình liệu trình{list.length ? ` · ${list.length} bước` : ""}</h2>
@@ -107,11 +107,3 @@ export default async function ServiceGuidePage({ params }: { params: Promise<{ i
   );
 }
 
-function Section({ id, title, text }: { id: string; title: string; text: string | null | undefined }) {
-  return (
-    <section id={id} className="card scroll-mt-4 space-y-2">
-      <h2 className="text-lg font-bold text-navy">{title}</h2>
-      {text ? <p className="whitespace-pre-line text-sm leading-relaxed text-ink/85">{text}</p> : <p className="text-sm text-ink/50">Chưa có nội dung.</p>}
-    </section>
-  );
-}

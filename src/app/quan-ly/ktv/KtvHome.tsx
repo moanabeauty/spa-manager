@@ -3,6 +3,7 @@ import type { Profile } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import { formatTime, formatVnd, todayVn } from "@/lib/format";
 import { CARD_ALERT, COMBO_ALERT, ktvState, weekdayShort, type MyDayRow } from "@/lib/ktv";
+import KtvServiceSearch from "./KtvServiceSearch";
 import AttendanceCard, { type TodayAtt } from "./AttendanceCard";
 
 /** Màn "Hôm nay" của KTV: chấm công, cảnh báo, khách của tôi hôm nay */
@@ -38,6 +39,9 @@ export default async function KtvHome({ profile }: { profile: Profile }) {
         <p className="text-[13px] tracking-wider text-beige-dark">MOANA · {(branch?.name ?? "").replace(/^Moana\s*/i, "").toUpperCase()}</p>
         <h1 className="text-[22px] font-bold">Chào {first || "bạn"}</h1>
         <p className="text-sm text-[#C9CADB]">{weekdayShort(today)}/{today.slice(0, 4)}</p>
+        <div className="mt-3">
+          <KtvServiceSearch />
+        </div>
       </div>
 
       <div className="space-y-3.5 px-4">

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatTime, vnError } from "@/lib/format";
 import { elapsed } from "@/lib/ktv";
 import ProductPicker from "./ProductPicker";
+import ServiceGuideSections, { type ServiceGuide } from "@/components/ServiceGuideSections";
 
 export type Step = { step_no: number; title: string; products: string[]; instructions: string | null; note: string | null };
 export type Change = { id: string; step_no: number; from_product: string | null; to_product: string; reason: string; status: string; review_note: string | null };
@@ -23,6 +24,7 @@ export default function ProcedureRunner(props: {
   stepLog: { step: number; at: string }[];
   steps: Step[];
   changes: Change[];
+  guide: ServiceGuide | null;
   closed: boolean;
 }) {
   const { apsId, steps, changes, startedAt, doneAt, stepsDone, plannedMinutes } = props;
@@ -105,6 +107,12 @@ export default function ProcedureRunner(props: {
           <div className="h-1.5 rounded-full bg-brown" style={{ width: `${pct}%` }} />
         </div>
       </div>
+
+      {props.guide && (
+        <div className="px-4 pt-4">
+          <ServiceGuideSections guide={props.guide} collapsible />
+        </div>
+      )}
 
       <div className="space-y-2.5 px-4 pt-4">
         <p className="text-[15px] font-bold">Quy trình (theo liệu trình gốc){total ? ` · ${Math.min(stepsDone, total)}/${total} bước` : ""}</p>

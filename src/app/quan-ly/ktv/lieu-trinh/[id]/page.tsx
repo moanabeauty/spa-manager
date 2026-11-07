@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
+import type { ServiceGuide } from "@/components/ServiceGuideSections";
 import ProcedureRunner, { type Change, type Step } from "./ProcedureRunner";
 
 export const metadata = { title: "Quy trình liệu trình – Moana Beauty" };
@@ -39,7 +40,7 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       </div>
     );
   }
-  const [{ data: steps }, { data: changes }] = await Promise.all([
+  const [{ data: steps }, { data: changes }, { data: guide }] = await Promise.all([
     supabase
       .from("service_procedure_steps")
       .select("step_no, title, products, instructions, note")
@@ -50,6 +51,11 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       .select("id, step_no, from_product, to_product, reason, status, review_note")
       .eq("appointment_service_id", id)
       .order("created_at"),
+    supabase
+      .from("service_guides")
+      .select("indication, indication_ext, consult_guide")
+      .eq("service_id", row.services?.id ?? "")
+      .maybeSingle(),
   ]);
   const planned = Math.round((new Date(row.end_at).getTime() - new Date(row.start_at).getTime()) / 60000);
 
@@ -66,6 +72,7 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       stepLog={row.step_log ?? []}
       steps={(steps ?? []) as Step[]}
       changes={(changes ?? []) as Change[]}
+      guide={(guide ?? null) as ServiceGuide | null}
       closed={["cancelled", "no_show"].includes(row.appointments?.status ?? "")}
     />
   );
