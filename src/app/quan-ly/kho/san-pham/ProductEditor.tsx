@@ -212,6 +212,8 @@ export function ProductForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  // mã vạch đang gắn cho 1 sản phẩm khác → cùng 1 sản phẩm, đề nghị gộp để dùng cả liệu trình lẫn bán lẻ
+  const [twin, setTwin] = useState<Pick<Product, "id" | "brand" | "name" | "capacity" | "for_treatment" | "for_retail" | "is_active"> | null>(null);
   const set = (p: Partial<typeof f>) => setF((x) => ({ ...x, ...p }));
 
   const pctNum = f.pct === "" ? null : Number(f.pct);
@@ -220,16 +222,27 @@ export function ProductForm({
     f.name.trim() && (product || (f.brand.trim() && f.capacity.trim())) && (pctNum === null || (pctNum >= 0 && pctNum <= 100));
 
   async function save() {
-    // tắt "Đang dùng" sẽ ẩn sản phẩm khỏi danh sách, tìm kiếm và quét mã → hỏi lại cho chắc
+    // tắt "Đang lưu hành" sẽ ẩn sản phẩm khỏi danh sách, tìm kiếm và quét mã → hỏi lại cho chắc
     if (product?.is_active && !f.is_active && !window.confirm("Chuyển sản phẩm này sang Ngừng dùng? Sản phẩm sẽ bị ẩn khỏi danh sách, tìm kiếm và quét mã.")) return;
     setBusy(true);
     setError(null);
+    setTwin(null);
+    const code = cleanBarcode(f.barcode);
+    if (code) {
+      let q = createClient().from("products").select("id, brand, name, capacity, for_treatment, for_retail, is_active").eq("barcode", code);
+      if (product) q = q.neq("id", product.id);
+      const { data: same } = await q.maybeSingle();
+      if (same) {
+        setBusy(false);
+        return setTwin(same as NonNullable<typeof twin>);
+      }
+    }
     const row = {
       brand: f.brand,
       name: f.name,
       capacity: f.capacity,
       unit: f.unit,
-      barcode: f.barcode,
+      barcode: code,
       category: f.category || null,
       used_in: f.used_in || null,
       retail_price: f.retail_price || null,
@@ -249,6 +262,23 @@ export function ProductForm({
     setBusy(false);
     if (error) return setError(vnError(error.message));
     onDone();
+    router.refresh();
+  }
+
+  // Tạo mới: không tạo dòng thứ 2, chỉ bật cả 2 loại cho sản phẩm có sẵn (ô nào còn trống thì lấy từ form)
+  // Đang sửa sản phẩm khác: gộp sản phẩm này vào sản phẩm đang giữ mã vạch (chuyển tồn kho, lịch sử, hóa đơn)
+  async function useBoth() {
+    if (!twin) return;
+    setBusy(true);
+    setError(null);
+    const supabase = createClient();
+    const { error } = product
+      ? await supabase.rpc("merge_products", { p_keep: twin.id, p_drop: product.id })
+      : await supabase.from("products").update({ for_treatment: true, for_retail: true, is_active: true }).eq("id", twin.id);
+    setBusy(false);
+    if (error) return setError(vnError(error.message));
+    onDone();
+    router.push(`/quan-ly/kho/san-pham/${twin.id}`);
     router.refresh();
   }
 
@@ -306,11 +336,33 @@ export function ProductForm({
       </label>
       <label className="sm:col-span-2">Ghi chú<input className={input} value={f.note} onChange={(e) => set({ note: e.target.value })} /></label>
       <div className="flex flex-wrap gap-4 sm:col-span-2">
+        <span className="w-full text-ink/60">Dùng cho (tick được cả 2 nếu sản phẩm vừa dùng liệu trình vừa bán lẻ):</span>
         <label className="flex items-center gap-1"><input type="checkbox" checked={f.for_treatment} onChange={(e) => set({ for_treatment: e.target.checked })} /> Hàng liệu trình</label>
         <label className="flex items-center gap-1"><input type="checkbox" checked={f.for_retail} onChange={(e) => set({ for_retail: e.target.checked })} /> Hàng bán lẻ</label>
-        <label className="flex items-center gap-1"><input type="checkbox" checked={f.is_active} onChange={(e) => set({ is_active: e.target.checked })} /> Đang dùng</label>
+        <label className="flex items-center gap-1"><input type="checkbox" checked={f.is_active} onChange={(e) => set({ is_active: e.target.checked })} /> Đang lưu hành</label>
         {!f.is_active && <span className="w-full text-[#8A2323]">Đang để Ngừng dùng: sản phẩm sẽ bị ẩn khỏi danh sách, tìm kiếm và quét mã.</span>}
       </div>
+      {twin && (
+        <div className="space-y-2 rounded-lg border border-brown bg-white p-3 sm:col-span-2">
+          <p>
+            Mã vạch này đang gắn cho <b>{[twin.brand, twin.name, twin.capacity].filter(Boolean).join(" ")}</b>
+            {" "}({[twin.for_treatment && "hàng liệu trình", twin.for_retail && "hàng bán lẻ"].filter(Boolean).join(" + ") || "chưa phân loại"}
+            {twin.is_active ? "" : ", đang ngừng dùng"}).
+            Trùng mã vạch nghĩa là cùng 1 sản phẩm, dùng được cả liệu trình lẫn bán lẻ.
+          </p>
+          <p className="text-ink/60">
+            {product
+              ? "Gộp: giữ sản phẩm kia, bật cả Hàng liệu trình + Hàng bán lẻ; tồn kho, lịch sử nhập/xuất và hóa đơn của sản phẩm này chuyển sang; ô nào bên kia còn trống (giá, % giảm…) lấy từ sản phẩm này. Sản phẩm này chuyển sang Ngừng dùng. Chỉ chủ / quản lý gộp được."
+              : "Không tạo thêm sản phẩm mới – bật cả Hàng liệu trình + Hàng bán lẻ cho sản phẩm có sẵn."}
+          </p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button className="btn-ghost py-1.5" onClick={() => setTwin(null)}>Để sau</button>
+            <button className="btn-primary py-1.5" disabled={busy} onClick={useBoth}>
+              {product ? "Gộp – dùng cả liệu trình + bán lẻ" : "Dùng cả liệu trình + bán lẻ"}
+            </button>
+          </div>
+        </div>
+      )}
       {error && <p className="text-[#8A2323] sm:col-span-2">{error}</p>}
       <div className="flex justify-end gap-2 sm:col-span-2">
         <button className="btn-ghost py-1.5" onClick={onDone}>Đóng</button>

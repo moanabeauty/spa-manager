@@ -58,7 +58,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       : []),
     ...(canEdit ? [["Giá nhập", cost != null ? formatVnd(cost) : "—"] as [string, React.ReactNode]] : []),
     ["Báo sắp hết khi còn ≤", String(p.min_stock)],
-    ["Trạng thái", p.is_active ? "Đang dùng" : "Ngừng dùng"],
+    ["Trạng thái", p.is_active ? "Đang lưu hành" : "Ngừng dùng"],
     ...(p.note ? [["Ghi chú", p.note] as [string, React.ReactNode]] : []),
   ];
 
