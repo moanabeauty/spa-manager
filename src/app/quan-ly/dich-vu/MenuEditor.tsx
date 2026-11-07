@@ -19,7 +19,7 @@ export type MenuService = {
   fee_once_per_visit: boolean;
   is_active: boolean;
   branch_id: string | null;
-  menu_tier: "public" | "members";
+  menu_tier: "public" | "private";
   followup_days: number | null;
   recall_days: number | null;
 };
@@ -55,7 +55,7 @@ export default function MenuEditor({
   const [query, setQuery] = useState("");
   const [showHidden, setShowHidden] = useState(false);
   const [onlyMissing, setOnlyMissing] = useState(false);
-  const [tierFilter, setTierFilter] = useState<"" | "public" | "members">("");
+  const [tierFilter, setTierFilter] = useState<"" | "public" | "private">("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -144,11 +144,11 @@ export default function MenuEditor({
           <select
             className="rounded-lg border border-beige-dark bg-white px-2 py-1.5"
             value={tierFilter}
-            onChange={(e) => setTierFilter(e.target.value as "" | "public" | "members")}
+            onChange={(e) => setTierFilter(e.target.value as "" | "public" | "private")}
           >
             <option value="">Mọi cấp menu</option>
-            <option value="public">Khách mới thấy</option>
-            <option value="members">Chỉ khách đã mua gói</option>
+            <option value="public">Public – khách có tài khoản thấy</option>
+            <option value="private">Private – chỉ nội bộ</option>
           </select>
           <button className="btn-outline ml-auto py-2" onClick={() => setAdding((v) => !v)}>
             {adding ? "Đóng" : "+ Thêm dịch vụ"}
@@ -169,10 +169,10 @@ export default function MenuEditor({
             <span className="flex gap-1 text-[11px]">
               <span className="self-center text-ink/50">Cả nhóm:</span>
               <button type="button" className="rounded-full bg-white px-2 py-1 font-semibold text-[#22612A] ring-1 ring-beige-dark" onClick={() => g.items.forEach((s) => edit(s.id, { menu_tier: "public" }))}>
-                khách mới thấy
+                Public
               </button>
-              <button type="button" className="rounded-full bg-white px-2 py-1 font-semibold text-navy ring-1 ring-beige-dark" onClick={() => g.items.forEach((s) => edit(s.id, { menu_tier: "members" }))}>
-                chỉ khách có gói
+              <button type="button" className="rounded-full bg-white px-2 py-1 font-semibold text-navy ring-1 ring-beige-dark" onClick={() => g.items.forEach((s) => edit(s.id, { menu_tier: "private" }))}>
+                Private
               </button>
             </span>
           </div>
@@ -219,13 +219,13 @@ export default function MenuEditor({
 
                   <button
                     type="button"
-                    title="Bấm để đổi: khách mới thấy / chỉ khách đã mua gói"
-                    onClick={() => edit(s.id, { menu_tier: val(s, "menu_tier") === "public" ? "members" : "public" })}
+                    title="Bấm để đổi: Public (khách thấy) / Private (chỉ nội bộ)"
+                    onClick={() => edit(s.id, { menu_tier: val(s, "menu_tier") === "public" ? "private" : "public" })}
                     className={`mt-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                       val(s, "menu_tier") === "public" ? "bg-[#D6EDD8] text-[#22612A]" : "bg-[#DCE3F5] text-navy"
                     }`}
                   >
-                    {val(s, "menu_tier") === "public" ? "👁 Khách mới thấy" : "🔒 Chỉ khách đã mua gói"}
+                    {val(s, "menu_tier") === "public" ? "👁 Public – khách thấy" : "🔒 Private – chỉ nội bộ"}
                   </button>
                   {open && (
                     <div className="mt-3 grid gap-3 rounded-xl bg-cream p-3 sm:grid-cols-2">

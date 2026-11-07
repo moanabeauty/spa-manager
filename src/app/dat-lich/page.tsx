@@ -15,6 +15,7 @@ export default async function BookingPage() {
       .from("services")
       .select("id, category_id, name, name_en, description, duration_minutes, price, branch_id")
       .eq("is_active", true)
+      .eq("menu_tier", "public") // khách chỉ tự đặt dịch vụ Public; còn lại đặt lịch tư vấn
       .order("name"),
     supabase.from("customers").select("id, full_name").eq("profile_id", user.id).maybeSingle(),
   ]);

@@ -38,6 +38,7 @@ export type Service = {
 };
 
 const MAX_SERVICES = 5;
+const CONSULT_MINUTES = 60; // lịch tư vấn tạm giữ 60 phút, chuyên viên chọn liệu trình khi khách đến
 
 function buildSlots(): string[] {
   const out: string[] = [];
@@ -71,6 +72,7 @@ export default function BookingForm({
 }) {
   const [branchId, setBranchId] = useState<string>(branches[0]?.id ?? "");
   const [selected, setSelected] = useState<string[]>([]);
+  const [consult, setConsult] = useState(false);
   const [query, setQuery] = useState("");
   const [openCat, setOpenCat] = useState<string | null>(null);
   const [date, setDate] = useState<string>(todayVn());
@@ -146,7 +148,7 @@ export default function BookingForm({
       .filter((g) => g.items.length > 0);
   }, [branchServices, categories, query]);
 
-  const totalMinutes = chosen.reduce((a, s) => a + s.duration_minutes, 0);
+  const totalMinutes = consult ? CONSULT_MINUTES : chosen.reduce((a, s) => a + s.duration_minutes, 0);
   const knownTotal = chosen.reduce((a, s) => a + (s.price ?? 0), 0);
   const hasQuote = chosen.some((s) => s.price === null);
 
@@ -171,6 +173,7 @@ export default function BookingForm({
 
   function toggle(id: string) {
     setError(null);
+    setConsult(false);
     setSelected((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
       if (prev.length >= MAX_SERVICES) {
@@ -184,7 +187,8 @@ export default function BookingForm({
   async function submit() {
     setError(null);
     if (!branchId) return setError("Vui lòng chọn chi nhánh.");
-    if (chosen.length === 0) return setError("Vui lòng chọn ít nhất 1 dịch vụ.");
+    if (!consult && chosen.length === 0)
+      return setError("Vui lòng chọn dịch vụ, hoặc chọn “Chưa chọn liệu trình – Đặt lịch tư vấn”.");
     if (!time) return setError("Vui lòng chọn giờ.");
     const start = vnDateTime(date, time);
     if (start.getTime() < earliest) return setError(`Vui lòng chọn giờ cách hiện tại ít nhất ${MIN_LEAD_MINUTES} phút.`);
@@ -202,12 +206,19 @@ export default function BookingForm({
         status: "pending",
         source: "online",
         note: note.trim() || null,
+        is_consultation: consult,
       })
       .select("id")
       .single();
     if (e1 || !appt) {
       setBusy(false);
       return setError(vnError(e1?.message));
+    }
+
+    if (consult) {
+      setBusy(false);
+      setDone({ start: start.toISOString() });
+      return;
     }
 
     let cursor = start.getTime();
@@ -237,7 +248,7 @@ export default function BookingForm({
     return (
       <div className="card text-center">
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#D6EDD8] text-2xl text-[#22612A]">✓</div>
-        <h1 className="text-xl font-bold text-navy">Đã gửi yêu cầu đặt lịch</h1>
+        <h1 className="text-xl font-bold text-navy">{consult ? "Đã gửi yêu cầu đặt lịch tư vấn" : "Đã gửi yêu cầu đặt lịch"}</h1>
         <p className="mt-2 text-sm text-ink/80">
           {formatTime(done.start)} · {formatDate(done.start)}
           <br />
@@ -251,6 +262,7 @@ export default function BookingForm({
             onClick={() => {
               setDone(null);
               setSelected([]);
+              setConsult(false);
               setTime("");
               setNote("");
             }}
@@ -292,7 +304,29 @@ export default function BookingForm({
       {/* 2. Dịch vụ */}
       <section className="card">
         <h2 className="mb-3 font-semibold text-navy">2. Dịch vụ <span className="font-normal text-ink/50">(tối đa {MAX_SERVICES})</span></h2>
-        {chosen.length > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            setConsult((v) => !v);
+            setSelected([]);
+          }}
+          className={`mb-3 flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${
+            consult ? "border-navy bg-navy text-white" : "border-beige-dark bg-cream hover:border-navy"
+          }`}
+        >
+          <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs ${consult ? "border-white bg-white text-navy" : "border-beige-dark bg-white"}`}>
+            {consult ? "✓" : ""}
+          </span>
+          <span>
+            <b className="block">Chưa chọn liệu trình – Đặt lịch tư vấn</b>
+            <span className={`text-xs ${consult ? "text-beige" : "text-ink/60"}`}>
+              Chuyên viên Moana soi da và tư vấn liệu trình phù hợp khi bạn đến spa (giữ chỗ khoảng {CONSULT_MINUTES} phút).
+            </span>
+          </span>
+        </button>
+        {!consult && <p className="mb-2 text-xs text-ink/50">Hoặc chọn dịch vụ bạn muốn làm:</p>}
+        {!consult && chosen.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-2">
             {chosen.map((s) => (
               <button key={s.id} type="button" onClick={() => toggle(s.id)} className="rounded-full bg-navy px-3 py-1 text-xs text-white">
@@ -301,6 +335,7 @@ export default function BookingForm({
             ))}
           </div>
         )}
+        {!consult && (<>
         <input
           className="input mb-3"
           placeholder="Tìm dịch vụ (vd: peel, mụn, cấp ẩm…)"
@@ -353,6 +388,7 @@ export default function BookingForm({
           })}
           {grouped.length === 0 && <p className="p-4 text-sm text-ink/60">Không tìm thấy dịch vụ phù hợp.</p>}
         </div>
+        </>)}
       </section>
 
       {/* 3. Ngày giờ */}
@@ -452,7 +488,7 @@ export default function BookingForm({
         {date !== "" && dayBusy && SLOTS.every((t) => !slotOk(t)) && (
           <p className="mt-2 text-sm text-ink/60">Ngày này đã hết giờ nhận đặt online, vui lòng chọn ngày khác.</p>
         )}
-        {chosen.length > 0 && (
+        {(consult || chosen.length > 0) && (
           <p className="mt-2 text-xs text-ink/50">Giờ còn chỗ đã tính theo thời gian làm {formatDuration(totalMinutes)}.</p>
         )}
       </section>
@@ -473,7 +509,15 @@ export default function BookingForm({
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-beige-dark bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <div className="flex-1 text-sm">
-            {chosen.length === 0 ? (
+            {consult ? (
+              <>
+                <b className="text-navy">Đặt lịch tư vấn</b>
+                <br />
+                <span className="text-ink/70">
+                  Chọn liệu trình tại spa{time && ` · ${time} ${date.split("-").reverse().join("/")}`}
+                </span>
+              </>
+            ) : chosen.length === 0 ? (
               <span className="text-ink/60">Chưa chọn dịch vụ</span>
             ) : (
               <>

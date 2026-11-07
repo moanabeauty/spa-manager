@@ -18,7 +18,6 @@ import {
 import RefundButton from "./RefundButton";
 import { SkinDot, SkinRecordCard, shortDay, type SkinRecord } from "@/lib/skin";
 import CrmProfileForm from "./CrmProfileForm";
-import MenuUnlockToggle from "./MenuUnlockToggle";
 import ReminderActions, { AddReminderForm } from "../cham-soc/ReminderActions";
 
 export const metadata = { title: "Khách hàng – Moana Beauty" };
@@ -191,13 +190,6 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             {checkout && <Link href={`/quan-ly/thu-tien?kh=${c.id}`} className="btn-primary py-2">Bán gói / nạp thẻ</Link>}
             {c.phone && <Link href={`/quan-ly/tao-lich?sdt=${c.phone}`} className="btn-outline py-2">Tạo lịch</Link>}
           </div>
-          <MenuUnlockToggle
-            customerId={c.id}
-            fullMenu={!!st?.full_menu}
-            manual={!!crm?.menu_unlocked}
-            auto={!!st?.has_package || !!st?.has_card}
-            canEdit={manager}
-          />
         </div>
 
         <CrmProfileForm

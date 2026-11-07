@@ -32,7 +32,7 @@ export default async function ServiceMenuPage() {
           spa&quot;. Thay đổi chỉ áp dụng cho lịch hẹn tạo sau đó, lịch cũ giữ nguyên giá lúc đặt.
         </p>
         <p className="mt-1 text-sm text-ink/70">
-          <b>Menu phân cấp:</b> nhãn 👁 = khách mới (chưa mua gói) thấy trên web và tự đặt lịch được; 🔒 = chỉ khách đã mua gói thấy.
+          <b>Hiển thị app:</b> 👁 Public = mọi khách đã có tài khoản thấy và tự đặt lịch được; 🔒 Private = chỉ nội bộ nhân viên thấy (khách đặt “lịch tư vấn”, nhân viên chọn liệu trình sau).
           Bấm nhãn để đổi. Mở “chi tiết” để đặt số ngày <b>hỏi thăm</b> và <b>mời quay lại</b> (trang Chăm sóc lại tự nhắc).
         </p>
       </div>

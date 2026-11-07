@@ -29,6 +29,7 @@ type Appt = {
   status: string;
   note: string | null;
   branches: { name: string; address: string } | null;
+  is_consultation: boolean;
   appointment_services: { id: string; start_at: string; price: number | null; services: { name: string } | null }[];
 };
 
@@ -40,7 +41,7 @@ export default async function MyAppointmentsPage() {
   const { data } = customer
     ? await supabase
         .from("appointments")
-        .select("id, start_at, end_at, status, note, branches(name, address), appointment_services(id, start_at, price, services(name))")
+        .select("id, start_at, end_at, status, note, is_consultation, branches(name, address), appointment_services(id, start_at, price, services(name))")
         .eq("customer_id", customer.id)
         .order("start_at", { ascending: false })
         .limit(50)
@@ -231,6 +232,9 @@ function ApptCard({ a, canCancel }: { a: Appt; canCancel: boolean }) {
         </span>
       </div>
       <ul className="mt-3 space-y-1 border-t border-beige pt-3 text-sm">
+        {items.length === 0 && (
+          <li className="text-ink/70">{a.is_consultation ? "Hẹn tư vấn – chuyên viên chọn liệu trình khi bạn đến" : "Chưa chọn dịch vụ"}</li>
+        )}
         {items.map((s) => (
           <li key={s.id} className="flex justify-between gap-3">
             <span>{s.services?.name}</span>
