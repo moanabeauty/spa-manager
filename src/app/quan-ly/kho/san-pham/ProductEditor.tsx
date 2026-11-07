@@ -91,7 +91,7 @@ export default function ProductEditor({
               ["treatment", "Hàng liệu trình"],
               ["retail", "Hàng bán lẻ"],
               ["nobarcode", "Chưa có mã vạch"],
-              ["inactive", "Ngừng dùng"],
+              ["inactive", "Ngừng lưu hành"],
             ] as const
           ).map(([k, label]) => (
             <button key={k} className={`rounded-full px-3 py-1.5 font-semibold ${scope === k ? "bg-navy text-white" : "bg-cream text-navy"}`} onClick={() => setScope(k)}>
@@ -223,7 +223,7 @@ export function ProductForm({
 
   async function save() {
     // tắt "Đang lưu hành" sẽ ẩn sản phẩm khỏi danh sách, tìm kiếm và quét mã → hỏi lại cho chắc
-    if (product?.is_active && !f.is_active && !window.confirm("Chuyển sản phẩm này sang Ngừng dùng? Sản phẩm sẽ bị ẩn khỏi danh sách, tìm kiếm và quét mã.")) return;
+    if (product?.is_active && !f.is_active && !window.confirm("Chuyển sản phẩm này sang Ngừng lưu hành? Sản phẩm sẽ bị ẩn khỏi danh sách, tìm kiếm và quét mã.")) return;
     setBusy(true);
     setError(null);
     setTwin(null);
@@ -340,7 +340,7 @@ export function ProductForm({
         <label className="flex items-center gap-1"><input type="checkbox" checked={f.for_treatment} onChange={(e) => set({ for_treatment: e.target.checked })} /> Hàng liệu trình</label>
         <label className="flex items-center gap-1"><input type="checkbox" checked={f.for_retail} onChange={(e) => set({ for_retail: e.target.checked })} /> Hàng bán lẻ</label>
         <label className="flex items-center gap-1"><input type="checkbox" checked={f.is_active} onChange={(e) => set({ is_active: e.target.checked })} /> Đang lưu hành</label>
-        {!f.is_active && <span className="w-full text-[#8A2323]">Đang để Ngừng dùng: sản phẩm sẽ bị ẩn khỏi danh sách, tìm kiếm và quét mã.</span>}
+        {!f.is_active && <span className="w-full text-[#8A2323]">Đang để Ngừng lưu hành: sản phẩm sẽ bị ẩn khỏi danh sách, tìm kiếm và quét mã.</span>}
       </div>
       {twin && (
         <div className="space-y-2 rounded-lg border border-brown bg-white p-3 sm:col-span-2">
@@ -352,7 +352,7 @@ export function ProductForm({
           </p>
           <p className="text-ink/60">
             {product
-              ? "Gộp: giữ sản phẩm kia, bật cả Hàng liệu trình + Hàng bán lẻ; tồn kho, lịch sử nhập/xuất và hóa đơn của sản phẩm này chuyển sang; ô nào bên kia còn trống (giá, % giảm…) lấy từ sản phẩm này. Sản phẩm này chuyển sang Ngừng dùng. Chỉ chủ / quản lý gộp được."
+              ? "Gộp: giữ sản phẩm kia, bật cả Hàng liệu trình + Hàng bán lẻ; tồn kho, lịch sử nhập/xuất và hóa đơn của sản phẩm này chuyển sang; ô nào bên kia còn trống (giá, % giảm…) lấy từ sản phẩm này. Sản phẩm này chuyển sang Ngừng lưu hành. Chỉ chủ / quản lý gộp được."
               : "Không tạo thêm sản phẩm mới – bật cả Hàng liệu trình + Hàng bán lẻ cho sản phẩm có sẵn."}
           </p>
           <div className="flex flex-wrap justify-end gap-2">
