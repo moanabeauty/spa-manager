@@ -88,6 +88,7 @@ export const ROLE_LABEL: Record<string, string> = {
   receptionist: "Lễ tân",
   technician: "Kỹ thuật viên",
   warehouse: "Quản lý kho",
+  marketing: "Marketing",
   customer: "Khách hàng",
 };
 

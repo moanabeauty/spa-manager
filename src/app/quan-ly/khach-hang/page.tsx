@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canViewCustomerPhone, fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -43,6 +44,7 @@ function SegmentBadges({ segs }: { segs: string[] }) {
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<Sp> }) {
   const { supabase, profile } = await getCurrentUser();
+  if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   const sp = await searchParams;
   const role = profile?.role;
   if (role === "warehouse") return <p className="card text-sm">Trang này dành cho lễ tân, KTV, quản lý và chủ spa.</p>;

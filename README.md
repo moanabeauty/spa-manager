@@ -226,3 +226,17 @@ Cơ sở dữ liệu (`20261104000039_skin_records_calendar.sql`):
 - Màu phiếu da: **Xanh** = xanh chàm `#2B2D64`, **Vàng** = nâu vàng `#A0845E` (theo bảng màu guideline Moana), **Đỏ** `#C94A4A` (thêm ngoài bảng).
 - **Đổi thời gian làm** (`20261104000040_service_duration_edit.sql`): chủ / quản lý bấm "⏱ … · đổi" dưới từng dịch vụ ở trang Lịch hẹn (30 / 45 / 60 / 75 / 90 / 120 phút hoặc số khác) – `set_appointment_service_minutes`; các dịch vụ làm sau trong lịch tự dời giờ, giờ kết thúc lịch và số khách / ca tự tính lại. Khi tạo lịch tại quầy, chủ / quản lý sửa được số phút từng dịch vụ (`create_staff_booking` nhận `minutes`).
 - Lịch hẹn hiện **phiếu da buổi trước** (màu + nhu cầu + đề xuất) để KTV xem trước khi làm.
+
+## Tab Marketing (09/11/2026)
+
+Vai trò mới **Marketing** (chủ spa cấp ở *Nhân viên & phân quyền*, cần chọn chi nhánh). Marketing chấm công, xin nghỉ, tạo phiếu thu/chi, có trong bảng lương như nhân viên khác; **không** xem khách hàng, lịch hẹn, hoá đơn.
+Chỉ **chủ spa + Marketing** thấy tab Marketing.
+
+| Trang | Việc |
+|---|---|
+| `/quan-ly/marketing` | Lịch bài viết theo tháng: **Timeline** (◆ deadline nộp, ● ngày đăng, kèm lịch quay/chụp/họp) hoặc **Danh sách** theo ngày; lọc theo PIC / trạng thái / kênh; khung "Bài chờ duyệt" (chủ) / "Bài cần sửa" (Marketing) |
+| `/quan-ly/marketing/bai/[id]` | Bài viết: tiêu đề, PIC, loại nội dung, kênh (Facebook, TikTok, Instagram, Zalo OA, Website), deadline nộp, ngày đăng, nội dung/caption, link bản nháp, link bài đã đăng + trao đổi |
+| `/quan-ly/marketing/ke-hoach` | Kế hoạch quay video / chụp ảnh / họp content theo tháng; mỗi buổi có ghi chú + trao đổi |
+
+Quy trình bài: Ý tưởng → Đang làm → **Chờ duyệt** → (Cần sửa) → **Đã duyệt** → Đã đăng. Chỉ chủ spa duyệt / yêu cầu sửa (trigger `marketing_posts_guard`); Marketing sửa nội dung bài đã duyệt thì bài tự quay lại Chờ duyệt; gửi duyệt thì báo điện thoại chủ spa (`/api/thong-bao/marketing`).
+Bảng: `marketing_posts`, `marketing_plans`, `marketing_comments` (migration 054–056).

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatShortDate, formatTime, formatVnd } from "@/lib/format";
@@ -56,6 +57,7 @@ const SKIN = [
 export default async function KtvAppointmentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase, profile } = await getCurrentUser();
+  if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   if (!profile) return null;
 
   const [{ data: appt }, { data: view, error }, { data: svcs }] = await Promise.all([

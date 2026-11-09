@@ -37,7 +37,7 @@ export default async function PayrollScreen({ mode, thang }: { mode: PayrollMode
     supabase
       .from("profiles")
       .select("id, full_name, role, branch_id, is_active")
-      .in("role", ["owner", "manager", "receptionist", "technician", "warehouse"])
+      .in("role", ["owner", "manager", "receptionist", "technician", "warehouse", "marketing"])
       .order("full_name"),
     supabase.from("branches").select("id, name, latitude, longitude").order("name"),
     supabase.from("payroll_entries").select("staff_id, work_days, overtime_hours, other_allowance, other_deduction, note").eq("month", m1),

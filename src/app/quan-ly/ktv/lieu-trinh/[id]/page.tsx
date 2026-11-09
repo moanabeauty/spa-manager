@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import type { ServiceGuide } from "@/components/ServiceGuideSections";
@@ -24,6 +25,7 @@ type Row = {
 export default async function ProcedurePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase, profile } = await getCurrentUser();
+  if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   if (!profile) return null;
   const { data } = await supabase
     .from("appointment_services")

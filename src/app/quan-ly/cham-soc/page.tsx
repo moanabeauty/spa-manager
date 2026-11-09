@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -32,6 +33,7 @@ const TABS = [
 
 export default async function CarePage({ searchParams }: { searchParams: Promise<Sp> }) {
   const { supabase, profile } = await getCurrentUser();
+  if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   const role = profile?.role;
   if (role === "warehouse") return <p className="card text-sm">Trang này dành cho lễ tân, KTV, quản lý và chủ spa.</p>;
   const sp = await searchParams;

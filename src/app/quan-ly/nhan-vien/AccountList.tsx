@@ -17,8 +17,8 @@ export type Account = {
   last_sign_in_at: string | null;
 };
 
-const ASSIGNABLE = ["receptionist", "technician", "warehouse", "manager", "customer"] as const;
-const NEEDS_BRANCH = new Set(["receptionist", "technician", "warehouse"]);
+const ASSIGNABLE = ["receptionist", "technician", "warehouse", "marketing", "manager", "customer"] as const;
+const NEEDS_BRANCH = new Set(["receptionist", "technician", "warehouse", "marketing"]);
 
 const ROLE_STYLE: Record<string, string> = {
   owner: "bg-navy text-white",
@@ -26,6 +26,7 @@ const ROLE_STYLE: Record<string, string> = {
   receptionist: "bg-[#DCE3F5] text-navy",
   technician: "bg-[#D6EDD8] text-[#22612A]",
   warehouse: "bg-[#FFE8BA] text-[#7A5600]",
+  marketing: "bg-[#F3DCE6] text-[#7A2350]",
   customer: "bg-[#ECECEC] text-[#555]",
 };
 

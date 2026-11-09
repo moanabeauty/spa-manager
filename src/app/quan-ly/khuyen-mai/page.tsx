@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -62,6 +63,7 @@ function shortDt(iso: string) {
 
 export default async function PromotionRegistrationsPage({ searchParams }: { searchParams: Promise<{ tt?: string; cn?: string }> }) {
   const { supabase, profile } = await getCurrentUser();
+  if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   if (!canCheckout(profile?.role)) return <p className="card text-sm">Trang dành cho lễ tân, KTV, quản lý.</p>;
   const sp = await searchParams;
   const status = TABS.some((t) => t.key === sp.tt) ? sp.tt! : "pending";

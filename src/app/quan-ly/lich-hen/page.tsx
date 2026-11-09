@@ -77,6 +77,7 @@ export default async function StaffAppointmentsPage({
   searchParams: Promise<{ ngay?: string; thang?: string; cn?: string; tt?: string }>;
 }) {
   const { supabase, user, profile } = await getCurrentUser();
+  if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   if (!user) redirect("/dang-nhap?next=/quan-ly/lich-hen");
   if (!isStaffRole(profile?.role)) {
     return (

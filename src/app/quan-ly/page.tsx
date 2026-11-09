@@ -24,6 +24,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   if (!isStaffRole(profile?.role)) return null; // layout đã báo
   const role = profile!.role;
   if (role === "technician") return <KtvHome profile={profile!} />;
+  if (role === "marketing") redirect("/quan-ly/marketing");
   const M = role === "owner" || role === "manager";
   const O = role === "owner";
   const W = role === "warehouse";
@@ -42,6 +43,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     { n: counts.attendance, label: "Chấm công / tăng ca", href: "/quan-ly/cham-cong" },
     { n: counts.leaves, label: "Đơn nghỉ phép", href: "/quan-ly/nghi-phep" },
     { n: counts.ktv, label: "KTV: đổi sản phẩm / chấm công", href: "/quan-ly/theo-doi-ktv" },
+    { n: O ? counts.marketing : 0, label: "Bài Marketing chờ duyệt", href: "/quan-ly/marketing" },
   ].filter((a) => a.n > 0 && (M || a.href === "/quan-ly/khuyen-mai" || (W && a.href.startsWith("/quan-ly/kho"))));
 
   let appts: Appt[] = [];

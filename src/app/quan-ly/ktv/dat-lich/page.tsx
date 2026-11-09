@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { DEFAULT_CAPACITY } from "@/lib/calendar";
 import type { PickService } from "../ServicePicker";
@@ -8,6 +9,7 @@ export const metadata = { title: "Đặt lịch cho khách – Moana Beauty" };
 /** KTV đặt lịch: chỉ thấy khung giờ trống / kín của chi nhánh mình, không thấy lịch KTV khác */
 export default async function KtvBookingPage() {
   const { supabase, profile } = await getCurrentUser();
+  if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   if (!profile) return null;
   const [{ data: branches }, { data: svcs }] = await Promise.all([
     supabase.from("branches").select("id, name, max_per_slot").eq("is_active", true).order("name"),

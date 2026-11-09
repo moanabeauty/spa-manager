@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -18,6 +19,7 @@ export const metadata = { title: "Thu tiền – Moana Beauty" };
 
 export default async function CheckoutPage({ searchParams }: { searchParams: Promise<{ lich?: string; kh?: string }> }) {
   const { supabase, profile } = await getCurrentUser();
+  if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   if (!canCheckout(profile?.role)) {
     return <p className="card text-sm">Tài khoản của bạn chưa được phép thu tiền.</p>;
   }

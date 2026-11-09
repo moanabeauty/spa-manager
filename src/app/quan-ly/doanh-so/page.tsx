@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatVnd, todayVn } from "@/lib/format";
@@ -15,6 +16,7 @@ function shiftMonth(m: string, d: number) {
 
 export default async function SalesPage({ searchParams }: { searchParams: Promise<{ thang?: string }> }) {
   const { supabase, profile } = await getCurrentUser();
+  if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   const sp = await searchParams;
   const month = sp.thang && /^\d{4}-\d{2}$/.test(sp.thang) ? sp.thang : todayVn().slice(0, 7);
   const all = profile?.role === "owner" || profile?.role === "manager";

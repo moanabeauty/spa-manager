@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -56,6 +57,7 @@ export default async function InvoicePage({
   const { id } = await params;
   const sp = await searchParams;
   const { supabase, profile } = await getCurrentUser();
+  if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   const { data } = await supabase
     .from("invoices")
     .select(

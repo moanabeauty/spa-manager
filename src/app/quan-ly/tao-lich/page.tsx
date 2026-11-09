@@ -7,6 +7,7 @@ export const metadata = { title: "Tạo lịch hẹn – Moana Beauty" };
 
 export default async function StaffBookingPage({ searchParams }: { searchParams: Promise<{ sdt?: string; cn?: string; ngay?: string; gio?: string }> }) {
   const { supabase, profile } = await getCurrentUser();
+  if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   if (profile?.role === "technician") redirect("/quan-ly/ktv/dat-lich"); // KTV đặt lịch ở app riêng
   const sp = await searchParams;
   const [{ data: branches }, { data: categories }, { data: services }, technicians] = await Promise.all([

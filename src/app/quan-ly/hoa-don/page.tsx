@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -40,6 +41,7 @@ export default async function InvoicesPage({
   searchParams: Promise<{ ngay?: string; cn?: string; loai?: string; gh?: string }>;
 }) {
   const { supabase, profile } = await getCurrentUser();
+  if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   if (!canCheckout(profile?.role)) return <p className="card text-sm">Trang dành cho nhân viên thu ngân.</p>;
   const sp = await searchParams;
   const tab: Tab = sp.loai === "online" || sp.loai === "no" ? sp.loai : "quay";

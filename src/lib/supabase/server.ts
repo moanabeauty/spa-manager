@@ -24,7 +24,7 @@ export type Profile = {
   id: string;
   full_name: string | null;
   phone: string | null;
-  role: "owner" | "manager" | "receptionist" | "technician" | "warehouse" | "customer";
+  role: "owner" | "manager" | "receptionist" | "technician" | "warehouse" | "marketing" | "customer";
   branch_id: string | null;
 };
 
@@ -47,5 +47,5 @@ export async function getCurrentUser() {
 }
 
 export function isStaffRole(role: string | undefined | null): boolean {
-  return role === "owner" || role === "manager" || role === "receptionist" || role === "technician" || role === "warehouse";
+  return role === "owner" || role === "manager" || role === "receptionist" || role === "technician" || role === "warehouse" || role === "marketing";
 }

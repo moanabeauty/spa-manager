@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatTime, todayVn, vnDateTime } from "@/lib/format";
@@ -11,6 +12,7 @@ const STAFF = ["owner", "manager", "receptionist", "technician"];
 
 export default async function SkinPage({ searchParams }: { searchParams: Promise<Sp> }) {
   const { supabase, user, profile } = await getCurrentUser();
+  if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   const sp = await searchParams;
   if (!profile || !STAFF.includes(profile.role)) {
     return <p className="card text-sm">Trang này dành cho lễ tân, KTV, quản lý và chủ spa.</p>;

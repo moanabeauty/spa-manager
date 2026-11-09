@@ -31,7 +31,7 @@ export default async function LeavePage({ searchParams }: { searchParams: Promis
     supabase
       .from("profiles")
       .select("id, full_name, role")
-      .in("role", ["manager", "receptionist", "technician", "warehouse"])
+      .in("role", ["manager", "receptionist", "technician", "warehouse", "marketing"])
       .eq("is_active", true)
       .order("full_name"),
     supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
