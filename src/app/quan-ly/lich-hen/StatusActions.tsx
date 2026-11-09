@@ -8,10 +8,7 @@ import { vnError } from "@/lib/format";
 type Action = { to: string; label: string; style: "primary" | "outline" | "danger" };
 
 const ACTIONS: Record<string, Action[]> = {
-  pending: [
-    { to: "confirmed", label: "Xác nhận", style: "primary" },
-    { to: "cancelled", label: "Huỷ", style: "danger" },
-  ],
+  // "Chờ xác nhận" dùng ConfirmAppointment (bắt buộc chọn KTV)
   confirmed: [
     { to: "in_progress", label: "Khách đã đến", style: "primary" },
     { to: "no_show", label: "Không đến", style: "danger" },

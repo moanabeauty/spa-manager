@@ -195,14 +195,17 @@ export default async function KtvMonitorPage() {
       </section>
 
       <section className="card space-y-2 p-4">
-        <h2 className="font-semibold text-navy">Lịch KTV chưa xác nhận ({unconf.length})</h2>
-        <p className="text-xs text-ink/60">Đến giờ hẹn mà KTV chưa bấm xác nhận thì hệ thống tự nhận lịch.</p>
+        <h2 className="font-semibold text-navy">Lịch chờ xác nhận ({unconf.length})</h2>
+        <p className="text-xs text-ink/60">
+          Lịch chưa có KTV: KTV nào bấm nhận thì khách thuộc về KTV đó, hoặc xác nhận ở trang Lịch hẹn và chọn KTV. Lịch đã có KTV mà chưa
+          nhận thì đến giờ hẹn hệ thống tự nhận.
+        </p>
         {unconf.map((a) => (
           <div key={a.id} className="flex justify-between gap-2 text-sm">
             <span>
               {formatShortDate(a.start_at)} {formatTime(a.start_at)} · {a.customers?.full_name}
             </span>
-            <span className="text-ink/60">{a.appointment_services.map((s) => s.technician?.full_name).filter(Boolean).join(", ")}</span>
+            <span className="text-ink/60">{a.appointment_services.map((s) => s.technician?.full_name).filter(Boolean).join(", ") || <b className="text-[#7A5600]">Chưa có KTV</b>}</span>
           </div>
         ))}
       </section>

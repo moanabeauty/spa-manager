@@ -78,6 +78,8 @@ export default function StaffBookingForm({
 
   // dịch vụ
   const [items, setItems] = useState<Item[]>([]);
+  const [consult, setConsult] = useState(false); // Chưa chọn liệu trình – Hẹn tư vấn
+  const [consultTech, setConsultTech] = useState("");
   const [query, setQuery] = useState("");
   const [nextKey, setNextKey] = useState(1);
 
@@ -90,7 +92,7 @@ export default function StaffBookingForm({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ id: string; start: string; name: string } | null>(null);
+  const [done, setDone] = useState<{ id: string; start: string; name: string; confirmed: boolean } | null>(null);
 
   const byId = useMemo(() => new Map(services.map((s) => [s.id, s])), [services]);
   const digits = normalizePhone(phone);
@@ -175,7 +177,7 @@ export default function StaffBookingForm({
   }, [items, date, time, byId]);
 
   const chosen = items.map((it) => byId.get(it.serviceId)).filter((s): s is StaffService => !!s);
-  const totalMinutes = items.reduce((a, it) => a + (it.minutes ?? byId.get(it.serviceId)?.duration_minutes ?? 0), 0);
+  const totalMinutes = consult ? 60 : items.reduce((a, it) => a + (it.minutes ?? byId.get(it.serviceId)?.duration_minutes ?? 0), 0);
   const knownTotal = chosen.reduce((a, s) => a + (s.price ?? 0), 0);
   const hasQuote = chosen.some((s) => s.price === null);
   const cap = branches.find((b) => b.id === branchId)?.max_per_slot ?? DEFAULT_CAPACITY;
@@ -210,10 +212,27 @@ export default function StaffBookingForm({
       if (digits.length < 9 || digits.length > 11) return setError("Vui lòng nhập số điện thoại khách (9–11 số).");
       if (!newName.trim()) return setError("Khách mới: vui lòng nhập tên khách.");
     }
-    if (items.length === 0) return setError("Vui lòng chọn ít nhất 1 dịch vụ.");
+    if (!consult && items.length === 0)
+      return setError("Vui lòng chọn dịch vụ, hoặc chọn “Chưa chọn liệu trình – Hẹn tư vấn”.");
     if (!date || !time) return setError("Vui lòng chọn ngày giờ.");
 
     setSaving(true);
+    if (consult) {
+      const { data, error: e } = await supabase.rpc("staff_book_consult", {
+        p_branch_id: branchId,
+        p_start_at: vnDateTime(date, time).toISOString(),
+        p_source: source,
+        p_customer_id: customer?.id ?? null,
+        p_customer_name: customer ? null : newName.trim(),
+        p_customer_phone: customer ? null : digits,
+        p_technician_id: consultTech || null,
+        p_note: note.trim() || null,
+      });
+      setSaving(false);
+      if (e) return setError(vnError(e.message));
+      setDone({ id: data as string, start: vnDateTime(date, time).toISOString(), name: customer?.full_name ?? newName.trim(), confirmed: !!consultTech });
+      return;
+    }
     const { data, error: e } = await supabase.rpc("create_staff_booking", {
       p_branch_id: branchId,
       p_start_at: vnDateTime(date, time).toISOString(),
@@ -226,7 +245,12 @@ export default function StaffBookingForm({
     });
     setSaving(false);
     if (e) return setError(vnError(e.message));
-    setDone({ id: data as string, start: vnDateTime(date, time).toISOString(), name: customer?.full_name ?? newName.trim() });
+    setDone({
+      id: data as string,
+      start: vnDateTime(date, time).toISOString(),
+      name: customer?.full_name ?? newName.trim(),
+      confirmed: items.every((it) => it.technicianId),
+    });
   }
 
   function reset() {
@@ -235,6 +259,8 @@ export default function StaffBookingForm({
     setNewName("");
     setCustomer(null);
     setItems([]);
+    setConsult(false);
+    setConsultTech("");
     setNote("");
     setTime(source === "walk_in" ? nowRounded() : "");
   }
@@ -248,7 +274,11 @@ export default function StaffBookingForm({
           {formatTime(done.start)} · {formatDate(done.start)}
           <br />
           {branches.find((b) => b.id === branchId)?.name}
-          {source === "walk_in" ? " · Khách đang ở spa (Đang làm)" : " · Đã xác nhận"}
+          {source === "walk_in"
+            ? " · Khách đang ở spa (Đang làm)"
+            : done.confirmed
+              ? " · Đã xác nhận, đã có KTV"
+              : " · Chờ xác nhận – KTV bấm nhận khách, hoặc chọn KTV khi xác nhận ở trang Lịch hẹn"}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link href={`/quan-ly/lich-hen?ngay=${date}&cn=${branchId}`} className="btn-primary">Xem lịch trong ngày</Link>
@@ -266,7 +296,7 @@ export default function StaffBookingForm({
       <section className="card space-y-3">
         <div className="grid grid-cols-2 gap-2">
           {([
-            ["phone", "📞 Khách gọi điện", "Lịch đã xác nhận"],
+            ["phone", "📞 Khách gọi / nhắn đặt lịch", "Hẹn trước"],
             ["walk_in", "🚶 Khách vãng lai", "Khách đang ở spa, làm ngay"],
           ] as const).map(([v, label, hint]) => (
             <button
@@ -365,7 +395,48 @@ export default function StaffBookingForm({
       {/* Dịch vụ + KTV */}
       <section className="card">
         <h2 className="mb-3 font-semibold text-navy">3. Dịch vụ và kỹ thuật viên</h2>
-        {items.length > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            setConsult((v) => !v);
+            setItems([]);
+            setQuery("");
+          }}
+          className={`mb-3 flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${
+            consult ? "border-navy bg-navy text-white" : "border-beige-dark bg-cream hover:border-navy"
+          }`}
+        >
+          <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs ${consult ? "border-white bg-white text-navy" : "border-beige-dark bg-white"}`}>
+            {consult ? "✓" : ""}
+          </span>
+          <span>
+            <b className="block">Chưa chọn liệu trình – Hẹn tư vấn</b>
+            <span className={`text-xs ${consult ? "text-beige" : "text-ink/60"}`}>
+              Giữ chỗ 60 phút, KTV soi da và chọn liệu trình khi khách đến
+            </span>
+          </span>
+        </button>
+        {consult && (
+          <label className="block text-xs text-ink/70">
+            KTV tư vấn <span className="text-ink/50">(để trống = Chờ xác nhận, KTV nào bấm nhận thì khách thuộc về KTV đó)</span>
+            <select className="input mt-1 py-2 text-sm" value={consultTech} onChange={(e) => setConsultTech(e.target.value)}>
+              <option value="">— Chưa xếp KTV —</option>
+              {technicians.map((t) => {
+                const s = date && time ? vnDateTime(date, time.slice(0, 5)).toISOString() : null;
+                const e = s ? new Date(new Date(s).getTime() + 3600000).toISOString() : null;
+                return (
+                  <option key={t.id} value={t.id}>
+                    {techLabel(t, branches)}
+                    {s && e && isBusy(busy, t.id, s, e) ? " (bận)" : ""}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+        )}
+        {!consult && <p className="mb-2 text-xs text-ink/50">Hoặc chọn dịch vụ (chưa xếp KTV = Chờ xác nhận):</p>}
+        {!consult && items.length > 0 && (
           <ul className="mb-3 space-y-2">
             {items.map((it, i) => {
               const s = byId.get(it.serviceId);
@@ -426,6 +497,7 @@ export default function StaffBookingForm({
             })}
           </ul>
         )}
+        {!consult && (<>
         <input
           className="input"
           placeholder={items.length ? "Thêm dịch vụ khác…" : "Gõ tên dịch vụ để thêm (vd: peel, mụn, gội…)"}
@@ -450,6 +522,7 @@ export default function StaffBookingForm({
           </ul>
         )}
         {query.trim() && filtered.length === 0 && <p className="mt-2 text-sm text-ink/60">Không tìm thấy dịch vụ.</p>}
+        </>)}
       </section>
 
       <section className="card">
@@ -460,7 +533,13 @@ export default function StaffBookingForm({
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-beige-dark bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <div className="flex-1 text-sm">
-            {chosen.length === 0 ? (
+            {consult ? (
+              <>
+                <b className="text-navy">Hẹn tư vấn · 60 phút</b>
+                <br />
+                <span className="text-ink/70">{consultTech ? "Đã chọn KTV – xác nhận luôn" : "Chờ xác nhận"}</span>
+              </>
+            ) : chosen.length === 0 ? (
               <span className="text-ink/60">Chưa chọn dịch vụ</span>
             ) : (
               <>
@@ -475,7 +554,7 @@ export default function StaffBookingForm({
             {error && <p className="mt-1 text-xs font-medium text-[#8A2323]">{error}</p>}
           </div>
           <button className="btn-primary px-6 py-3" disabled={saving} onClick={submit}>
-            {saving ? "Đang lưu…" : "Tạo lịch"}
+            {saving ? "Đang lưu…" : consult ? "Đặt hẹn tư vấn" : "Tạo lịch"}
           </button>
         </div>
       </div>

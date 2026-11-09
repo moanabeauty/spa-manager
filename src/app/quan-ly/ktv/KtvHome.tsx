@@ -5,13 +5,14 @@ import { formatTime, formatVnd, todayVn } from "@/lib/format";
 import { CARD_ALERT, COMBO_ALERT, ktvState, weekdayShort, type MyDayRow } from "@/lib/ktv";
 import KtvServiceSearch from "./KtvServiceSearch";
 import AttendanceCard, { type TodayAtt } from "./AttendanceCard";
+import OpenBookings, { type OpenBooking } from "./OpenBookings";
 
 /** Màn "Hôm nay" của KTV: chấm công, cảnh báo, khách của tôi hôm nay */
 export default async function KtvHome({ profile }: { profile: Profile }) {
   const supabase = await createClient();
   await supabase.rpc("ktv_auto_accept"); // đến giờ hẹn mà chưa xác nhận -> hệ thống tự nhận
   const today = todayVn();
-  const [{ data: rows }, { data: att }, { data: branch }, { data: cfg }] = await Promise.all([
+  const [{ data: rows }, { data: att }, { data: branch }, { data: cfg }, { data: openData }] = await Promise.all([
     supabase.rpc("ktv_my_day", { p_date: today }),
     supabase
       .from("staff_attendance")
@@ -21,7 +22,9 @@ export default async function KtvHome({ profile }: { profile: Profile }) {
       .maybeSingle(),
     profile.branch_id ? supabase.from("branches").select("name").eq("id", profile.branch_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
+    supabase.rpc("ktv_open_bookings", { p_days: 14 }),
   ]);
+  const open = (openData ?? []) as OpenBooking[];
   const list = ((rows ?? []) as MyDayRow[]).map((r) => ({ ...r, card_balance: Number(r.card_balance), debt: Number(r.debt) }));
   // đang làm lên đầu, rồi chờ / đã nhận theo giờ, xong xuống cuối
   const rank = (r: MyDayRow) => (r.work_done || r.status === "completed" ? 2 : r.work_started || r.status === "in_progress" ? 0 : 1);
@@ -47,12 +50,13 @@ export default async function KtvHome({ profile }: { profile: Profile }) {
       <div className="space-y-3.5 px-4">
         <AttendanceCard today={att as TodayAtt} radius={radius} />
 
-        {(debtors > 0 || advise > 0 || pending > 0) && (
+        {(debtors > 0 || advise > 0 || pending > 0 || open.length > 0) && (
           <div className="flex gap-2 rounded-xl bg-[#FDECEA] px-3.5 py-3 text-[13px] text-[#8C1D18]">
             <span className="font-bold">!</span>
             <span>
               {[
                 pending ? `${pending} lịch chờ bạn xác nhận.` : "",
+                open.length ? `${open.length} lịch chưa có KTV nhận.` : "",
                 debtors ? `${debtors} khách đang nợ spa.` : "",
                 advise ? `${advise} khách cần tư vấn: thẻ còn dưới 2 triệu hoặc combo còn dưới 3 buổi.` : "",
               ]
@@ -61,6 +65,8 @@ export default async function KtvHome({ profile }: { profile: Profile }) {
             </span>
           </div>
         )}
+
+        <OpenBookings rows={open} />
 
         <div className="flex items-baseline justify-between">
           <h2 className="text-[17px] font-bold">Khách của tôi hôm nay</h2>

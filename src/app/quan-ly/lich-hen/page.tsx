@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import { STATUS_LABEL, STATUS_STYLE, formatDate, formatTime, formatVnd, todayVn, vnDateTime } from "@/lib/format";
 import StatusActions from "./StatusActions";
+import ConfirmAppointment from "./ConfirmAppointment";
+import ConsultTechPicker from "./ConsultTechPicker";
 import TechnicianPicker from "./TechnicianPicker";
 import CapacityEditor from "./CapacityEditor";
 import DurationEditor from "./DurationEditor";
@@ -39,6 +41,7 @@ type Row = {
   ktv_confirmed_at: string | null;
   ktv_confirmed_auto: boolean;
   is_consultation: boolean;
+  consult_technician_id: string | null;
   customers: { id: string; full_name: string; phone: string | null; note: string | null } | null;
   appointment_services: {
     id: string;
@@ -124,7 +127,7 @@ export default async function StaffAppointmentsPage({
   let q = supabase
     .from("appointments")
     .select(
-      "id, customer_id, start_at, end_at, status, source, note, ktv_confirmed_at, ktv_confirmed_auto, is_consultation, customers(id, full_name, note), appointment_services(id, start_at, end_at, price, technician_id, services(name))",
+      "id, customer_id, start_at, end_at, status, source, note, ktv_confirmed_at, ktv_confirmed_auto, is_consultation, consult_technician_id, customers(id, full_name, note), appointment_services(id, start_at, end_at, price, technician_id, services(name))",
     )
     .eq("branch_id", branchId)
     .gte("start_at", from)
@@ -424,9 +427,15 @@ export default async function StaffAppointmentsPage({
                       <a href={`tel:${r.customers.phone}`} className="block text-sm text-navy underline">{r.customers.phone}</a>
                     )}
                     <p className="text-xs text-ink/50">{SOURCE_LABEL[r.source] ?? r.source}{r.is_consultation ? " · hẹn tư vấn" : ""}</p>
-                    {(items.some((s) => s.technician_id) || r.is_consultation) && !["cancelled", "no_show", "completed"].includes(r.status) && (
-                      <p className={`text-xs ${r.ktv_confirmed_at ? "text-[#22612A]" : "text-[#7A5600]"}`}>
-                        {r.ktv_confirmed_at ? (r.ktv_confirmed_auto ? "✓ Hệ thống tự nhận lịch (đến giờ hẹn)" : "✓ KTV đã xác nhận") : "⏳ KTV chưa xác nhận"}
+                    {!["cancelled", "no_show", "completed"].includes(r.status) && (
+                      <p className={`text-xs ${r.status !== "pending" && r.ktv_confirmed_at ? "text-[#22612A]" : "text-[#7A5600]"}`}>
+                        {r.status === "pending"
+                          ? "⏳ Chờ xác nhận – KTV bấm nhận hoặc lễ tân / quản lý chọn KTV"
+                          : r.ktv_confirmed_at
+                            ? r.ktv_confirmed_auto
+                              ? "✓ Hệ thống tự nhận lịch (đến giờ hẹn)"
+                              : "✓ Đã xác nhận, đã có KTV"
+                            : "⏳ KTV chưa nhận lịch"}
                       </p>
                     )}
                   </div>
@@ -449,7 +458,20 @@ export default async function StaffAppointmentsPage({
               )}
 
               <ul className="mt-3 space-y-1 border-t border-beige pt-3 text-sm">
-                {items.length === 0 && <li className="text-ink/60">Chưa chọn dịch vụ – quản lý tư vấn khi khách đến.</li>}
+                {items.length === 0 && (
+                  <li className="space-y-1">
+                    <p className="text-ink/60">Chưa chọn liệu trình – hẹn tư vấn, KTV chọn liệu trình khi khách đến.</p>
+                    {canAssign && r.status !== "pending" && (
+                      <ConsultTechPicker
+                        id={r.id}
+                        current={r.consult_technician_id}
+                        locked={["cancelled", "no_show", "completed"].includes(r.status)}
+                        technicians={technicians}
+                        branches={branches}
+                      />
+                    )}
+                  </li>
+                )}
                 {items.map((s) => (
                   <li key={s.id} className="py-1">
                     <div className="flex justify-between gap-3">
@@ -514,7 +536,20 @@ export default async function StaffAppointmentsPage({
                 </p>
               ) : (
                 <>
-                  <StatusActions id={r.id} status={r.status} />
+                  {r.status === "pending" ? (
+                    <ConfirmAppointment
+                      id={r.id}
+                      needTech={items.some((s) => !s.technician_id) || (items.length === 0 && !r.consult_technician_id)}
+                      consult={items.length === 0}
+                      start={r.start_at}
+                      end={r.end_at ?? new Date(new Date(r.start_at).getTime() + 3600000).toISOString()}
+                      technicians={technicians}
+                      busy={busy}
+                      branches={branches}
+                    />
+                  ) : (
+                    <StatusActions id={r.id} status={r.status} />
+                  )}
                   {cashier && ["confirmed", "in_progress", "completed"].includes(r.status) && (
                     <div className="mt-2 flex justify-end">
                       <Link href={`/quan-ly/thu-tien?lich=${r.id}`} className="btn-primary bg-brown py-2 hover:bg-[#87704f]">

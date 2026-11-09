@@ -202,13 +202,13 @@ export default function KtvBookingForm({
         <section className="space-y-2">
           <p className="text-[13px] font-semibold">Dịch vụ</p>
           <div className="grid grid-cols-2 gap-2">
-            <button className={chip(mode === "service")} onClick={() => setMode("service")}>
-              <b className="block">Chọn liệu trình</b>
-              <span className={`text-xs ${mode === "service" ? "text-white/80" : "text-[#646464]"}`}>Combo khách đang có hiện trước</span>
-            </button>
             <button className={chip(mode === "consult")} onClick={() => setMode("consult")}>
               <b className="block">Chưa chọn liệu trình – Hẹn tư vấn</b>
               <span className={`text-xs ${mode === "consult" ? "text-white/80" : "text-[#646464]"}`}>Khách đến mới chọn</span>
+            </button>
+            <button className={chip(mode === "service")} onClick={() => setMode("service")}>
+              <b className="block">Chọn liệu trình</b>
+              <span className={`text-xs ${mode === "service" ? "text-white/80" : "text-[#646464]"}`}>Combo khách đang có hiện trước</span>
             </button>
           </div>
           {mode === "service" && (
