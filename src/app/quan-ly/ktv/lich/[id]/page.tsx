@@ -4,6 +4,9 @@ import { formatShortDate, formatTime, formatVnd } from "@/lib/format";
 import { CARD_ALERT, COMBO_ALERT } from "@/lib/ktv";
 import type { PickService } from "../../ServicePicker";
 import DetailActions from "./DetailActions";
+import SessionPhotos from "@/components/SessionPhotos";
+import PhotoHistory from "@/components/PhotoHistory";
+import { loadCustomerPhotos, photosRequired } from "@/lib/photos";
 
 export const metadata = { title: "Chi tiết lịch – Moana Beauty" };
 
@@ -15,6 +18,7 @@ type Aps = {
   is_active: boolean;
   work_started_at: string | null;
   work_done_at: string | null;
+  service_id: string;
   services: { name: string; name_en: string | null } | null;
 };
 type Appt = {
@@ -28,6 +32,7 @@ type Appt = {
   ktv_confirmed_at: string | null;
   ktv_confirmed_auto: boolean;
   is_consultation: boolean;
+  photo_skip_reason: string | null;
   customers: { full_name: string; code: string | null } | null;
   appointment_services: Aps[];
 };
@@ -57,7 +62,7 @@ export default async function KtvAppointmentPage({ params }: { params: Promise<{
     supabase
       .from("appointments")
       .select(
-        "id, start_at, end_at, status, branch_id, customer_id, note, ktv_confirmed_at, ktv_confirmed_auto, is_consultation, customers(full_name, code), appointment_services(id, technician_id, start_at, end_at, is_active, work_started_at, work_done_at, services(name, name_en))",
+        "id, start_at, end_at, status, branch_id, customer_id, note, ktv_confirmed_at, ktv_confirmed_auto, is_consultation, photo_skip_reason, customers(full_name, code), appointment_services(id, technician_id, service_id, start_at, end_at, is_active, work_started_at, work_done_at, services(name, name_en))",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -85,6 +90,11 @@ export default async function KtvAppointmentPage({ params }: { params: Promise<{
   const lowCombo = v.packages.filter((p) => p.left !== null && p.left < COMBO_ALERT);
   const closed = ["completed", "cancelled", "no_show"].includes(a.status);
   const current = mine.find((s) => !s.work_done_at) ?? mine[0];
+  const activeSvcIds = a.appointment_services.filter((s) => s.is_active).map((s) => s.service_id);
+  const [photoSessions, needPhotos] = await Promise.all([loadCustomerPhotos(supabase, a.customer_id), photosRequired(supabase, activeSvcIds)]);
+  const thisSession = photoSessions.find((s) => s.appointmentId === a.id)?.photos ?? [];
+  const pastSessions = photoSessions.filter((s) => s.appointmentId !== a.id);
+  const canEditPhotos = profile.role === "owner" || profile.role === "manager" || (profile.role === "technician" && mine.length > 0 && !closed);
   const services: PickService[] = ((svcs ?? []) as unknown as (Omit<PickService, "category"> & { service_categories: { name: string } | null })[]).map((s) => ({
     ...s,
     category: s.service_categories?.name ?? null,
@@ -174,6 +184,17 @@ export default async function KtvAppointmentPage({ params }: { params: Promise<{
             Ghi phiếu da buổi này ›
           </Link>
         </div>
+
+        {!consult && (
+          <SessionPhotos
+            appointmentId={a.id}
+            photos={thisSession}
+            editable={canEditPhotos && !["cancelled", "no_show"].includes(a.status)}
+            required={needPhotos}
+            skipReason={a.photo_skip_reason}
+          />
+        )}
+        <PhotoHistory sessions={pastSessions} title="Ảnh các buổi trước" empty="Chưa có ảnh các buổi trước." />
 
         <div className="space-y-1.5 rounded-[14px] bg-white p-3.5">
           <p className="text-[15px] font-bold">Lịch sử gần đây</p>

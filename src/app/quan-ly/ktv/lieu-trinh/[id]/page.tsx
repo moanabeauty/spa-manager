@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import type { ServiceGuide } from "@/components/ServiceGuideSections";
+import { loadCustomerPhotos, photosRequired } from "@/lib/photos";
 import ProcedureRunner, { type Change, type Step } from "./ProcedureRunner";
 
 export const metadata = { title: "Quy trình liệu trình – Moana Beauty" };
@@ -16,7 +17,7 @@ type Row = {
   steps_done: number;
   step_log: { step: number; at: string }[];
   services: { id: string; name: string; name_en: string | null; duration_minutes: number } | null;
-  appointments: { status: string; customers: { full_name: string } | null } | null;
+  appointments: { status: string; customer_id: string; photo_skip_reason: string | null; customers: { full_name: string } | null } | null;
 };
 
 /** Quy trình liệu trình: quy trình gốc từng bước kèm sản phẩm; Bắt đầu / Xong bước / Hoàn thành */
@@ -27,7 +28,7 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
   const { data } = await supabase
     .from("appointment_services")
     .select(
-      "id, appointment_id, technician_id, start_at, end_at, work_started_at, work_done_at, steps_done, step_log, services(id, name, name_en, duration_minutes), appointments(status, customers(full_name))",
+      "id, appointment_id, technician_id, start_at, end_at, work_started_at, work_done_at, steps_done, step_log, services(id, name, name_en, duration_minutes), appointments(status, customer_id, photo_skip_reason, customers(full_name))",
     )
     .eq("id", id)
     .maybeSingle();
@@ -40,7 +41,7 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       </div>
     );
   }
-  const [{ data: steps }, { data: changes }, { data: guide }] = await Promise.all([
+  const [{ data: steps }, { data: changes }, { data: guide }, photoSessions, needPhotos] = await Promise.all([
     supabase
       .from("service_procedure_steps")
       .select("step_no, title, products, instructions, note")
@@ -56,6 +57,8 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       .select("indication, indication_ext, consult_guide")
       .eq("service_id", row.services?.id ?? "")
       .maybeSingle(),
+    loadCustomerPhotos(supabase, row.appointments?.customer_id ?? "", row.appointment_id),
+    photosRequired(supabase, row.services?.id ? [row.services.id] : []),
   ]);
   const planned = Math.round((new Date(row.end_at).getTime() - new Date(row.start_at).getTime()) / 60000);
 
@@ -74,6 +77,11 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       changes={(changes ?? []) as Change[]}
       guide={(guide ?? null) as ServiceGuide | null}
       closed={["cancelled", "no_show"].includes(row.appointments?.status ?? "")}
+      appointmentId={row.appointment_id}
+      photos={photoSessions[0]?.photos ?? []}
+      photosRequired={needPhotos}
+      photoSkipReason={row.appointments?.photo_skip_reason ?? null}
+      photosEditable={profile.role === "owner" || profile.role === "manager" || (row.technician_id === profile.id && row.appointments?.status !== "completed")}
     />
   );
 }

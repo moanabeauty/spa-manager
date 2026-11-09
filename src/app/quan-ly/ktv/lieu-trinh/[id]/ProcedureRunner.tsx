@@ -8,6 +8,8 @@ import { formatTime, vnError } from "@/lib/format";
 import { elapsed } from "@/lib/ktv";
 import ProductPicker from "./ProductPicker";
 import ServiceGuideSections, { type ServiceGuide } from "@/components/ServiceGuideSections";
+import SessionPhotos from "@/components/SessionPhotos";
+import type { Photo } from "@/lib/photos";
 
 export type Step = { step_no: number; title: string; products: string[]; instructions: string | null; note: string | null };
 export type Change = { id: string; step_no: number; from_product: string | null; to_product: string; reason: string; status: string; review_note: string | null };
@@ -26,6 +28,11 @@ export default function ProcedureRunner(props: {
   changes: Change[];
   guide: ServiceGuide | null;
   closed: boolean;
+  appointmentId: string;
+  photos: Photo[];
+  photosRequired: boolean;
+  photoSkipReason: string | null;
+  photosEditable: boolean;
 }) {
   const { apsId, steps, changes, startedAt, doneAt, stepsDone, plannedMinutes } = props;
   const router = useRouter();
@@ -113,6 +120,17 @@ export default function ProcedureRunner(props: {
           <ServiceGuideSections guide={props.guide} collapsible />
         </div>
       )}
+
+      <div className="px-4 pt-4">
+        <SessionPhotos
+          appointmentId={props.appointmentId}
+          photos={props.photos}
+          editable={props.photosEditable && !props.closed}
+          required={props.photosRequired}
+          skipReason={props.photoSkipReason}
+          highlight={!startedAt || doneAt ? null : props.photos.filter((p) => p.phase === "before" && p.angle !== "extra").length < 3 ? "before" : total > 0 && stepsDone >= total ? "after" : null}
+        />
+      </div>
 
       <div className="space-y-2.5 px-4 pt-4">
         <p className="text-[15px] font-bold">Quy trình (theo liệu trình gốc){total ? ` · ${Math.min(stepsDone, total)}/${total} bước` : ""}</p>

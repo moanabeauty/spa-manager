@@ -18,6 +18,8 @@ import {
 import RefundButton from "./RefundButton";
 import { SkinDot, SkinRecordCard, shortDay, type SkinRecord } from "@/lib/skin";
 import CrmProfileForm from "./CrmProfileForm";
+import PhotoHistory from "@/components/PhotoHistory";
+import { loadCustomerPhotos } from "@/lib/photos";
 import ReminderActions, { AddReminderForm } from "../cham-soc/ReminderActions";
 
 export const metadata = { title: "Khách hàng – Moana Beauty" };
@@ -73,7 +75,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       supabase
         .from("appointments")
         .select(
-          "id, start_at, status, branches(name), appointment_services(id, price, customer_package_item_id, services(name), technician:profiles!appointment_services_technician_id_fkey(full_name))",
+          "id, start_at, status, photo_skip_reason, branches(name), appointment_services(id, price, customer_package_item_id, services(name), technician:profiles!appointment_services_technician_id_fkey(full_name))",
         )
         .eq("customer_id", sp.id)
         .in("status", ["completed", "no_show", "cancelled"])
@@ -87,7 +89,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
 
     const wallet = await fetchWallet(supabase, c.id);
     const cardIds = wallet.cards.map((x) => x.card_id);
-    const [{ data: txns }, { data: invs }, { data: refunds }, { data: skinData }] = await Promise.all([
+    const [{ data: txns }, { data: invs }, { data: refunds }, { data: skinData }, photoSessions] = await Promise.all([
       cardIds.length
         ? supabase.from("card_transactions").select("id, txn_type, amount, note, created_at").in("card_id", cardIds).order("created_at", { ascending: false }).limit(30)
         : Promise.resolve({ data: [] }),
@@ -110,6 +112,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         .order("record_date", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(30),
+      loadCustomerPhotos(supabase, c.id),
     ]);
     const skins = (skinData ?? []) as unknown as (SkinRecord & { author: { full_name: string | null } | null })[];
     const balance = cardBalance(wallet);
@@ -121,6 +124,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       id: string;
       start_at: string;
       status: string;
+      photo_skip_reason: string | null;
       branches: { name: string } | null;
       appointment_services: { id: string; price: number | null; customer_package_item_id: string | null; services: { name: string } | null; technician: { full_name: string | null } | null }[];
     };
@@ -252,6 +256,8 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           )}
         </div>
 
+        <PhotoHistory sessions={photoSessions} empty="Chưa có ảnh. KTV chụp ảnh trước – sau ở màn Quy trình liệu trình của mỗi buổi." />
+
         <div className="card">
           <h2 className="mb-2 font-semibold text-navy">Nhắc chăm sóc</h2>
           {openRems.length === 0 && <p className="text-sm text-ink/60">Không có nhắc nào đang mở.</p>}
@@ -300,6 +306,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                   {shortDate(v.start_at)} {formatTime(v.start_at)} · {v.branches?.name.replace("Moana ", "")}
                   {v.status === "no_show" && <span className="ml-1 text-[#8A2323]">· Không đến</span>}
                   {v.status === "cancelled" && <span className="ml-1">· Đã huỷ</span>}
+                  {v.photo_skip_reason && <span className="ml-1 text-[#7A6242]">· Không chụp ảnh: {v.photo_skip_reason}</span>}
                 </p>
                 <ul>
                   {v.appointment_services.map((s) => (
