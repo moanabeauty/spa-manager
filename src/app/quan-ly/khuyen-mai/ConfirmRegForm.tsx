@@ -3,15 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { todayVn, vnDateTime, vnError } from "@/lib/format";
-import { TIMEZONE } from "@/lib/config";
+import { nowVnHHMM, todayVn, vnDateTime, vnDayOf, vnError } from "@/lib/format";
 import { TIME_SLOTS } from "@/app/khuyen-mai/RegisterForm";
 
 function splitVn(iso: string | null): { date: string; time: string } {
   if (!iso) return { date: "", time: "" };
   const d = new Date(iso);
-  const date = new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(d);
-  const time = new Intl.DateTimeFormat("en-GB", { timeZone: TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+  const date = vnDayOf(d);
+  const time = nowVnHHMM(d);
   return { date, time };
 }
 

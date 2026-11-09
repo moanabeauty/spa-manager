@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { formatDate, formatTime, formatVnd, todayVn, vnDateTime } from "@/lib/format";
+import { formatDate, formatShortDate, formatTime, formatVnd, todayVn, vnDateTime, vnDayOf } from "@/lib/format";
 import { METHOD_LABEL } from "@/lib/billing";
 import { canCheckout } from "@/lib/staff";
 import { SHIP_STATUS } from "@/lib/shipping";
@@ -27,11 +27,9 @@ type Tab = "quay" | "online" | "no";
 
 function shiftDate(d: string, days: number) {
   const t = vnDateTime(d, "12:00").getTime() + days * 86400000;
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(t));
+  return vnDayOf(t);
 }
-function shortDate(iso: string) {
-  return new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit" }).format(new Date(iso));
-}
+const shortDate = formatShortDate;
 const SELECT =
   "id, code, status, channel, paid_at, created_at, debt_amount, customers(id, full_name), invoice_items(item_type, description, amount), payments(method, amount), debt_payments(amount), invoice_shipments(carrier, tracking_code, status, recipient_name, address)";
 

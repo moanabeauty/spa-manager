@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cleanBarcode } from "@/lib/inventory";
-import CameraScanner from "@/components/CameraScanner";
+import CameraScanner from "@/components/LazyCameraScanner";
 
 type P = { id: string; name: string; brand: string | null; capacity: string | null; sku: string | null; barcode: string | null; for_retail: boolean };
 const COLS = "id, name, brand, capacity, sku, barcode, for_retail";

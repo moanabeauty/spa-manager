@@ -29,20 +29,18 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   let customer: CustomerInfo | null = null;
 
   if (sp.lich) {
-    const { data } = await supabase
-      .from("appointments")
-      .select(
-        "id, branch_id, start_at, status, customer_id, customers(id, full_name, note), appointment_services(id, service_id, technician_id, start_at, customer_package_item_id)",
-      )
-      .eq("id", sp.lich)
-      .maybeSingle();
+    // lấy lịch hẹn và hoá đơn (nếu đã thu) cùng lúc
+    const [{ data }, { data: inv }] = await Promise.all([
+      supabase
+        .from("appointments")
+        .select(
+          "id, branch_id, start_at, status, customer_id, customers(id, full_name, note), appointment_services(id, service_id, technician_id, start_at, customer_package_item_id)",
+        )
+        .eq("id", sp.lich)
+        .maybeSingle(),
+      supabase.from("invoices").select("id, code").eq("appointment_id", sp.lich).neq("status", "cancelled").maybeSingle(),
+    ]);
     if (!data) return <p className="card text-sm">Không tìm thấy lịch hẹn.</p>;
-    const { data: inv } = await supabase
-      .from("invoices")
-      .select("id, code")
-      .eq("appointment_id", sp.lich)
-      .neq("status", "cancelled")
-      .maybeSingle();
     if (inv) {
       return (
         <div className="card text-sm">
@@ -74,8 +72,6 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
     const { data } = await supabase.from("customers").select("id, full_name, note").eq("id", sp.kh).maybeSingle();
     customer = (data as CustomerInfo) ?? null;
   }
-  if (customer) await fillPhones(supabase, [customer]);
-
   // yêu cầu giảm giá gần nhất (chưa dùng) của lịch / khách này
   let dq = supabase
     .from("discount_requests")
@@ -85,9 +81,33 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
     .order("created_at", { ascending: false })
     .limit(1);
   dq = appt ? dq.eq("appointment_id", appt.id) : customer ? dq.eq("customer_id", customer.id).is("appointment_id", null) : dq.eq("id", "00000000-0000-0000-0000-000000000000");
-  const { data: lastRequest } = await dq.maybeSingle();
+  // tồn kho bán lẻ theo chi nhánh (cần danh sách kho trước rồi mới đếm tồn)
+  const loadRetailStock = async () => {
+    const { data: retailWh } = await supabase.from("warehouses").select("id, branch_id").eq("type", "retail");
+    const whList = (retailWh ?? []) as { id: string; branch_id: string }[];
+    const stock = await fetchStock(supabase, whList.map((w) => w.id));
+    return Object.fromEntries(
+      whList.map((w) => [w.branch_id, Object.fromEntries(stock.get(w.id) ?? new Map())]),
+    ) as Record<string, Record<string, number>>;
+  };
 
-  const [{ data: retail }, { data: retailWh }, retailPct] = await Promise.all([
+  // tất cả dữ liệu còn lại không phụ thuộc nhau → lấy cùng lúc
+  const [
+    ,
+    { data: lastRequest },
+    { data: retail },
+    retailStock,
+    retailPct,
+    { data: branches },
+    { data: services },
+    { data: packages },
+    { data: tiers },
+    sellers,
+    wallet,
+    promos,
+  ] = await Promise.all([
+    customer ? fillPhones(supabase, [customer]) : Promise.resolve(),
+    dq.maybeSingle(),
     supabase
       .from("products")
       .select("id, name, brand, capacity, unit, barcode, retail_price, max_staff_discount_pct")
@@ -95,16 +115,8 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       .eq("for_retail", true)
       .not("retail_price", "is", null)
       .order("name"),
-    supabase.from("warehouses").select("id, branch_id").eq("type", "retail"),
+    loadRetailStock(),
     fetchDefaultDiscountPct(supabase),
-  ]);
-  const whList = (retailWh ?? []) as { id: string; branch_id: string }[];
-  const stock = await fetchStock(supabase, whList.map((w) => w.id));
-  const retailStock: Record<string, Record<string, number>> = Object.fromEntries(
-    whList.map((w) => [w.branch_id, Object.fromEntries(stock.get(w.id) ?? new Map())]),
-  );
-
-  const [{ data: branches }, { data: services }, { data: packages }, { data: tiers }, sellers, wallet, promos] = await Promise.all([
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
     supabase
       .from("services")

@@ -2,17 +2,13 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatVnd, todayVn } from "@/lib/format";
+import { shiftMonth } from "@/lib/reports";
 
 export const metadata = { title: "Doanh số & hoa hồng – Moana Beauty" };
 
 type Comm = { staff_id: string; full_name: string | null; sales_amount: number; rate: number; commission_amount: number };
 type Fee = { technician_id: string; full_name: string | null; services_done: number; fee_amount: number };
 
-function shiftMonth(m: string, d: number) {
-  const [y, mo] = m.split("-").map(Number);
-  const t = new Date(Date.UTC(y, mo - 1 + d, 1));
-  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}`;
-}
 
 export default async function SalesPage({ searchParams }: { searchParams: Promise<{ thang?: string }> }) {
   const { supabase, profile } = await getCurrentUser();

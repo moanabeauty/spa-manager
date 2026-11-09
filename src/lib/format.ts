@@ -1,8 +1,23 @@
 import { TIMEZONE, TZ_OFFSET } from "./config";
 
+// Tạo bộ định dạng 1 lần rồi dùng lại (tạo mới mỗi lần gọi rất tốn thời gian khi danh sách dài)
+const NUM = new Intl.NumberFormat("vi-VN");
+const TIME = new Intl.DateTimeFormat("vi-VN", { timeZone: TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false });
+const HHMM = new Intl.DateTimeFormat("en-GB", { timeZone: TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false });
+const DATE_LONG = new Intl.DateTimeFormat("vi-VN", { timeZone: TIMEZONE, weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
+const DAY_KEY = new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE });
+const DM = new Intl.DateTimeFormat("vi-VN", { timeZone: TIMEZONE, day: "2-digit", month: "2-digit" });
+const DMY = new Intl.DateTimeFormat("vi-VN", { timeZone: TIMEZONE, day: "2-digit", month: "2-digit", year: "numeric" });
+const DMY2 = new Intl.DateTimeFormat("vi-VN", { timeZone: TIMEZONE, day: "2-digit", month: "2-digit", year: "2-digit" });
+
+/** 1234567 -> "1.234.567" */
+export function formatNumber(n: number): string {
+  return NUM.format(n);
+}
+
 export function formatVnd(n: number | null | undefined): string {
   if (n === null || n === undefined) return "Báo giá tại spa";
-  return new Intl.NumberFormat("vi-VN").format(n) + "đ";
+  return NUM.format(n) + "đ";
 }
 
 export function formatDuration(mins: number): string {
@@ -14,28 +29,27 @@ export function formatDuration(mins: number): string {
 }
 
 export function formatTime(iso: string): string {
-  return new Intl.DateTimeFormat("vi-VN", {
-    timeZone: TIMEZONE,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(iso));
+  return TIME.format(new Date(iso));
 }
 
 export function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("vi-VN", {
-    timeZone: TIMEZONE,
-    weekday: "long",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(iso));
+  return DATE_LONG.format(new Date(iso));
 }
 
 /** Ngày hôm nay theo giờ Việt Nam, dạng YYYY-MM-DD */
 export function todayVn(offsetDays = 0): string {
   const d = new Date(Date.now() + offsetDays * 86400000);
-  return new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(d);
+  return DAY_KEY.format(d);
+}
+
+/** Ngày (YYYY-MM-DD, giờ Việt Nam) của một thời điểm */
+export function vnDayOf(iso: string | number | Date): string {
+  return DAY_KEY.format(new Date(iso));
+}
+
+/** "HH:MM" theo giờ Việt Nam (mặc định: bây giờ) */
+export function nowVnHHMM(at: Date = new Date()): string {
+  return HHMM.format(at);
 }
 
 /** "2026-11-05" + "09:30" -> Date (giờ Việt Nam) */
@@ -110,5 +124,16 @@ export function normalizeText(s: string): string {
 
 /** "04/11" theo giờ Việt Nam */
 export function formatShortDate(iso: string): string {
-  return new Intl.DateTimeFormat("vi-VN", { timeZone: TIMEZONE, day: "2-digit", month: "2-digit" }).format(new Date(iso));
+  return DM.format(new Date(iso));
+}
+
+/** "04/11/2026" (ngày dạng YYYY-MM-DD được hiểu theo giờ Việt Nam) */
+export function formatDmy(iso: string | null | undefined, fallback = "—"): string {
+  if (!iso) return fallback;
+  return DMY.format(iso.length === 10 ? new Date(`${iso}T00:00:00${TZ_OFFSET}`) : new Date(iso));
+}
+
+/** "04/11/26" */
+export function formatDmy2(iso: string): string {
+  return DMY2.format(new Date(iso));
 }

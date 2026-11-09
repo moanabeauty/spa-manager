@@ -1,3 +1,4 @@
+import { formatDmy } from "./format";
 // Dùng chung cho CRM khách hàng (giai đoạn 8)
 
 export type CrmCustomer = {
@@ -71,9 +72,7 @@ export const SOURCES = ["Facebook", "Instagram", "TikTok", "Google / Maps", "Zal
 export const SKIN_TYPES = ["Da thường", "Da khô", "Da dầu", "Da hỗn hợp", "Da nhạy cảm", "Da mụn"];
 
 export function shortDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = iso.length === 10 ? new Date(`${iso}T00:00:00+07:00`) : new Date(iso);
-  return new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" }).format(d);
+  return formatDmy(iso);
 }
 
 /** Số ngày từ ngày (YYYY-MM-DD) đến hôm nay */

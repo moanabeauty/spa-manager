@@ -1,11 +1,13 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { todayVn } from "@/lib/format";
 import type { NavCounts } from "@/lib/nav";
 
 const head = { count: "exact" as const, head: true };
 
-/** Đếm các việc đang chờ của từng nhóm (hiện số trên thanh điều hướng + trang Tổng quan) */
-export async function loadNavCounts(role: string, branchId: string | null): Promise<NavCounts> {
+/** Đếm các việc đang chờ của từng nhóm (hiện số trên thanh điều hướng + trang Tổng quan).
+ *  cache(): layout và trang Tổng quan cùng gọi nhưng chỉ đếm 1 lần mỗi lần tải trang. */
+export const loadNavCounts = cache(async (role: string, branchId: string | null): Promise<NavCounts> => {
   const supabase = await createClient();
   const M = role === "owner" || role === "manager";
   const O = role === "owner";
@@ -49,5 +51,4 @@ export async function loadNavCounts(role: string, branchId: string | null): Prom
     ktv: (chg.count ?? 0) + (early.count ?? 0) + (fix.count ?? 0),
     marketing: mk.count ?? 0,
   };
-}
-
+});

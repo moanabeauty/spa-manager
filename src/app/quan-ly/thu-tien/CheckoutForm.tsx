@@ -17,7 +17,7 @@ import {
 } from "@/lib/billing";
 import { techLabel, type Seller } from "@/lib/staff";
 import MoneyInput from "@/components/MoneyInput";
-import CameraScanner from "@/components/CameraScanner";
+import CameraScanner from "@/components/LazyCameraScanner";
 import { cleanBarcode, productLabel, retailMinPrice } from "@/lib/inventory";
 import { dmy, fetchCustomerPromos, type CustomerPromo, type PromoItem } from "@/lib/promotions";
 

@@ -9,13 +9,6 @@ export const METHOD_LABEL: Record<string, string> = {
   service_card: "Thẻ tài khoản",
 };
 
-export const ITEM_TYPE_LABEL: Record<string, string> = {
-  service: "Dịch vụ",
-  package: "Gói combo",
-  card_topup: "Nạp thẻ",
-  product: "Sản phẩm",
-};
-
 export const CARD_TXN_LABEL: Record<string, string> = {
   topup: "Nạp tiền",
   bonus: "Tiền tặng",
@@ -157,6 +150,4 @@ export function parseVnd(s: string): number {
   return Math.round(n * mul);
 }
 
-export function formatNumber(n: number): string {
-  return new Intl.NumberFormat("vi-VN").format(n);
-}
+export { formatNumber } from "./format";

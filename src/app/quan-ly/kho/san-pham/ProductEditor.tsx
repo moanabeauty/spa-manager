@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatVnd, normalizeText, vnError } from "@/lib/format";
 import { UNITS, cleanBarcode, productLabel, retailMinPrice, type Product } from "@/lib/inventory";
 import MoneyInput from "@/components/MoneyInput";
-import CameraScanner from "@/components/CameraScanner";
+import CameraScanner from "@/components/LazyCameraScanner";
 
 type Scope = "all" | "treatment" | "retail" | "nobarcode" | "inactive";
 

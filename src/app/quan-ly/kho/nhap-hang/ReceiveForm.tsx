@@ -15,7 +15,7 @@ import {
   type WarehouseType,
 } from "@/lib/inventory";
 import MoneyInput from "@/components/MoneyInput";
-import CameraScanner from "@/components/CameraScanner";
+import CameraScanner from "@/components/LazyCameraScanner";
 
 export type RecentReceipt = {
   id: string;

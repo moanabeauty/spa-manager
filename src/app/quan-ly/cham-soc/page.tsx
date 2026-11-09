@@ -41,17 +41,21 @@ export default async function CarePage({ searchParams }: { searchParams: Promise
   const today = todayVn();
 
   // tạo nhắc định kỳ (gói sắp hết hạn, lâu chưa đến, sinh nhật) – chạy lại không bị trùng
-  await supabase.rpc("refresh_care_reminders");
-
-  const { data: branchData } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+  // (chạy cùng lúc với việc lấy danh sách chi nhánh)
+  const [, { data: branchData }] = await Promise.all([
+    supabase.rpc("refresh_care_reminders"),
+    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+  ]);
   const branches = (branchData ?? []) as { id: string; name: string }[];
   const defaultBranch = role === "owner" || role === "manager" ? "" : profile?.branch_id ?? "";
   const cn = sp.cn === "all" ? "" : sp.cn && branches.some((b) => b.id === sp.cn) ? sp.cn : defaultBranch;
   const kind = sp.loai && REMINDER_KIND[sp.loai] ? sp.loai : "";
 
   if (tab === "chua-quay-lai") {
-    const { data: lapsedData, error: lapsedErr } = await supabase.rpc("care_lapsed", { p_branch: cn || null });
-    const { count: dueCount } = await supabase.from("care_reminders").select("id", { count: "exact", head: true }).eq("status", "open").lte("due_date", today);
+    const [{ data: lapsedData, error: lapsedErr }, { count: dueCount }] = await Promise.all([
+      supabase.rpc("care_lapsed", { p_branch: cn || null }),
+      supabase.from("care_reminders").select("id", { count: "exact", head: true }).eq("status", "open").lte("due_date", today),
+    ]);
     return (
       <div className="space-y-4">
         <Head />
@@ -77,11 +81,12 @@ export default async function CarePage({ searchParams }: { searchParams: Promise
   else query = query.neq("status", "open").gte("done_at", new Date(Date.now() - 30 * 86400000).toISOString()).order("done_at", { ascending: false });
   if (cn) query = query.or(`branch_id.eq.${cn},branch_id.is.null`);
   if (kind) query = query.eq("kind", kind);
-  const { data, error } = await query;
+  const [{ data, error }, { count: dueCount }] = await Promise.all([
+    query,
+    supabase.from("care_reminders").select("id", { count: "exact", head: true }).eq("status", "open").lte("due_date", today),
+  ]);
   const list = (data ?? []) as unknown as Rem[];
   await fillPhones(supabase, list.map((r) => r.customers));
-
-  const { count: dueCount } = await supabase.from("care_reminders").select("id", { count: "exact", head: true }).eq("status", "open").lte("due_date", today);
 
 
   return (

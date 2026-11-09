@@ -42,10 +42,7 @@ export function ktvState(r: Pick<MyDayRow, "status" | "ktv_confirmed_at" | "work
   return { label: "Đã nhận", style: "bg-white text-navy ring-1 ring-navy/30" };
 }
 
-/** "HH:MM" theo giờ Việt Nam của thời điểm hiện tại */
-export function nowVnHHMM(): string {
-  return new Intl.DateTimeFormat("en-GB", { timeZone: TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
-}
+export { nowVnHHMM } from "./format";
 
 /** Số phút giữa 2 mốc "HH:MM" (b − a) */
 export function minutesBetween(a: string, b: string): number {
@@ -55,9 +52,11 @@ export function minutesBetween(a: string, b: string): number {
 }
 
 /** "Thứ Bảy 07/11" */
+const WEEKDAY = new Intl.DateTimeFormat("vi-VN", { timeZone: TIMEZONE, weekday: "long" });
+
 export function weekdayShort(date: string): string {
   const d = new Date(`${date}T12:00:00+07:00`);
-  const wd = new Intl.DateTimeFormat("vi-VN", { timeZone: TIMEZONE, weekday: "long" }).format(d);
+  const wd = WEEKDAY.format(d);
   return `${wd.charAt(0).toUpperCase()}${wd.slice(1)} ${date.slice(8, 10)}/${date.slice(5, 7)}`;
 }
 

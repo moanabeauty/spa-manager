@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { formatTime, formatVnd } from "@/lib/format";
+import { formatShortDate, formatTime, formatVnd } from "@/lib/format";
 import ReviewButtons from "./ReviewButtons";
 import PushToggle from "@/components/PushToggle";
 
@@ -24,9 +24,7 @@ type Req = {
 
 const STATUS: Record<string, string> = { approved: "Đã duyệt", rejected: "Từ chối", used: "Đã dùng" };
 
-function shortDate(iso: string) {
-  return new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit" }).format(new Date(iso));
-}
+const shortDate = formatShortDate;
 
 export default async function DiscountApprovalPage() {
   const { supabase, profile } = await getCurrentUser();

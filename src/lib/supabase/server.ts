@@ -1,8 +1,10 @@
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/config";
 
-export async function createClient() {
+// cache(): trong 1 lần tải trang, Header + layout + trang dùng chung 1 client (không tạo lại)
+export const createClient = cache(async () => {
   const cookieStore = await cookies();
   return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
@@ -18,7 +20,7 @@ export async function createClient() {
       },
     },
   });
-}
+});
 
 export type Profile = {
   id: string;
@@ -28,8 +30,9 @@ export type Profile = {
   branch_id: string | null;
 };
 
-/** Người dùng đang đăng nhập + hồ sơ (null nếu chưa đăng nhập) */
-export async function getCurrentUser() {
+/** Người dùng đang đăng nhập + hồ sơ (null nếu chưa đăng nhập).
+ *  Bọc cache(): Header, layout và trang gọi cùng lúc nhưng chỉ hỏi Supabase 1 lần mỗi lần tải trang. */
+export const getCurrentUser = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -44,7 +47,7 @@ export async function getCurrentUser() {
   const meta = (user.user_metadata ?? {}) as { phone?: string };
   const profile: Profile | null = row ? { ...row, phone: user.phone || meta.phone || null } : null;
   return { supabase, user, profile };
-}
+});
 
 export function isStaffRole(role: string | undefined | null): boolean {
   return role === "owner" || role === "manager" || role === "receptionist" || role === "technician" || role === "warehouse" || role === "marketing";

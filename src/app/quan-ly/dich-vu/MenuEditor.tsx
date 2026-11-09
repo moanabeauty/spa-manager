@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { formatVnd, normalizeText, vnError } from "@/lib/format";
+import { formatNumber, formatVnd, normalizeText, vnError } from "@/lib/format";
 
 export type MenuService = {
   id: string;
@@ -38,7 +38,7 @@ function parseMoney(s: string): number | null {
   return d === "" ? null : Number(d);
 }
 function moneyInput(n: number | null | undefined): string {
-  return n === null || n === undefined ? "" : new Intl.NumberFormat("vi-VN").format(n);
+  return n === null || n === undefined ? "" : formatNumber(n);
 }
 
 export default function MenuEditor({

@@ -3,16 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { formatTime, vnError } from "@/lib/format";
+import { formatTime, nowVnHHMM, vnError } from "@/lib/format";
 import { getPosition } from "@/lib/geo";
 import { EARLY_START } from "@/lib/ktv";
 
 type Att = { check_in: string; check_out: string | null; approval_status?: string; approval_reason?: string | null } | null;
 
 /** Nhân viên bấm check-in khi đến, check-out khi về (giờ lấy theo máy chủ) */
-function nowVnHHMM(): string {
-  return new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
-}
 
 export default function CheckInBar({ today, otStart = "18:30" }: { today: Att; otStart?: string }) {
   const router = useRouter();

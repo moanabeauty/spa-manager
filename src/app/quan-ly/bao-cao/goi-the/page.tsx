@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { formatVnd, normalizeText, todayVn } from "@/lib/format";
+import { formatDmy2, formatVnd, normalizeText, todayVn } from "@/lib/format";
 import { isMonth, monthEnd, shiftMonth, shortLabel } from "@/lib/reports";
 import ReportNav from "../ReportNav";
 
@@ -18,9 +18,7 @@ type Pkg = {
 };
 type ItemRow = { item_type: string; name: string; qty: number; amount: number };
 
-function d(iso: string) {
-  return new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "2-digit" }).format(new Date(iso));
-}
+const d = formatDmy2;
 
 export default async function LiabilitiesPage({ searchParams }: { searchParams: Promise<{ thang?: string; cn?: string; q?: string }> }) {
   const { supabase, profile } = await getCurrentUser();

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { formatTime, todayVn, vnDateTime } from "@/lib/format";
+import { formatTime, todayVn, vnDateTime, vnDayOf } from "@/lib/format";
 import { SKIN_COLORS, SkinDot, SkinRecordCard, shortDay, type SkinColor, type SkinRecord } from "@/lib/skin";
 import SkinRecordForm from "./SkinRecordForm";
 
@@ -55,7 +55,7 @@ export default async function SkinPage({ searchParams }: { searchParams: Promise
     if (!cust) return <p className="card text-sm">Không tìm thấy khách hàng.</p>;
     const canEdit = !existing || manager || existing.created_by === user?.id;
     const back =
-      sp.back && sp.back.startsWith("/quan-ly") ? sp.back : appt ? `/quan-ly/lich-hen?ngay=${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(appt.start_at))}&cn=${appt.branch_id}` : `/quan-ly/khach-hang?id=${cust.id}`;
+      sp.back && sp.back.startsWith("/quan-ly") ? sp.back : appt ? `/quan-ly/lich-hen?ngay=${vnDayOf(appt.start_at)}&cn=${appt.branch_id}` : `/quan-ly/khach-hang?id=${cust.id}`;
 
     return (
       <div className="space-y-4">
@@ -65,7 +65,7 @@ export default async function SkinPage({ searchParams }: { searchParams: Promise
           <p className="text-sm text-ink/70">
             <Link href={`/quan-ly/khach-hang?id=${cust.id}`} className="font-semibold text-navy underline">{cust.full_name}</Link>
             {cust.code && ` · ${cust.code}`}
-            {appt && ` · ${formatTime(appt.start_at)} ${shortDay(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(appt.start_at)))}`}
+            {appt && ` · ${formatTime(appt.start_at)} ${shortDay(vnDayOf(appt.start_at))}`}
           </p>
           {appt && appt.appointment_services.length > 0 && (
             <p className="text-sm text-ink/60">Dịch vụ: {appt.appointment_services.map((s) => s.services?.name).filter(Boolean).join(", ")}</p>

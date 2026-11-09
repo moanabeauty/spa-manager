@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { cleanBarcode } from "@/lib/inventory";
 import { formatVnd } from "@/lib/format";
-import CameraScanner from "./CameraScanner";
+import CameraScanner from "./LazyCameraScanner";
 
 type Hit = {
   kind: "customer" | "invoice" | "product" | "service";
@@ -65,12 +65,17 @@ export default function StaffSearch() {
       return;
     }
     setBusy(true);
+    let alive = true; // gõ tiếp thì bỏ kết quả cũ về muộn (tránh hiện sai kết quả)
     const id = setTimeout(async () => {
       const { data } = await createClient().rpc("staff_search_v3", { p_q: t });
+      if (!alive) return;
       setHits((data ?? []) as Hit[]);
       setBusy(false);
     }, 250);
-    return () => clearTimeout(id);
+    return () => {
+      alive = false;
+      clearTimeout(id);
+    };
   }, [q]);
 
   useEffect(() => {

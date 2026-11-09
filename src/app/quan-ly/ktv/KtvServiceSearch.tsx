@@ -23,12 +23,17 @@ export default function KtvServiceSearch() {
       return;
     }
     setBusy(true);
+    let alive = true; // gõ tiếp thì bỏ kết quả cũ về muộn (tránh hiện sai kết quả)
     const id = setTimeout(async () => {
       const { data } = await createClient().rpc("service_search", { p_q: t });
+      if (!alive) return;
       setHits((data ?? []) as Hit[]);
       setBusy(false);
     }, 250);
-    return () => clearTimeout(id);
+    return () => {
+      alive = false;
+      clearTimeout(id);
+    };
   }, [q]);
 
   useEffect(() => {

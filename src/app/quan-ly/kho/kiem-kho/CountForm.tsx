@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeText, vnError } from "@/lib/format";
 import { cleanBarcode } from "@/lib/inventory";
-import CameraScanner from "@/components/CameraScanner";
+import CameraScanner from "@/components/LazyCameraScanner";
 
 type P = { id: string; label: string; brand: string | null; unit: string; barcode: string | null; qty: number };
 

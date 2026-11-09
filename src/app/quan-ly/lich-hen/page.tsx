@@ -91,13 +91,15 @@ export default async function StaffAppointmentsPage({
   if (profile?.role === "warehouse") redirect("/quan-ly/kho");
   // KTV dùng app riêng: không xem lịch của KTV khác
   if (profile?.role === "technician") redirect("/quan-ly/ktv/dat-lich");
-  await supabase.rpc("ktv_auto_accept"); // đến giờ hẹn mà KTV chưa xác nhận -> tự nhận
-
   const sp = await searchParams;
   const today = todayVn();
   const date = sp.ngay && /^\d{4}-\d{2}-\d{2}$/.test(sp.ngay) ? sp.ngay : today;
   const ym = sp.thang && /^\d{4}-\d{2}$/.test(sp.thang) ? sp.thang : monthOf(date);
-  const { data: branchData } = await supabase.from("branches").select("id, name, max_per_slot").eq("is_active", true).order("name");
+  // đến giờ hẹn mà KTV chưa xác nhận -> tự nhận (chạy cùng lúc với lấy chi nhánh)
+  const [, { data: branchData }] = await Promise.all([
+    supabase.rpc("ktv_auto_accept"),
+    supabase.from("branches").select("id, name, max_per_slot").eq("is_active", true).order("name"),
+  ]);
   const branches = (branchData ?? []) as { id: string; name: string; max_per_slot: number | null }[];
   const branchId = sp.cn ?? profile?.branch_id ?? branches[0]?.id ?? "";
   const branch = branches.find((b) => b.id === branchId);
@@ -108,19 +110,13 @@ export default async function StaffAppointmentsPage({
   const grid = monthGrid(ym);
   const gridFrom = grid[0][0].date;
   const gridTo = addDays(grid[grid.length - 1][6].date, 1);
-  const { data: monthData } = await supabase
+  const monthQ = supabase
     .from("appointments")
     .select("id, start_at, end_at, status")
     .eq("branch_id", branchId)
     .gte("start_at", vnDateTime(gridFrom, "00:00").toISOString())
     .lt("start_at", vnDateTime(gridTo, "00:00").toISOString())
     .not("status", "in", "(cancelled,no_show)");
-  const monthRows = (monthData ?? []) as { id: string; start_at: string; end_at: string | null; status: string }[];
-  const byDay = new Map<string, typeof monthRows>();
-  for (const r of monthRows) {
-    const d = vnDayOf(r.start_at);
-    byDay.set(d, [...(byDay.get(d) ?? []), r]);
-  }
 
   // ---- dữ liệu ngày đang chọn ----
   const from = vnDateTime(date, "00:00").toISOString();
@@ -135,7 +131,21 @@ export default async function StaffAppointmentsPage({
     .lt("start_at", to)
     .order("start_at");
   if (filter === "active") q = q.not("status", "in", "(cancelled,no_show)");
-  const [{ data, error }, technicians, busy] = await Promise.all([q, fetchTechnicians(supabase), fetchBusy(supabase, from, to)]);
+  // lịch cả tháng + lịch trong ngày + KTV + giờ bận: lấy cùng lúc
+  const [{ data: monthData }, { data, error }, technicians, busy] = await Promise.all([
+    monthQ,
+    q,
+    fetchTechnicians(supabase),
+    fetchBusy(supabase, from, to),
+  ]);
+  const monthRows = (monthData ?? []) as { id: string; start_at: string; end_at: string | null; status: string }[];
+  const byDay = new Map<string, typeof monthRows>();
+  for (const r of monthRows) {
+    const d = vnDayOf(r.start_at);
+    const list = byDay.get(d);
+    if (list) list.push(r);
+    else byDay.set(d, [r]);
+  }
   const rows = (data ?? []) as unknown as Row[];
   await fillPhones(supabase, rows.map((r) => r.customers));
   const canAssign = profile?.role !== "customer";

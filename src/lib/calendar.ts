@@ -18,11 +18,7 @@ export function monthOf(date: string): string {
   return date.slice(0, 7);
 }
 
-export function shiftMonth(ym: string, n: number): string {
-  const [y, m] = ym.split("-").map(Number);
-  const t = new Date(Date.UTC(y, m - 1 + n, 1));
-  return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}`;
-}
+export { shiftMonth } from "./reports";
 
 export function monthLabel(ym: string): string {
   const [y, m] = ym.split("-");
@@ -54,10 +50,7 @@ export function vnTime(date: string, hhmm: string): number {
   return new Date(`${date}T${hhmm}:00${TZ_OFFSET}`).getTime();
 }
 
-/** Ngày (YYYY-MM-DD, giờ VN) của một thời điểm */
-export function vnDayOf(iso: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(iso));
-}
+export { vnDayOf } from "./format";
 
 export type Interval = { s: number; e: number };
 

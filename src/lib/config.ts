@@ -17,4 +17,3 @@ export const SLOT_MINUTES = 30;
 export const MIN_LEAD_MINUTES = 60; // phải đặt trước ít nhất 60 phút
 export const MAX_DAYS_AHEAD = 60;
 
-export const STAFF_ROLES = ["owner", "manager", "receptionist", "technician"] as const;

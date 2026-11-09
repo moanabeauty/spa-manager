@@ -11,18 +11,6 @@ export const SKIN_COLORS: { key: SkinColor; label: string; short: string; dot: s
 ];
 export const SKIN_COLOR = new Map(SKIN_COLORS.map((c) => [c.key, c]));
 
-/** Các mục đánh giá trên phiếu (mỗi mục chọn 1 trong 3 màu, bỏ trống = không đánh giá) */
-export const SKIN_CRITERIA: { key: string; label: string }[] = [
-  { key: "mun", label: "Mụn" },
-  { key: "tham", label: "Thâm / nám / sắc tố" },
-  { key: "am", label: "Độ ẩm" },
-  { key: "dau", label: "Dầu nhờn" },
-  { key: "nhay_cam", label: "Nhạy cảm / đỏ" },
-  { key: "lo_chan_long", label: "Lỗ chân lông" },
-  { key: "lao_hoa", label: "Nếp nhăn / lão hoá" },
-  { key: "seo", label: "Sẹo" },
-];
-
 /** Nhu cầu khách hay gặp (bấm chọn nhanh) */
 export const NEED_TAGS = [
   "Trị mụn",

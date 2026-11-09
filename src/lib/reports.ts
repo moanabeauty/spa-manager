@@ -29,16 +29,6 @@ export function shortLabel(s: string): string {
   return s;
 }
 
-/** 3.500.000 -> "3,5tr"; 850.000 -> "850k" (cho ô nhỏ) */
-export function compactVnd(n: number): string {
-  const a = Math.abs(n);
-  const sign = n < 0 ? "-" : "";
-  if (a >= 1e9) return `${sign}${(a / 1e9).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} tỷ`;
-  if (a >= 1e6) return `${sign}${(a / 1e6).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}tr`;
-  if (a >= 1e3) return `${sign}${Math.round(a / 1e3)}k`;
-  return `${sign}${a}đ`;
-}
-
 export function pctText(part: number, whole: number): string {
   if (!whole) return "–";
   return `${(Math.round((part / whole) * 1000) / 10).toLocaleString("vi-VN")}%`;

@@ -1,5 +1,6 @@
 // Bài viết cho khách: giới thiệu liệu trình mới, góc chăm da
 import Link from "next/link";
+import { formatDmy } from "./format";
 
 export type PostKind = "new_treatment" | "skincare";
 export const POST_KIND: Record<PostKind, { label: string; path: string; intro: string }> = {
@@ -26,7 +27,7 @@ export function slugify(s: string): string {
 
 export function postDate(iso: string | null): string {
   if (!iso) return "";
-  return new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(iso));
+  return formatDmy(iso, "");
 }
 
 /** Nội dung bài: dòng trống tách đoạn; "## " = tiêu đề nhỏ; "- " = gạch đầu dòng; **chữ đậm** */
