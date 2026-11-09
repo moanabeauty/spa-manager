@@ -4,6 +4,7 @@ import CheckInBar from "@/components/CheckInBar";
 import PushToggle from "@/components/PushToggle";
 import StaffNav from "@/components/StaffNav";
 import KtvNav from "@/components/KtvNav";
+import RoleSwitcher from "@/components/RoleSwitcher";
 import { todayVn } from "@/lib/format";
 import { buildNav } from "@/lib/nav";
 import { loadNavCounts } from "@/lib/navCounts";
@@ -31,6 +32,7 @@ export default async function ManagerLayout({ children }: { children: React.Reac
     return (
       <div className="space-y-4 pb-24">
         <KtvNav />
+        <RoleSwitcher roles={profile!.roles} active={role} />
         {children}
       </div>
     );
@@ -57,6 +59,7 @@ export default async function ManagerLayout({ children }: { children: React.Reac
       {role !== "owner" && <CheckInBar today={attendance} otStart={otStart} />}
       {role === "owner" && vapidKey && <PushToggle publicKey={vapidKey} hideWhenOn />}
       <StaffNav groups={groups} />
+      <RoleSwitcher roles={profile!.roles} active={role} />
       {children}
     </div>
   );

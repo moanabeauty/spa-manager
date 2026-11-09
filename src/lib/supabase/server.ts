@@ -22,11 +22,18 @@ export const createClient = cache(async () => {
   });
 });
 
+export type Role = "owner" | "manager" | "receptionist" | "technician" | "warehouse" | "marketing" | "customer";
+
 export type Profile = {
   id: string;
   full_name: string | null;
   phone: string | null;
-  role: "owner" | "manager" | "receptionist" | "technician" | "warehouse" | "marketing" | "customer";
+  /** vai trò ĐANG DÙNG (người kiêm nhiều vai trò có thể chuyển) – khớp hàm my_role() */
+  role: Role;
+  /** vai trò chính (tính lương, mặc định) */
+  primary_role: Role;
+  /** tất cả vai trò: vai trò chính + kiêm nhiệm */
+  roles: Role[];
   branch_id: string | null;
 };
 
@@ -41,11 +48,24 @@ export const getCurrentUser = cache(async () => {
   // cột phone của profiles không đọc trực tiếp được (bảo mật SĐT) – lấy từ tài khoản đăng nhập
   const { data: row } = await supabase
     .from("profiles")
-    .select("id, full_name, role, branch_id")
+    .select("id, full_name, role, branch_id, extra_roles, active_role")
     .eq("id", user.id)
-    .maybeSingle<Omit<Profile, "phone">>();
+    .maybeSingle<{ id: string; full_name: string | null; role: Role; branch_id: string | null; extra_roles: Role[] | null; active_role: Role | null }>();
   const meta = (user.user_metadata ?? {}) as { phone?: string };
-  const profile: Profile | null = row ? { ...row, phone: user.phone || meta.phone || null } : null;
+  let profile: Profile | null = null;
+  if (row) {
+    const roles = [row.role, ...(row.extra_roles ?? []).filter((r) => r !== row.role)];
+    const active = row.active_role && roles.includes(row.active_role) ? row.active_role : row.role;
+    profile = {
+      id: row.id,
+      full_name: row.full_name,
+      branch_id: row.branch_id,
+      role: active,
+      primary_role: row.role,
+      roles,
+      phone: user.phone || meta.phone || null,
+    };
+  }
   return { supabase, user, profile };
 });
 

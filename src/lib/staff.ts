@@ -7,15 +7,26 @@ export type Technician = { id: string; full_name: string | null; role: string; b
 /** Khoảng thời gian KTV đã bận (để đánh dấu "bận" khi chọn) */
 export type Busy = { id: string; technician_id: string; start_at: string; end_at: string };
 
+type StaffRow = { id: string; full_name: string | null; role: string; branch_id: string | null; extra_roles: string[] | null };
+
+/** Chọn vai trò đại diện của một người (ưu tiên theo thứ tự trong `order`), tính cả vai trò kiêm nhiệm */
+function pickRole(r: StaffRow, order: Record<string, number>): string {
+  return [r.role, ...(r.extra_roles ?? [])]
+    .filter((x) => x in order)
+    .sort((a, b) => order[a] - order[b])[0] ?? r.role;
+}
+
 export async function fetchTechnicians(supabase: Db): Promise<Technician[]> {
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name, role, branch_id")
-    .in("role", ["technician", "manager", "owner"])
+    .select("id, full_name, role, branch_id, extra_roles")
+    .or("role.in.(technician,manager,owner),extra_roles.ov.{technician,manager}")
     .eq("is_active", true)
     .order("full_name");
   const order: Record<string, number> = { technician: 0, manager: 1, owner: 2 };
-  return ((data ?? []) as Technician[]).sort((a, b) => order[a.role] - order[b.role]);
+  return ((data ?? []) as StaffRow[])
+    .map((r) => ({ id: r.id, full_name: r.full_name, branch_id: r.branch_id, role: pickRole(r, order) }))
+    .sort((a, b) => order[a.role] - order[b.role]);
 }
 
 export async function fetchBusy(supabase: Db, fromIso: string, toIso: string): Promise<Busy[]> {
@@ -52,12 +63,14 @@ export type Seller = { id: string; full_name: string | null; role: string; branc
 export async function fetchSellers(supabase: Db): Promise<Seller[]> {
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name, role, branch_id")
-    .in("role", ["technician", "receptionist", "manager", "owner"])
+    .select("id, full_name, role, branch_id, extra_roles")
+    .or("role.in.(technician,receptionist,manager,owner),extra_roles.ov.{technician,receptionist,manager}")
     .eq("is_active", true)
     .order("full_name");
   const order: Record<string, number> = { technician: 0, receptionist: 1, manager: 2, owner: 3 };
-  return ((data ?? []) as Seller[]).sort((a, b) => order[a.role] - order[b.role]);
+  return ((data ?? []) as StaffRow[])
+    .map((r) => ({ id: r.id, full_name: r.full_name, branch_id: r.branch_id, role: pickRole(r, order) }))
+    .sort((a, b) => order[a.role] - order[b.role]);
 }
 
 /** Vai trò được thu tiền (khớp hàm checkout_invoice) */

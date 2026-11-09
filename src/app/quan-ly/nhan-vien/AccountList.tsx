@@ -15,10 +15,15 @@ export type Account = {
   is_active: boolean;
   created_at: string;
   last_sign_in_at: string | null;
+  extra_roles: string[] | null;
 };
 
 const ASSIGNABLE = ["receptionist", "technician", "warehouse", "marketing", "manager", "customer"] as const;
 const NEEDS_BRANCH = new Set(["receptionist", "technician", "warehouse", "marketing"]);
+/** Vai trò có thể kiêm nhiệm thêm */
+const EXTRA = ["technician", "warehouse", "marketing", "receptionist", "manager"] as const;
+
+const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
 
 const ROLE_STYLE: Record<string, string> = {
   owner: "bg-navy text-white",
@@ -87,20 +92,32 @@ function AccountRow({ account: a, branches, isMe }: { account: Account; branches
   const router = useRouter();
   const [role, setRole] = useState(a.role);
   const [branch, setBranch] = useState(a.branch_id ?? "");
+  const savedExtra = (a.extra_roles ?? []).filter((r) => r !== a.role);
+  const [extra, setExtra] = useState<string[]>(savedExtra);
+  const extraNow = role === "customer" ? [] : extra.filter((r) => r !== role);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const editable = !isMe && a.role !== "owner";
-  const dirty = role !== a.role || (branch || null) !== a.branch_id;
+  const dirty = role !== a.role || (branch || null) !== a.branch_id || !sameSet(extraNow, savedExtra);
 
   async function save() {
     setMsg(null);
-    if (NEEDS_BRANCH.has(role) && !branch) return setMsg({ ok: false, text: "Vui lòng chọn chi nhánh." });
+    if ([role, ...extraNow].some((r) => NEEDS_BRANCH.has(r)) && !branch)
+      return setMsg({ ok: false, text: "Vui lòng chọn chi nhánh." });
     setSaving(true);
-    const { error } = await createClient().rpc("set_user_role", {
-      target_user: a.id,
-      new_role: role,
-      new_branch: role === "customer" ? null : branch || null,
-    });
+    const supabase = createClient();
+    if (role !== a.role || (branch || null) !== a.branch_id) {
+      const { error } = await supabase.rpc("set_user_role", {
+        target_user: a.id,
+        new_role: role,
+        new_branch: role === "customer" ? null : branch || null,
+      });
+      if (error) {
+        setSaving(false);
+        return setMsg({ ok: false, text: vnError(error.message) });
+      }
+    }
+    const { error } = await supabase.rpc("set_user_extra_roles", { target_user: a.id, p_roles: extraNow });
     setSaving(false);
     if (error) return setMsg({ ok: false, text: vnError(error.message) });
     setMsg({ ok: true, text: "Đã lưu." });
@@ -129,6 +146,11 @@ function AccountRow({ account: a, branches, isMe }: { account: Account; branches
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <span className={`rounded-full px-3 py-1 text-xs font-semibold ${ROLE_STYLE[a.role] ?? ""}`}>{ROLE_LABEL[a.role] ?? a.role}</span>
+          {savedExtra.map((r) => (
+            <span key={r} className={`rounded-full px-3 py-0.5 text-[11px] font-semibold ${ROLE_STYLE[r] ?? ""}`}>
+              + {ROLE_LABEL[r] ?? r}
+            </span>
+          ))}
           {!a.is_active && <span className="text-xs font-semibold text-[#8A2323]">Đã khoá</span>}
           {a.role !== "customer" && (
             <span className="text-xs text-ink/50">{branches.find((b) => b.id === a.branch_id)?.name ?? "Mọi chi nhánh"}</span>
@@ -138,6 +160,7 @@ function AccountRow({ account: a, branches, isMe }: { account: Account; branches
 
       {editable && (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-beige pt-3">
+          <span className="w-full text-xs font-semibold text-ink/60">Vai trò chính</span>
           <select className="input w-auto flex-1 py-2 text-sm" value={role} onChange={(e) => setRole(e.target.value)}>
             {ASSIGNABLE.map((r) => (
               <option key={r} value={r}>{ROLE_LABEL[r]}</option>
@@ -145,11 +168,26 @@ function AccountRow({ account: a, branches, isMe }: { account: Account; branches
           </select>
           {role !== "customer" && (
             <select className="input w-auto flex-1 py-2 text-sm" value={branch} onChange={(e) => setBranch(e.target.value)}>
-              <option value="">{NEEDS_BRANCH.has(role) ? "— Chọn chi nhánh —" : "Mọi chi nhánh"}</option>
+              <option value="">{[role, ...extraNow].some((r) => NEEDS_BRANCH.has(r)) ? "— Chọn chi nhánh —" : "Mọi chi nhánh"}</option>
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
+          )}
+          {role !== "customer" && (
+            <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="w-full text-xs font-semibold text-ink/60">Kiêm nhiệm thêm (người này tự chuyển vai trò trên app)</span>
+              {EXTRA.filter((r) => r !== role).map((r) => (
+                <label key={r} className="flex items-center gap-1.5 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={extra.includes(r)}
+                    onChange={(e) => setExtra((x) => (e.target.checked ? [...x, r] : x.filter((y) => y !== r)))}
+                  />
+                  {ROLE_LABEL[r]}
+                </label>
+              ))}
+            </div>
           )}
           <button className="btn-primary py-2" disabled={!dirty || saving} onClick={save}>
             {saving ? "…" : "Lưu"}
