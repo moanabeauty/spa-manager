@@ -88,9 +88,8 @@ select pg_temp.patch_fn('public.set_user_role(uuid, public.user_role, uuid)',
          extra_roles = case when new_role = 'customer' then '{}' else array_remove(extra_roles, new_role) end,
          active_role = null$n$);
 
--- danh sách tài khoản (chủ spa) kèm vai trò kiêm nhiệm
-drop function public.list_accounts();
-create function public.list_accounts()
+-- danh sách tài khoản (chủ spa) kèm vai trò kiêm nhiệm (hàm mới, giữ nguyên list_accounts cũ)
+create or replace function public.list_accounts_v2()
 returns table (
   id uuid, full_name text, phone text, email text, role public.user_role, branch_id uuid,
   is_active boolean, created_at timestamptz, last_sign_in_at timestamptz, extra_roles public.user_role[]
@@ -103,8 +102,8 @@ language sql stable security definer set search_path = '' as $$
    where public.has_role('owner')
    order by (p.role = 'customer'), p.full_name
 $$;
-revoke execute on function public.list_accounts() from public, anon;
-grant execute on function public.list_accounts() to authenticated;
+revoke execute on function public.list_accounts_v2() from public, anon;
+grant execute on function public.list_accounts_v2() to authenticated;
 
 -- ============ CÁC CHỖ KIỂM TRA VAI TRÒ TRỰC TIẾP ============
 -- được gán làm KTV cho dịch vụ

@@ -9,7 +9,7 @@ export default async function StaffAccountsPage() {
     return <p className="card text-sm">Chỉ chủ spa xem được trang này.</p>;
   }
   const [{ data: accounts, error }, { data: branches }] = await Promise.all([
-    supabase.rpc("list_accounts"),
+    supabase.rpc("list_accounts_v2"),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
   ]);
 
