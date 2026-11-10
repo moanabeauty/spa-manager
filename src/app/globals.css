@@ -8,7 +8,18 @@
   --color-cream: #f7f4ed;
   --color-brown: #a0845e;
   --color-ink: #282b38;
+  --color-gold: #c9ad7f;
   --font-sans: var(--font-be-vietnam), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-cormorant), "Times New Roman", serif;
+}
+
+/* Tiêu đề trang: chữ có chân giống logo Moana */
+@layer base {
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
 }
 
 /* Thanh nút Lưu/Thanh toán cố định ở đáy: trên điện thoại phải nằm TRÊN thanh menu dưới của nhân viên */
@@ -25,8 +36,28 @@
 }
 
 body {
-  background: var(--color-cream);
+  /* nền kem, góc trên có ánh sáng vàng nhạt như nền logo */
+  background:
+    radial-gradient(120% 60% at 50% -10%, #fbf6ec 0%, rgba(251, 246, 236, 0) 60%),
+    var(--color-cream);
+  background-attachment: fixed;
   color: var(--color-ink);
+}
+
+/* Khối nổi bật (trang chủ khách, đăng nhập): ánh lụa vàng – kem như ảnh logo */
+.brand-sheen {
+  background:
+    radial-gradient(90% 70% at 15% 0%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 60%),
+    radial-gradient(80% 80% at 100% 100%, rgba(201, 173, 127, 0.35) 0%, rgba(201, 173, 127, 0) 65%),
+    linear-gradient(160deg, #f6efe2 0%, #eadcc3 100%);
+}
+
+/* Ngôi sao 4 cánh trong logo – dùng làm điểm nhấn trang trí */
+.sparkle::before {
+  content: "✦";
+  margin-right: 0.4em;
+  color: var(--color-gold);
+  font-size: 0.8em;
 }
 
 @layer components {

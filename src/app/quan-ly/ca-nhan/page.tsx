@@ -4,11 +4,11 @@ import { formatShortDate, formatTime, formatVnd, todayVn } from "@/lib/format";
 import { monthEnd } from "@/lib/reports";
 import AttendanceFixForm from "./AttendanceFixForm";
 
-export const metadata = { title: "Cá nhân – Moana Beauty" };
+export const metadata = { title: "Của tôi – Moana Beauty" };
 
 type Att = { work_date: string; check_in: string; check_out: string | null; approval_status: string | null; ot_status: string | null; ot_hours_approved: number | null; in_status: string | null };
 
-/** Màn Cá nhân của KTV: lương tạm tính, công, nghỉ còn, tăng ca, doanh số, yêu cầu chờ duyệt */
+/** Màn Cá nhân của KTV (và mục "Của tôi" của quản lý, lễ tân, marketing): lương tạm tính, công, nghỉ còn, tăng ca, doanh số, yêu cầu chờ duyệt */
 export default async function PersonalPage() {
   const { supabase, profile } = await getCurrentUser();
   if (!profile) return null;
@@ -45,7 +45,7 @@ export default async function PersonalPage() {
     ...leaves.filter((l) => l.status === "pending").map((_, i) => ({ key: `l${i}`, text: "Đơn nghỉ phép" })),
     ...((fixR.data ?? []) as { id: string; work_date: string; reason: string }[]).map((r) => ({ key: r.id, text: `Sửa công ngày ${formatShortDate(r.work_date)}: ${r.reason}` })),
     ...((chgR.data ?? []) as { id: string; to_product: string; reason: string }[]).map((r) => ({ key: r.id, text: `Đổi sản phẩm sang ${r.to_product}` })),
-    ...((vouR.data ?? []) as { id: string; amount: number; description: string | null }[]).map((r) => ({ key: r.id, text: `Phiếu thu/chi ${formatVnd(Number(r.amount))}${r.description ? ` · ${r.description}` : ""}` })),
+    ...((vouR.data ?? []) as { id: string; amount: number; description: string | null }[]).map((r) => ({ key: r.id, text: `Thu chi tiền mặt ${formatVnd(Number(r.amount))}${r.description ? ` · ${r.description}` : ""}` })),
     ...((discR.data ?? []) as { id: string; amount: number; kind: string }[]).map((r) => ({ key: r.id, text: `${r.kind === "debt" ? "Cho nợ" : "Giảm giá"} ${formatVnd(Number(r.amount))}` })),
     ...att.filter((r) => r.in_status === "pending").map((r) => ({ key: `in${r.work_date}`, text: `Chấm vào sớm ngày ${formatShortDate(r.work_date)}` })),
     ...att.filter((r) => r.ot_status === "pending").map((r) => ({ key: `ot${r.work_date}`, text: `Tăng ca ngày ${formatShortDate(r.work_date)}` })),
@@ -53,6 +53,7 @@ export default async function PersonalPage() {
   ];
   const row = "flex min-h-12 items-center justify-between border-b border-[#EFECE6] text-sm last:border-0";
   const [y, m] = month.split("-");
+  const isKtv = profile.roles.includes("technician");
 
   return (
     <div className="-mx-4 -mt-6 space-y-3 pb-4">
@@ -89,7 +90,7 @@ export default async function PersonalPage() {
             <span>Hoa hồng{comm?.rate ? ` (${Math.round(Number(comm.rate) * 1000) / 10}%)` : " (3% / 5%)"}</span>
             <b>{formatVnd(Number(comm?.commission_amount ?? 0))}</b>
           </div>
-          <div className="flex justify-between text-[13px]"><span>Phí dịch vụ · {Number(fee?.services_done ?? 0)} lượt</span><b>{formatVnd(Number(fee?.fee_amount ?? 0))}</b></div>
+          {isKtv && <div className="flex justify-between text-[13px]"><span>Phí dịch vụ · {Number(fee?.services_done ?? 0)} lượt</span><b>{formatVnd(Number(fee?.fee_amount ?? 0))}</b></div>}
           <div className="flex gap-4">
             <Link href="/quan-ly/hoa-don" className="flex min-h-8 items-center text-[13px] font-semibold text-navy">Hoá đơn tôi đã bán ›</Link>
             <Link href="/quan-ly/doanh-so" className="flex min-h-8 items-center text-[13px] font-semibold text-navy">Phiếu lương chi tiết ›</Link>
@@ -116,9 +117,9 @@ export default async function PersonalPage() {
             </ul>
           </details>
           <Link href="/quan-ly/nghi-phep" className={row}>Đăng ký nghỉ<span className="text-[#646464]">›</span></Link>
-          <Link href="/quan-ly/ngoai-gio?kieu=ra" className={row}>Xin tăng ca (chấm ra sau 18:30)<span className="text-[#646464]">›</span></Link>
+          {isKtv && <Link href="/quan-ly/ngoai-gio?kieu=ra" className={row}>Xin tăng ca (chấm ra sau 18:30)<span className="text-[#646464]">›</span></Link>}
           <AttendanceFixForm />
-          <Link href="/quan-ly/phieu-thu-chi" className={row}>Phiếu thu / chi quầy<span className="text-[#646464]">›</span></Link>
+          <Link href="/quan-ly/phieu-thu-chi" className={row}>Thu chi tiền mặt tại spa<span className="text-[#646464]">›</span></Link>
           <details>
             <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between text-sm">
               Yêu cầu của tôi

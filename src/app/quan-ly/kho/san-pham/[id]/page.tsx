@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import { formatShortDate, formatVnd, todayVn } from "@/lib/format";
 import {
-  MOVEMENT_LABEL, PRODUCT_COLUMNS, WAREHOUSE_LABEL, canManageStock, fetchDefaultDiscountPct, productLabel, retailMinPrice,
+  MOVEMENT_LABEL, PRODUCT_COLUMNS, WAREHOUSE_LABEL, canEditProducts, fetchDefaultDiscountPct, productLabel, retailMinPrice,
   type Product, type Warehouse,
 } from "@/lib/inventory";
 import ProductEdit from "./ProductEdit";
@@ -13,7 +13,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const { supabase, profile } = await getCurrentUser();
   if (!isStaffRole(profile?.role)) return <p className="card text-sm">Trang dành cho nhân viên.</p>;
-  const canEdit = canManageStock(profile?.role);
+  const canEdit = canEditProducts(profile?.roles);
   const [{ data }, { data: whs }, { data: branches }, { data: levels }, { data: moves }, pct] = await Promise.all([
     supabase.from("products").select(PRODUCT_COLUMNS).eq("id", id).maybeSingle(),
     supabase.from("warehouses").select("id, branch_id, type, name"),

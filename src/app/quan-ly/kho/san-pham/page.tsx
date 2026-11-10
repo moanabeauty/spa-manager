@@ -1,5 +1,5 @@
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
-import { PRODUCT_COLUMNS, canManageStock, fetchDefaultDiscountPct, type Product } from "@/lib/inventory";
+import { PRODUCT_COLUMNS, canEditProducts, fetchDefaultDiscountPct, type Product } from "@/lib/inventory";
 import ProductEditor from "./ProductEditor";
 
 export const metadata = { title: "Sản phẩm – Moana Beauty" };
@@ -7,7 +7,7 @@ export const metadata = { title: "Sản phẩm – Moana Beauty" };
 export default async function ProductsPage() {
   const { supabase, profile } = await getCurrentUser();
   if (!isStaffRole(profile?.role)) return <p className="card text-sm">Trang dành cho nhân viên.</p>;
-  const canEdit = canManageStock(profile?.role);
+  const canEdit = canEditProducts(profile?.roles);
   const [{ data: products }, pct] = await Promise.all([
     supabase.from("products").select(PRODUCT_COLUMNS).order("name"),
     fetchDefaultDiscountPct(supabase),

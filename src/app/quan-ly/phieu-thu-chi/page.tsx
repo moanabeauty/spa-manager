@@ -3,7 +3,7 @@ import { formatShortDate, formatTime, formatVnd } from "@/lib/format";
 import { CASH_METHOD_LABEL } from "@/lib/reports";
 import VoucherForm, { VoucherReview } from "./VoucherForm";
 
-export const metadata = { title: "Phiếu thu / chi tại quầy – Moana Beauty" };
+export const metadata = { title: "Thu chi tiền mặt tại spa – Moana Beauty" };
 
 type Voucher = {
   id: string; code: string | null; kind: string; amount: number; method: string; description: string | null;
@@ -39,7 +39,7 @@ export default async function VoucherPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-navy">Phiếu thu / chi tại quầy</h1>
+        <h1 className="text-2xl font-bold text-navy">Thu chi tiền mặt tại spa</h1>
         <p className="text-sm text-ink/70">
           Ghi các khoản tiền mặt thu / chi lặt vặt tại quầy: tiền ship, mua dụng cụ, đồ dùng… {manage ? "Phiếu của quản lý / chủ spa được duyệt luôn." : "Chủ spa / quản lý duyệt xong mới vào sổ thu chi."}
         </p>

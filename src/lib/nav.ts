@@ -4,7 +4,7 @@ import type { Profile } from "@/lib/supabase/server";
 type Role = Profile["role"];
 export type NavItem = { href: string; label: string; badge?: number };
 export type NavGroup = { key: string; label: string; icon: IconName; items: NavItem[]; badge: number };
-export type IconName = "home" | "desk" | "users" | "box" | "staff" | "chart" | "settings" | "megaphone";
+export type IconName = "home" | "desk" | "users" | "box" | "staff" | "chart" | "settings" | "megaphone" | "check";
 
 /** Số việc đang chờ (hiện trên nhóm / mục) */
 export type NavCounts = {
@@ -20,6 +20,12 @@ export type NavCounts = {
   ktv: number; // KTV xin đổi sản phẩm + chấm vào sớm + xin sửa công
   marketing: number; // chủ: bài chờ duyệt · Marketing: bài cần sửa
 };
+
+/** Tổng số việc cần chủ / quản lý duyệt (gom ở trang Việc chờ duyệt) */
+export function approvalTotal(role: Role, c: NavCounts): number {
+  if (role !== "owner" && role !== "manager") return 0;
+  return c.discounts + c.vouchers + c.attendance + c.leaves + c.ktv + c.stockRequests + (role === "owner" ? c.stockCounts + c.receipts + c.marketing : 0);
+}
 
 export function buildNav(role: Role, c: NavCounts): NavGroup[] {
   const M = role === "owner" || role === "manager";
@@ -41,6 +47,7 @@ export function buildNav(role: Role, c: NavCounts): NavGroup[] {
   };
   const groups: Omit<NavGroup, "badge">[] = [
     { key: "tong-quan", label: "Tổng quan", icon: "home", items: item(!MK, "/quan-ly", "Tổng quan") },
+    { key: "cho-duyet", label: "Chờ duyệt", icon: "check", items: item(M, "/quan-ly/cho-duyet", "Việc chờ duyệt", approvalTotal(role, c)) },
     ...(MK ? [marketingGroup] : []),
     {
       key: "quan-ly",
@@ -48,10 +55,9 @@ export function buildNav(role: Role, c: NavCounts): NavGroup[] {
       icon: "desk",
       items: [
         ...item(!L, "/quan-ly/lich-hen", "Lịch hẹn"),
-        ...item(!L, "/quan-ly/tao-lich", "+ Tạo lịch"),
         ...item(!L, "/quan-ly/thu-tien", "Thu tiền"),
         ...item(!L, "/quan-ly/hoa-don", "Hoá đơn"),
-        ...item(true, "/quan-ly/phieu-thu-chi", "Phiếu thu / chi", M ? c.vouchers : 0),
+        ...item(true, "/quan-ly/phieu-thu-chi", "Thu chi tiền mặt tại spa", M ? c.vouchers : 0),
         ...item(M, "/quan-ly/duyet-giam-gia", "Duyệt giảm giá & nợ", c.discounts),
         ...item(M, "/quan-ly/theo-doi-ktv", "Theo dõi KTV", c.ktv),
       ],
@@ -77,7 +83,6 @@ export function buildNav(role: Role, c: NavCounts): NavGroup[] {
         ...item(stockManage, "/quan-ly/kho/nhap-hang", "Nhập hàng", O ? c.receipts : 0),
         ...item(!MK, "/quan-ly/kho/xin-xuat", stockManage ? "Phiếu xin xuất" : "Xin xuất hàng", stockManage ? c.stockRequests : 0),
         ...item(stockManage, "/quan-ly/kho/kiem-kho", "Kiểm kho", O ? c.stockCounts : 0),
-        ...item(O, "/quan-ly/kho/cong-no-ncc", "Công nợ nhà cung cấp"),
         ...item(stockManage, "/quan-ly/kho/chuyen-kho", "Chuyển kho"),
         ...item(!MK, "/quan-ly/kho/san-pham", "Sản phẩm"),
         ...item(!MK, "/quan-ly/kho/lich-su", "Lịch sử nhập / xuất"),
@@ -88,6 +93,7 @@ export function buildNav(role: Role, c: NavCounts): NavGroup[] {
       label: "Nhân sự",
       icon: "staff",
       items: [
+        ...item(!O && !W, "/quan-ly/ca-nhan", "Của tôi"),
         ...item(M, "/quan-ly/cham-cong", "Chấm công & tăng ca", c.attendance),
         ...item(true, "/quan-ly/nghi-phep", "Nghỉ phép", M ? c.leaves : 0),
         ...item(O, "/quan-ly/bang-luong", "Bảng lương"),
@@ -103,7 +109,8 @@ export function buildNav(role: Role, c: NavCounts): NavGroup[] {
         ...item(M, "/quan-ly/bao-cao", "Doanh thu"),
         ...item(M, "/quan-ly/bao-cao/goi-the", "Gói & thẻ còn nợ khách"),
         ...item(M, "/quan-ly/bao-cao/cong-no", "Công nợ khách"),
-        ...item(O, "/quan-ly/thu-chi", "Thu chi & lợi nhuận"),
+        ...item(O, "/quan-ly/kho/cong-no-ncc", "Công nợ nhà cung cấp"),
+        ...item(O, "/quan-ly/thu-chi", "Sổ quỹ & lợi nhuận"),
       ],
     },
     ...(O ? [marketingGroup] : []),
@@ -115,7 +122,6 @@ export function buildNav(role: Role, c: NavCounts): NavGroup[] {
         ...item(M, "/quan-ly/dich-vu", "Menu dịch vụ"),
         ...item(M, "/quan-ly/goi-combo", "Gói combo"),
         ...item(M, "/quan-ly/khuyen-mai/chuong-trinh", "Chương trình khuyến mãi"),
-        ...item(M, "/quan-ly/kho/san-pham", "Danh mục sản phẩm"),
         ...item(M, "/quan-ly/cai-dat/bai-viet", "Bài viết web khách"),
         ...item(O, "/quan-ly/cai-dat/crm", "Cài đặt CRM"),
         ...item(O, "/quan-ly/cai-dat/luong", "Lương nhân viên"),
@@ -127,7 +133,8 @@ export function buildNav(role: Role, c: NavCounts): NavGroup[] {
     .filter((g) => g.items.length > 0)
     .map((g) => ({ ...g, badge: g.items.reduce((a, i) => a + (i.badge ?? 0), 0) }));
   // Tổng quan: tổng số việc chờ duyệt / xử lý
-  const total = out.reduce((a, g) => a + (g.key === "tong-quan" ? 0 : g.badge), 0);
+  // (không cộng nhóm Chờ duyệt vì các việc đó đã tính trong nhóm gốc)
+  const total = out.reduce((a, g) => a + (g.key === "tong-quan" || g.key === "cho-duyet" ? 0 : g.badge), 0);
   const home = out.find((g) => g.key === "tong-quan");
   if (home) home.badge = total;
   return out;

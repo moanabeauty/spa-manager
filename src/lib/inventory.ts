@@ -103,6 +103,11 @@ export async function fetchStock(supabase: Db, warehouseIds: string[]): Promise<
 }
 
 /** Chủ / quản lý: mọi chi nhánh; quản lý kho: chi nhánh của mình */
+/** Có quyền sửa danh mục sản phẩm theo BẤT KỲ vai trò nào (VD: KTV kiêm Kho đang ở giao diện KTV) – khớp quyền dữ liệu has_role */
+export function canEditProducts(roles: readonly string[] | null | undefined): boolean {
+  return (roles ?? []).some((r) => r === "owner" || r === "manager" || r === "warehouse");
+}
+
 export function canManageStock(role: string | null | undefined): boolean {
   return role === "owner" || role === "manager" || role === "warehouse";
 }

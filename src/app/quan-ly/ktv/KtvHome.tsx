@@ -39,7 +39,11 @@ export default async function KtvHome({ profile }: { profile: Profile }) {
   return (
     <div className="-mx-4 -mt-6 space-y-4">
       <div className="bg-navy px-5 pb-6 pt-5 text-white">
-        <p className="text-[13px] tracking-wider text-beige-dark">MOANA · {(branch?.name ?? "").replace(/^Moana\s*/i, "").toUpperCase()}</p>
+        <div className="flex items-center gap-2 text-[13px] tracking-wider text-beige-dark">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-moana-light.png" alt="Moana" width={72} height={25} className="h-6 w-auto" />
+          <span>· {(branch?.name ?? "").replace(/^Moana\s*/i, "").toUpperCase()}</span>
+        </div>
         <h1 className="text-[22px] font-bold">Chào {first || "bạn"}</h1>
         <p className="text-sm text-[#C9CADB]">{weekdayShort(today)}/{today.slice(0, 4)}</p>
         <div className="mt-3">

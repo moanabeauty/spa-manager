@@ -20,9 +20,10 @@ export default async function Home() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl bg-beige px-6 py-10 text-center">
-        <p className="text-xs uppercase tracking-[0.35em] text-brown">Moana Beauty</p>
-        <h1 className="mt-3 text-2xl font-bold text-navy sm:text-3xl">Đặt lịch chăm sóc da</h1>
+      <section className="brand-sheen rounded-3xl px-6 py-10 text-center ring-1 ring-gold/30">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-moana.png" alt="Moana Beauty" width={212} height={74} className="mx-auto h-16 w-auto sm:h-20" />
+        <h1 className="mt-5 text-3xl text-navy sm:text-4xl">Đặt lịch chăm sóc da</h1>
         <p className="mx-auto mt-3 max-w-md text-sm text-ink/80">
           Chọn chi nhánh, dịch vụ và giờ phù hợp. Moana sẽ xác nhận lịch với bạn sớm nhất.
         </p>
@@ -52,7 +53,7 @@ export default async function Home() {
       {sections.map((s) => (
         <section key={s.k} className="space-y-3">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-bold text-navy">{POST_KIND[s.k].label}</h2>
+            <h2 className="sparkle font-display text-2xl font-bold text-navy">{POST_KIND[s.k].label}</h2>
             <Link href={POST_KIND[s.k].path} className="text-sm font-semibold text-navy underline">Xem tất cả</Link>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">

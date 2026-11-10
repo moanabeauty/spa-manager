@@ -4,6 +4,7 @@ import CheckInBar from "@/components/CheckInBar";
 import PushToggle from "@/components/PushToggle";
 import StaffNav from "@/components/StaffNav";
 import KtvNav from "@/components/KtvNav";
+import KtvTopSearch from "./ktv/KtvTopSearch";
 import RoleSwitcher from "@/components/RoleSwitcher";
 import { todayVn } from "@/lib/format";
 import { buildNav } from "@/lib/nav";
@@ -33,6 +34,7 @@ export default async function ManagerLayout({ children }: { children: React.Reac
       <div className="space-y-4 pb-24">
         <KtvNav />
         <RoleSwitcher roles={profile!.roles} active={role} />
+        <KtvTopSearch />
         {children}
       </div>
     );

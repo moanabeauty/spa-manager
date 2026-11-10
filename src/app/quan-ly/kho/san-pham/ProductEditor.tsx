@@ -85,6 +85,11 @@ export default function ProductEditor({
             📷 Quét mã vạch
           </button>
         </div>
+        {canEdit && (
+          <button className="btn-outline w-full py-2" onClick={() => { setNewBarcode(""); setOpen(open === "new" ? null : "new"); }}>
+            {open === "new" ? "Đóng form thêm sản phẩm" : "+ Thêm sản phẩm mới"}
+          </button>
+        )}
         {scanMsg && <p className="rounded-lg bg-cream px-3 py-2 text-xs">{scanMsg}</p>}
         <div className="flex flex-wrap gap-2 text-xs">
           {(
@@ -100,11 +105,6 @@ export default function ProductEditor({
               {label}
             </button>
           ))}
-          {canEdit && (
-            <button className="ml-auto rounded-full bg-[#D6EDD8] px-3 py-1.5 font-semibold text-[#22612A]" onClick={() => { setNewBarcode(""); setOpen(open === "new" ? null : "new"); }}>
-              + Sản phẩm mới
-            </button>
-          )}
         </div>
         {open === "new" && <ProductForm key={newBarcode} initialBarcode={newBarcode} cost={showCost ? null : undefined} defaultPct={defaultPct} onDone={() => setOpen(null)} />}
       </div>

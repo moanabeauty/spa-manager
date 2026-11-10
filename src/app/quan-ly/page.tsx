@@ -34,17 +34,19 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const myBranch = M ? null : profile!.branch_id;
 
   const counts = await loadNavCounts(role, profile!.branch_id);
+  // chủ / quản lý: mọi việc cần duyệt mở thẳng trang Việc chờ duyệt (đúng mục)
+  const cd = (hash: string, own: string) => (M ? `/quan-ly/cho-duyet#${hash}` : own);
   const approvals = [
-    { n: counts.discounts, label: O ? "Giảm giá / cho nợ chờ duyệt" : "Cho nợ chờ duyệt", href: "/quan-ly/duyet-giam-gia" },
-    { n: counts.vouchers, label: "Phiếu thu / chi tại quầy", href: "/quan-ly/phieu-thu-chi" },
-    { n: counts.stockRequests, label: "Phiếu xin xuất kho", href: "/quan-ly/kho/xin-xuat" },
-    { n: counts.stockCounts, label: "Kiểm kho bị lệch", href: "/quan-ly/kho/kiem-kho" },
-    { n: counts.receipts, label: "Phiếu nhập chờ duyệt giá", href: "/quan-ly/kho/nhap-hang" },
+    { n: counts.discounts, label: O ? "Giảm giá / cho nợ chờ duyệt" : "Cho nợ chờ duyệt", href: cd("giam-gia", "/quan-ly/duyet-giam-gia") },
+    { n: counts.vouchers, label: "Thu chi tiền mặt tại spa", href: cd("thu-chi", "/quan-ly/phieu-thu-chi") },
+    { n: counts.stockRequests, label: "Phiếu xin xuất kho", href: cd("xin-xuat", "/quan-ly/kho/xin-xuat") },
+    { n: counts.stockCounts, label: "Kiểm kho bị lệch", href: cd("kiem-kho", "/quan-ly/kho/kiem-kho") },
+    { n: counts.receipts, label: "Phiếu nhập chờ duyệt giá", href: cd("nhap-hang", "/quan-ly/kho/nhap-hang") },
     { n: counts.promos, label: "Khách đăng ký khuyến mãi", href: "/quan-ly/khuyen-mai" },
-    { n: counts.attendance, label: "Chấm công / tăng ca", href: "/quan-ly/cham-cong" },
-    { n: counts.leaves, label: "Đơn nghỉ phép", href: "/quan-ly/nghi-phep" },
-    { n: counts.ktv, label: "KTV: đổi sản phẩm / chấm công", href: "/quan-ly/theo-doi-ktv" },
-    { n: O ? counts.marketing : 0, label: "Bài Marketing chờ duyệt", href: "/quan-ly/marketing" },
+    { n: counts.attendance, label: "Chấm công / tăng ca", href: cd("cham-cong", "/quan-ly/cham-cong") },
+    { n: counts.leaves, label: "Đơn nghỉ phép", href: cd("nghi-phep", "/quan-ly/nghi-phep") },
+    { n: counts.ktv, label: "KTV: đổi sản phẩm / chấm công", href: cd("ktv", "/quan-ly/theo-doi-ktv") },
+    { n: O ? counts.marketing : 0, label: "Bài Marketing chờ duyệt", href: cd("marketing", "/quan-ly/marketing") },
   ].filter((a) => a.n > 0 && (M || a.href === "/quan-ly/khuyen-mai" || (W && a.href.startsWith("/quan-ly/kho"))));
 
   let appts: Appt[] = [];
@@ -91,12 +93,12 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         { href: "/quan-ly/kho/nhap-hang", label: "Nhập hàng" },
         { href: "/quan-ly/kho/kiem-kho", label: "Kiểm kho" },
         { href: "/quan-ly/kho/chuyen-kho", label: "Chuyển kho" },
-        { href: "/quan-ly/phieu-thu-chi", label: "Phiếu thu / chi" },
+        { href: "/quan-ly/phieu-thu-chi", label: "Thu chi tiền mặt" },
       ]
     : [
         { href: "/quan-ly/tao-lich", label: "+ Tạo lịch" },
         { href: "/quan-ly/thu-tien", label: "Thu tiền / bán hàng" },
-        { href: "/quan-ly/phieu-thu-chi", label: "Phiếu thu / chi" },
+        { href: "/quan-ly/phieu-thu-chi", label: "Thu chi tiền mặt" },
         { href: "/quan-ly/kho/xin-xuat", label: "Xin xuất hàng" },
       ];
 
@@ -117,7 +119,10 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
       {(M || W || approvals.length > 0) && (
         <section className="card space-y-2 p-4">
-          <h2 className="font-semibold text-navy">Chờ duyệt / xử lý</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-navy">Chờ duyệt / xử lý</h2>
+            {M && <Link href="/quan-ly/cho-duyet" className="text-sm text-navy underline">Mở Việc chờ duyệt</Link>}
+          </div>
           {approvals.length === 0 ? (
             <p className="text-sm text-[#22612A]">✓ Không có việc nào đang chờ.</p>
           ) : (

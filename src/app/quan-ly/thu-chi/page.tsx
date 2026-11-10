@@ -5,7 +5,7 @@ import { CASH_METHOD_LABEL, isMonth, monthEnd, pctText, shortLabel } from "@/lib
 import ReportNav from "../bao-cao/ReportNav";
 import CashbookForm, { DeleteEntryButton, type Category } from "./CashbookForm";
 
-export const metadata = { title: "Thu chi & lợi nhuận – Moana Beauty" };
+export const metadata = { title: "Sổ quỹ & lợi nhuận – Moana Beauty" };
 
 type Flow = { month: number; kind: "income" | "expense"; source: string; category: string; amount: number };
 type EntryRow = {
@@ -59,7 +59,7 @@ export default async function CashbookPage({ searchParams }: { searchParams: Pro
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-navy">Thu chi & lợi nhuận {year}</h1>
+        <h1 className="text-2xl font-bold text-navy">Sổ quỹ & lợi nhuận {year}</h1>
         <p className="text-sm text-ink/70">{branch ? bname(branch) : "Cả 2 chi nhánh + khoản chung"}</p>
       </div>
       <ReportNav active="thu-chi" isOwner />
@@ -188,7 +188,7 @@ export default async function CashbookPage({ searchParams }: { searchParams: Pro
 
       <p className="text-xs text-ink/60">
         <b>Thu</b> = tiền khách trả tại quầy (tiền mặt + chuyển khoản + POS, gồm cả tiền nạp thẻ và bán gói) + tiền thu nợ khách + các khoản
-        thu nhập tay. Phiếu thu / chi tại quầy chỉ được tính sau khi chủ spa / quản lý duyệt.
+        thu nhập tay. Phiếu thu chi tiền mặt tại spa chỉ được tính sau khi chủ spa / quản lý duyệt.
         Dịch vụ trừ thẻ không tính lại vì tiền đã thu lúc nạp. <b>Chi</b> = tiền hoàn khách khi huỷ gói / thẻ + các khoản chi nhập tay
         (lương ghi từ trang Bảng lương). Lọc theo chi nhánh thì không gồm khoản “Chung”. Đây là dòng tiền thực tế: tháng khách nạp thẻ
         / mua gói nhiều thì lợi nhuận cao, nhưng spa vẫn còn nợ dịch vụ (xem trang Gói & thẻ).
