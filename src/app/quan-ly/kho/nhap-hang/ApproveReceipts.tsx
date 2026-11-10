@@ -69,9 +69,7 @@ function ReceiptCard({
   );
   const [extras, setExtras] = useState<Extra[]>(() => r.extra_costs.map((x, k) => ({ key: k, label: x.label, amount: Number(x.amount) })));
   const [supplier, setSupplier] = useState(r.supplier ?? "");
-  const [payableEdit, setPayableEdit] = useState<number | null>(null); // null = theo tiền hàng
   const [paid, setPaid] = useState(0);
-  const [method, setMethod] = useState("bank_transfer");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,7 +79,7 @@ function ReceiptCard({
   const landed = (price: number) =>
     extraTotal <= 0 ? price : Math.round(price + (goods > 0 ? (extraTotal * price) / goods : extraTotal / Math.max(1, units)));
   const missing = r.items.some((i) => !(prices[i.movement_id] > 0));
-  const payable = payableEdit ?? goods;
+  const payable = goods; // chỉ tiền hàng; ship / chi phí khác trả ngoài
   const owe = Math.max(0, payable - paid);
   const debtBefore = debts[supplier.trim().toLowerCase()] ?? 0;
 
@@ -96,9 +94,7 @@ function ReceiptCard({
       p_prices: r.items.map((i) => ({ movement_id: i.movement_id, unit_cost: prices[i.movement_id] || 0 })),
       p_extra_costs: extras.filter((x) => x.amount > 0).map((x) => ({ label: x.label, amount: x.amount })),
       p_supplier: supplier.trim() || null,
-      p_payable: payable,
       p_paid: paid,
-      p_method: method,
     });
     setBusy(false);
     if (error) return setError(vnError(error.message));
@@ -199,22 +195,15 @@ function ReceiptCard({
           value={supplier}
           onChange={(e) => setSupplier(e.target.value)}
         />
-        <label className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2">
           <span>Cần trả nhà cung cấp</span>
-          <MoneyInput value={payable} onChange={(n) => setPayableEdit(n)} className="w-32" ariaLabel="Cần trả nhà cung cấp" />
-        </label>
-        <p className="-mt-1 text-xs text-ink/55">Mặc định = tiền hàng. Sửa nếu NCC tính thêm ship / chiết khấu.</p>
+          <b>{formatVnd(payable)}</b>
+        </div>
+        <p className="-mt-1 text-xs text-ink/55">Chỉ tiền hàng — tiền ship / chi phí khác trả riêng.</p>
         <label className="flex items-center justify-between gap-2">
           <span>Đã trả nhà cung cấp</span>
           <MoneyInput value={paid} onChange={setPaid} className="w-32" ariaLabel="Đã trả" />
         </label>
-        {paid > 0 && (
-          <select className="w-full rounded-lg border border-beige-dark bg-white px-3 py-2 text-sm" value={method} onChange={(e) => setMethod(e.target.value)}>
-            <option value="bank_transfer">Chuyển khoản</option>
-            <option value="cash">Tiền mặt</option>
-            <option value="other">Khác</option>
-          </select>
-        )}
         <div className="flex gap-2 text-xs">
           <button className="rounded-full bg-white px-3 py-1.5 font-semibold text-navy" onClick={() => setPaid(payable)}>Trả đủ</button>
           <button className="rounded-full bg-white px-3 py-1.5 font-semibold text-navy" onClick={() => setPaid(0)}>Chưa trả</button>

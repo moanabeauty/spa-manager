@@ -1,5 +1,5 @@
 -- Công nợ nhà cung cấp (chỉ chủ spa):
---  mỗi phiếu nhập: Tổng đơn (tiền hàng + chi phí) · Cần trả NCC · Đã trả NCC · Còn nợ; mỗi NCC: tổng dư nợ.
+--  mỗi phiếu nhập: Tổng đơn (tiền hàng + chi phí) · Cần trả NCC (= tiền hàng) · Đã trả NCC · Còn nợ; mỗi NCC: tổng dư nợ.
 create table public.suppliers (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -143,7 +143,7 @@ begin
   end loop;
   if v_n = 0 then raise exception 'Phiếu nhập không có sản phẩm'; end if;
 
-  v_payable := round(coalesce(p_payable, v_goods));
+  v_payable := v_goods; -- chỉ trả NCC tiền hàng; tiền ship / chi phí khác chủ spa tự thanh toán ngoài
   if v_payable < 0 then raise exception 'Số tiền cần trả nhà cung cấp không hợp lệ'; end if;
   if v_paid < 0 or v_paid > v_payable then raise exception 'Số tiền đã trả phải từ 0 đến số cần trả nhà cung cấp'; end if;
   if v_paid < v_payable and nullif(trim(coalesce(p_supplier, '')), '') is null then

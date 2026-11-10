@@ -11,7 +11,6 @@ export default function PayButton({ receiptId, owe }: { receiptId: string; owe: 
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(owe);
-  const [method, setMethod] = useState("bank_transfer");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +25,7 @@ export default function PayButton({ receiptId, owe }: { receiptId: string; owe: 
   async function pay() {
     setBusy(true);
     setError(null);
-    const { error } = await createClient().rpc("pay_supplier", { p_receipt_id: receiptId, p_amount: amount, p_method: method, p_note: note });
+    const { error } = await createClient().rpc("pay_supplier", { p_receipt_id: receiptId, p_amount: amount, p_method: null, p_note: note });
     setBusy(false);
     if (error) return setError(vnError(error.message));
     setOpen(false);
@@ -40,11 +39,6 @@ export default function PayButton({ receiptId, owe }: { receiptId: string; owe: 
         <MoneyInput value={amount} onChange={setAmount} className="w-32" ariaLabel="Số tiền trả" />
       </label>
       <p className="text-xs text-ink/55">Còn nợ phiếu này {formatVnd(owe)}</p>
-      <select className="w-full rounded-lg border border-beige-dark bg-white px-3 py-2" value={method} onChange={(e) => setMethod(e.target.value)}>
-        <option value="bank_transfer">Chuyển khoản</option>
-        <option value="cash">Tiền mặt</option>
-        <option value="other">Khác</option>
-      </select>
       <input className="w-full rounded-lg border border-beige-dark bg-white px-3 py-2" placeholder="Ghi chú (không bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} />
       {error && <p className="text-[#8A2323]">{error}</p>}
       <div className="flex gap-2">

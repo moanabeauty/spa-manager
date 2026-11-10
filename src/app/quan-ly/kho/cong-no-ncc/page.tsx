@@ -19,7 +19,6 @@ type Row = {
   payments: { amount: number; method: string; paid_on: string; note: string | null }[];
 };
 
-const METHOD: Record<string, string> = { bank_transfer: "CK", cash: "TM", other: "Khác" };
 const d = (s: string) => new Date(s).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
 
 export default async function SupplierDebtPage({ searchParams }: { searchParams: Promise<{ all?: string }> }) {
@@ -84,7 +83,7 @@ export default async function SupplierDebtPage({ searchParams }: { searchParams:
                   <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     <dt className="text-ink/60">Tổng đơn</dt>
                     <dd className="text-right">{formatVnd(r.goods_total + r.extra_cost_total)}</dd>
-                    <dt className="text-ink/60">Cần trả NCC</dt>
+                    <dt className="text-ink/60">Cần trả NCC (tiền hàng)</dt>
                     <dd className="text-right">{formatVnd(r.payable)}</dd>
                     <dt className="text-ink/60">Đã trả NCC</dt>
                     <dd className="text-right">{formatVnd(r.paid)}</dd>
@@ -95,7 +94,7 @@ export default async function SupplierDebtPage({ searchParams }: { searchParams:
                     <ul className="mt-2 space-y-0.5 border-t border-beige pt-2 text-xs text-ink/60">
                       {r.payments.map((p, k) => (
                         <li key={k}>
-                          {d(p.paid_on)} · {METHOD[p.method] ?? p.method} · {formatVnd(Number(p.amount))}
+                          {d(p.paid_on)} · {formatVnd(Number(p.amount))}
                           {p.note ? ` · ${p.note}` : ""}
                         </li>
                       ))}
