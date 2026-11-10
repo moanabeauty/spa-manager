@@ -10,6 +10,8 @@ export type MenuService = {
   category_id: string | null;
   name: string;
   name_en: string | null;
+  internal_name: string | null;
+  internal_note: string | null;
   duration_minutes: number;
   price: number | null;
   member_price: number | null;
@@ -27,7 +29,7 @@ type Category = { id: string; name: string; sort_order: number };
 type Draft = Partial<Omit<MenuService, "id">>;
 
 const FIELDS: (keyof Draft)[] = [
-  "category_id", "name", "name_en", "duration_minutes", "price", "member_price",
+  "category_id", "name", "name_en", "internal_name", "internal_note", "duration_minutes", "price", "member_price",
   "technician_fee", "card_allowed", "commission_eligible", "fee_once_per_visit", "is_active", "branch_id",
   "menu_tier", "followup_days", "recall_days",
 ];
@@ -94,7 +96,7 @@ export default function MenuEditor({
         (showHidden || s.is_active) &&
         (!onlyMissing || s.technician_fee === 0) &&
         (!tierFilter || s.menu_tier === tierFilter) &&
-        (!q || normalizeText(`${s.name} ${s.name_en ?? ""}`).includes(q)),
+        (!q || normalizeText(`${s.name} ${s.name_en ?? ""} ${s.internal_name ?? ""}`).includes(q)),
     );
     const g = categories.map((c) => ({ id: c.id, name: c.name, items: list.filter((s) => s.category_id === c.id) }));
     const none = list.filter((s) => !s.category_id || !categories.some((c) => c.id === s.category_id));
@@ -105,7 +107,7 @@ export default function MenuEditor({
   async function saveAll() {
     setMsg(null);
     for (const c of changes) {
-      if (c.patch.name !== undefined && !c.patch.name.trim()) return setMsg({ ok: false, text: `Tên dịch vụ không được để trống.` });
+      if (c.patch.name !== undefined && !c.patch.name.trim()) return setMsg({ ok: false, text: `Diễn giải tiếng Việt không được để trống.` });
       if (c.patch.duration_minutes !== undefined && !(c.patch.duration_minutes > 0))
         return setMsg({ ok: false, text: `${c.name}: thời lượng phải lớn hơn 0.` });
     }
@@ -194,7 +196,11 @@ export default function MenuEditor({
                       className="col-span-3 text-left text-sm font-medium sm:col-span-1"
                       onClick={() => setOpenId(open ? null : s.id)}
                     >
-                      {val(s, "name")}
+                      <span className="block font-semibold uppercase tracking-wide text-navy">{val(s, "name_en") || val(s, "name")}</span>
+                      <span className="block text-xs font-normal text-ink/70">
+                        {val(s, "name")}
+                        {val(s, "internal_name") && val(s, "internal_name") !== val(s, "name") && <span className="text-ink/50"> · {val(s, "internal_name")}</span>}
+                      </span>
                       {!val(s, "is_active") && <span className="ml-1 text-xs text-[#8A2323]">(ngừng)</span>}
                       <span className="ml-1 text-xs text-navy/60">{open ? "▴" : "▾ chi tiết"}</span>
                     </button>
@@ -230,12 +236,20 @@ export default function MenuEditor({
                   {open && (
                     <div className="mt-3 grid gap-3 rounded-xl bg-cream p-3 sm:grid-cols-2">
                       <label className="text-sm">
-                        <span className="label">Tên dịch vụ</span>
+                        <span className="label">Tên truyền thông (khách thấy)</span>
+                        <input className="input py-2" value={val(s, "name_en") ?? ""} onChange={(e) => edit(s.id, { name_en: e.target.value || null })} />
+                      </label>
+                      <label className="text-sm">
+                        <span className="label">Diễn giải ngắn tiếng Việt (khách thấy)</span>
                         <input className="input py-2" value={val(s, "name")} onChange={(e) => edit(s.id, { name: e.target.value })} />
                       </label>
                       <label className="text-sm">
-                        <span className="label">Tên tiếng Anh</span>
-                        <input className="input py-2" value={val(s, "name_en") ?? ""} onChange={(e) => edit(s.id, { name_en: e.target.value || null })} />
+                        <span className="label">Tên nội bộ (chỉ nhân viên thấy)</span>
+                        <input className="input py-2" value={val(s, "internal_name") ?? ""} onChange={(e) => edit(s.id, { internal_name: e.target.value || null })} />
+                      </label>
+                      <label className="text-sm">
+                        <span className="label">Ghi chú nội bộ</span>
+                        <input className="input py-2" value={val(s, "internal_note") ?? ""} onChange={(e) => edit(s.id, { internal_note: e.target.value || null })} />
                       </label>
                       <label className="text-sm">
                         <span className="label">Nhóm</span>
@@ -353,6 +367,7 @@ function NewServiceForm({ categories, onDone }: { categories: Category[]; onDone
   const [name, setName] = useState("");
   const [cat, setCat] = useState(categories[0]?.id ?? "");
   const [dur, setDur] = useState("60");
+  const [nameEn, setNameEn] = useState("");
   const [price, setPrice] = useState("");
   const [fee, setFee] = useState("");
   const [saving, setSaving] = useState(false);
@@ -360,12 +375,14 @@ function NewServiceForm({ categories, onDone }: { categories: Category[]; onDone
 
   async function save() {
     setError(null);
-    if (!name.trim()) return setError("Vui lòng nhập tên dịch vụ.");
+    if (!nameEn.trim()) return setError("Vui lòng nhập tên truyền thông.");
+    if (!name.trim()) return setError("Vui lòng nhập diễn giải ngắn tiếng Việt.");
     const d = Number(dur);
     if (!(d > 0)) return setError("Thời lượng phải lớn hơn 0.");
     setSaving(true);
     const { error } = await createClient().from("services").insert({
       name: name.trim(),
+      name_en: nameEn.trim().toUpperCase(),
       category_id: cat || null,
       duration_minutes: d,
       price: parseMoney(price),
@@ -379,7 +396,8 @@ function NewServiceForm({ categories, onDone }: { categories: Category[]; onDone
   return (
     <div className="card space-y-3">
       <h2 className="font-semibold text-navy">Thêm dịch vụ mới</h2>
-      <input className="input" placeholder="Tên dịch vụ" value={name} onChange={(e) => setName(e.target.value)} />
+      <input className="input" placeholder="Tên truyền thông (vd: GLOW MTS)" value={nameEn} onChange={(e) => setNameEn(e.target.value)} />
+      <input className="input" placeholder="Diễn giải ngắn tiếng Việt (vd: Phi kim cấp ẩm căng bóng)" value={name} onChange={(e) => setName(e.target.value)} />
       <select className="input" value={cat} onChange={(e) => setCat(e.target.value)}>
         {categories.map((c) => (
           <option key={c.id} value={c.id}>{c.name}</option>

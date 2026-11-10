@@ -10,6 +10,7 @@ import {
   OPEN_HOUR,
   SLOT_MINUTES,
 } from "@/lib/config";
+import ServiceTitle from "@/components/ServiceTitle";
 import { formatDate, formatDuration, formatTime, formatVnd, todayVn, vnDateTime, vnError } from "@/lib/format";
 import {
   DEFAULT_CAPACITY,
@@ -330,7 +331,7 @@ export default function BookingForm({
           <div className="mb-3 flex flex-wrap gap-2">
             {chosen.map((s) => (
               <button key={s.id} type="button" onClick={() => toggle(s.id)} className="rounded-full bg-navy px-3 py-1 text-xs text-white">
-                {s.name} ✕
+                {s.name_en || s.name} ✕
               </button>
             ))}
           </div>
@@ -373,8 +374,7 @@ export default function BookingForm({
                               {on ? "✓" : ""}
                             </span>
                             <span className="flex-1">
-                              <span className="block text-sm font-medium">{s.name}</span>
-                              {s.name_en && <span className="block text-[11px] uppercase tracking-wide text-ink/50">{s.name_en}</span>}
+                              <ServiceTitle nameEn={s.name_en} name={s.name} />
                             </span>
                             <span className="shrink-0 text-right text-sm font-semibold text-navy">{formatVnd(s.price)}</span>
                           </button>

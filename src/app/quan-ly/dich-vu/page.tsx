@@ -12,7 +12,7 @@ export default async function ServiceMenuPage() {
     supabase.from("service_categories").select("id, name, sort_order").order("sort_order"),
     supabase
       .from("services")
-      .select("id, category_id, name, name_en, duration_minutes, price, member_price, card_allowed, commission_eligible, fee_once_per_visit, is_active, branch_id, menu_tier, followup_days, recall_days")
+      .select("id, category_id, name, name_en, internal_name, internal_note, duration_minutes, price, member_price, card_allowed, commission_eligible, fee_once_per_visit, is_active, branch_id, menu_tier, followup_days, recall_days")
       .order("name"),
     supabase.rpc("service_internal_costs"),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),

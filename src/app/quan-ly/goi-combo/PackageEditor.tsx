@@ -13,8 +13,12 @@ export type Pkg = {
   price: number;
   validity_days: number | null;
   is_active: boolean;
+  category: string | null;
+  sort_order: number;
   package_items: {
+    id: string;
     label: string;
+    note?: string | null;
     quantity: number | null;
     unit_price: number | null;
     sort_order: number;
@@ -22,19 +26,20 @@ export type Pkg = {
   }[];
 };
 type Svc = { id: string; name: string; name_en: string | null; price: number | null };
-type Part = { key: number; label: string; unlimited: boolean; quantity: number; unit_price: number; service_ids: string[] };
+type Part = { key: number; label: string; note: string; unlimited: boolean; quantity: number; unit_price: number; service_ids: string[] };
 type Draft = {
   id: string | null;
   name: string;
   description: string;
   price: number;
   validity: string;
+  category: string;
   is_active: boolean;
   parts: Part[];
 };
 
 let seq = 1;
-const newPart = (): Part => ({ key: seq++, label: "", unlimited: false, quantity: 1, unit_price: 0, service_ids: [] });
+const newPart = (): Part => ({ key: seq++, label: "", note: "", unlimited: false, quantity: 1, unit_price: 0, service_ids: [] });
 
 function ServicePicker({ services, onPick, exclude }: { services: Svc[]; onPick: (s: Svc) => void; exclude: string[] }) {
   const [query, setQuery] = useState("");
@@ -58,7 +63,7 @@ function ServicePicker({ services, onPick, exclude }: { services: Svc[]; onPick:
                 }}
               >
                 <span>
-                  {s.name} <span className="text-xs text-ink/50">{s.name_en}</span>
+                  <span className="font-medium uppercase">{s.name_en || s.name}</span> <span className="text-xs text-ink/50">{s.name_en ? s.name : ""}</span>
                 </span>
                 <span className="text-ink/60">{formatVnd(s.price)}</span>
               </button>
@@ -85,12 +90,14 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
       description: p.description ?? "",
       price: Number(p.price),
       validity: p.validity_days ? String(p.validity_days) : "",
+      category: p.category ?? "",
       is_active: p.is_active,
       parts: [...p.package_items]
         .sort((a, b) => a.sort_order - b.sort_order)
         .map((i) => ({
           key: seq++,
           label: i.label,
+          note: i.note ?? "",
           unlimited: i.quantity === null,
           quantity: i.quantity ?? 1,
           unit_price: Number(i.unit_price ?? 0),
@@ -116,8 +123,10 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
       p_validity_days: draft.validity ? Number(draft.validity) : null,
       p_description: draft.description,
       p_is_active: draft.is_active,
+      p_category: draft.category,
       p_items: draft.parts.map((p) => ({
-        label: p.label || (p.service_ids.length === 1 ? byId.get(p.service_ids[0])?.name ?? "" : ""),
+        label: p.label || (p.service_ids.length === 1 ? byId.get(p.service_ids[0])?.name_en || byId.get(p.service_ids[0])?.name || "" : ""),
+        note: p.note,
         quantity: p.unlimited ? null : p.quantity,
         unit_price: p.unit_price || null,
         service_ids: p.service_ids,
@@ -139,7 +148,7 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
           <p className="text-sm text-ink/70">{packages.filter((p) => p.is_active).length} gói đang bán. Bấm vào gói để sửa.</p>
         </div>
         {!draft && (
-          <button className="btn-primary" onClick={() => { setError(null); setDraft({ id: null, name: "", description: "", price: 0, validity: "", is_active: true, parts: [newPart()] }); }}>
+          <button className="btn-primary" onClick={() => { setError(null); setDraft({ id: null, name: "", description: "", price: 0, validity: "", category: "", is_active: true, parts: [newPart()] }); }}>
             + Tạo gói
           </button>
         )}
@@ -163,6 +172,15 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
             </label>
           </div>
           <label className="block">
+            <span className="label">Nhóm combo (trên Menu Combo)</span>
+            <input className="input py-2" list="combo-groups" placeholder="vd: Mụn – Lỗ chân lông" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} />
+            <datalist id="combo-groups">
+              {Array.from(new Set(packages.map((p) => p.category ?? "").filter((c) => c !== ""))).map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          </label>
+          <label className="block">
             <span className="label">Mục tiêu / mô tả</span>
             <input className="input py-2" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
           </label>
@@ -175,7 +193,7 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
                   <span className="text-xs text-ink/50">{i + 1}.</span>
                   <input
                     className="flex-1 rounded-lg border border-beige-dark px-2 py-1.5"
-                    placeholder="Tên phần (vd: Detox Skin, 10 buổi linh hoạt)"
+                    placeholder="Tên buổi truyền thông – khách thấy (vd: Acne Peeling)"
                     value={p.label}
                     onChange={(e) => setPart(p.key, { label: e.target.value })}
                   />
@@ -183,6 +201,12 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
                     ✕
                   </button>
                 </div>
+                <input
+                  className="mt-2 w-full rounded-lg border border-beige-dark bg-cream px-2 py-1.5 text-xs"
+                  placeholder="🔒 Thực tế chỉ định – chỉ nhân viên thấy (vd: Được chọn peel bất kì trong nhóm Chemical Peel)"
+                  value={p.note}
+                  onChange={(e) => setPart(p.key, { note: e.target.value })}
+                />
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
                   <label className="flex items-center gap-1">
                     Số buổi
@@ -207,14 +231,14 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
                 <div className="mt-2 flex flex-wrap gap-1">
                   {p.service_ids.map((id) => (
                     <span key={id} className="inline-flex items-center gap-1 rounded-full bg-cream px-2 py-0.5 text-xs">
-                      {byId.get(id)?.name ?? "(dịch vụ đã ngừng)"}
+                      {byId.get(id) ? byId.get(id)!.name_en || byId.get(id)!.name : "(dịch vụ đã ngừng)"}
                       <button className="text-ink/40 hover:text-[#8A2323]" onClick={() => setPart(p.key, { service_ids: p.service_ids.filter((x) => x !== id) })}>
                         ✕
                       </button>
                     </span>
                   ))}
                 </div>
-                {p.service_ids.length > 1 && <p className="mt-1 text-xs text-ink/60">Khách dùng linh hoạt các dịch vụ trên, trừ chung vào số buổi của phần này.</p>}
+                {p.service_ids.length > 1 && <p className="mt-1 text-xs text-ink/60">KTV chọn 1 trong các dịch vụ trên cho mỗi buổi, trừ chung vào số buổi của phần này.</p>}
                 <ServicePicker
                   services={services}
                   exclude={p.service_ids}
@@ -263,7 +287,7 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
               </p>
               <p className="shrink-0 font-bold text-navy">{formatVnd(Number(p.price))}</p>
             </div>
-            {p.description && <p className="text-xs text-ink/60">{p.description}</p>}
+            {(p.category || p.description) && <p className="text-xs text-ink/60">{[p.category, p.description].filter(Boolean).join(" · ")}</p>}
             <p className="mt-1 text-xs text-ink/70">
               {[...p.package_items]
                 .sort((a, b) => a.sort_order - b.sort_order)
