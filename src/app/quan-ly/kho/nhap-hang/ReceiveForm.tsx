@@ -28,7 +28,7 @@ export type RecentReceipt = {
   stock_movements: { quantity: number }[];
 };
 
-type Line = { productId: string; qty: number };
+type Line = { productId: string; qty: number; exp: string };
 type Extra = { key: number; label: string; amount: number };
 
 const EXTRA_PRESETS = ["Tiền ship", "Chi phí khác"];
@@ -40,6 +40,7 @@ export default function ReceiveForm({
   warehouses,
   initialProducts,
   recent,
+  suppliers,
 }: {
   branches: { id: string; name: string }[];
   defaultBranchId: string;
@@ -47,6 +48,7 @@ export default function ReceiveForm({
   warehouses: Warehouse[];
   initialProducts: Product[];
   recent: RecentReceipt[];
+  suppliers: string[];
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -80,7 +82,7 @@ export default function ReceiveForm({
     setLines((ls) => {
       const i = ls.findIndex((l) => l.productId === p.id);
       if (i >= 0) return ls.map((l, k) => (k === i ? { ...l, qty: l.qty + qty } : l));
-      return [{ productId: p.id, qty }, ...ls];
+      return [{ productId: p.id, qty, exp: "" }, ...ls];
     });
     setFlash(`+${qty} ${productLabel(p)}`);
     setDone(null);
@@ -111,16 +113,22 @@ export default function ReceiveForm({
 
   const totalQty = lines.reduce((a, l) => a + l.qty, 0);
   const extraTotal = extras.reduce((a, x) => a + (x.amount || 0), 0);
+  const minExp = useMemo(() => {
+    const d = new Date(Date.now() + 7 * 3600 * 1000 + 86400 * 1000); // ngày mai (giờ VN)
+    return d.toISOString().slice(0, 10);
+  }, []);
+  const noExp = lines.filter((l) => !l.exp).length;
 
   async function save() {
     if (!wh || lines.length === 0) return;
+    if (noExp > 0 && !window.confirm(`Còn ${noExp} sản phẩm chưa nhập hạn sử dụng. Vẫn lưu phiếu?`)) return;
     setSaving(true);
     setError(null);
     const { data, error } = await supabase.rpc("receive_stock", {
       p_warehouse_id: wh.id,
       p_supplier: supplier,
       p_note: note,
-      p_items: lines.map((l) => ({ product_id: l.productId, quantity: l.qty })),
+      p_items: lines.map((l) => ({ product_id: l.productId, quantity: l.qty, expiry_date: l.exp || null })),
       p_extra_costs: extras.filter((x) => x.amount > 0).map((x) => ({ label: x.label, amount: x.amount })),
     });
     setSaving(false);
@@ -277,12 +285,27 @@ export default function ReceiveForm({
                   </button>
                   <span className="ml-1">{p.unit}</span>
                 </span>
+                <label className="flex items-center gap-1">
+                  Hạn sử dụng
+                  <input
+                    type="date"
+                    min={minExp}
+                    className={`rounded-lg border px-2 py-1.5 text-sm ${l.exp ? "border-beige-dark" : "border-[#E0A526] bg-[#FFF8E8]"}`}
+                    value={l.exp}
+                    onChange={(e) => setLines((ls) => ls.map((x) => (x.productId === l.productId ? { ...x, exp: e.target.value } : x)))}
+                  />
+                </label>
               </div>
             </div>
           );
         })}
         <div className="grid gap-2 sm:grid-cols-2">
-          <input className="input py-2 text-sm" placeholder="Nhà cung cấp (không bắt buộc)" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
+          <input className="input py-2 text-sm" placeholder="Nhà cung cấp" list="ncc-list" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
+          <datalist id="ncc-list">
+            {suppliers.map((n) => (
+              <option key={n} value={n} />
+            ))}
+          </datalist>
           <input className="input py-2 text-sm" placeholder="Ghi chú (không bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
 
