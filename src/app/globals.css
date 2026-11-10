@@ -11,6 +11,19 @@
   --font-sans: var(--font-be-vietnam), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Thanh nút Lưu/Thanh toán cố định ở đáy: trên điện thoại phải nằm TRÊN thanh menu dưới của nhân viên */
+:root {
+  --bottom-nav-h: 0px;
+}
+@media (max-width: 639.98px) {
+  body:has(.staff-bottom-nav) {
+    --bottom-nav-h: calc(3.75rem + env(safe-area-inset-bottom));
+  }
+}
+.action-bar {
+  bottom: var(--bottom-nav-h);
+}
+
 body {
   background: var(--color-cream);
   color: var(--color-ink);

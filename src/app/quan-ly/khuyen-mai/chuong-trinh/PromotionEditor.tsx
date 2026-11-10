@@ -367,7 +367,7 @@ export default function PromotionEditor({
           </label>
         </div>
 
-        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-beige-dark bg-white/95 px-4 py-3 backdrop-blur">
+        <div className="action-bar fixed inset-x-0 z-10 border-t border-beige-dark bg-white/95 px-4 py-3 backdrop-blur">
           <div className="mx-auto flex max-w-3xl items-center gap-3">
             <p className="min-w-0 flex-1 text-xs text-[#8A2323]">{error ?? problems[0] ?? ""}</p>
             <button className="btn-primary" disabled={saving || problems.length > 0} onClick={save}>

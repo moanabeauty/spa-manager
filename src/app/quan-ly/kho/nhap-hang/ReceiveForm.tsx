@@ -28,6 +28,9 @@ export type RecentReceipt = {
 };
 
 type Line = { productId: string; qty: number; cost: number };
+type Extra = { key: number; label: string; amount: number };
+
+const EXTRA_PRESETS = ["Tiền ship", "Phí bốc xếp", "Khác"];
 
 export default function ReceiveForm({
   branches,
@@ -59,6 +62,7 @@ export default function ReceiveForm({
   const [lines, setLines] = useState<Line[]>([]);
   const [supplier, setSupplier] = useState("");
   const [note, setNote] = useState("");
+  const [extras, setExtras] = useState<Extra[]>([]);
   const [code, setCode] = useState("");
   const [unknown, setUnknown] = useState<string | null>(null); // mã vạch chưa có trong danh mục
   const [camera, setCamera] = useState(false);
@@ -108,6 +112,11 @@ export default function ReceiveForm({
 
   const totalQty = lines.reduce((a, l) => a + l.qty, 0);
   const totalCost = lines.reduce((a, l) => a + l.qty * l.cost, 0);
+  const extraTotal = extras.reduce((a, x) => a + (x.amount || 0), 0);
+  const grandTotal = totalCost + extraTotal;
+  // giá vốn sau khi phân bổ chi phí khác (theo giá trị hàng; chưa có giá thì chia theo số lượng)
+  const landed = (l: Line) =>
+    extraTotal <= 0 ? l.cost : Math.round(l.cost + (totalCost > 0 ? (extraTotal * l.cost) / totalCost : extraTotal / Math.max(1, totalQty)));
 
   async function save() {
     if (!wh || lines.length === 0) return;
@@ -118,12 +127,14 @@ export default function ReceiveForm({
       p_supplier: supplier,
       p_note: note,
       p_items: lines.map((l) => ({ product_id: l.productId, quantity: l.qty, unit_cost: l.cost || null })),
+      p_extra_costs: extras.filter((x) => x.amount > 0).map((x) => ({ label: x.label, amount: x.amount })),
     });
     setSaving(false);
     if (error) return setError(vnError(error.message));
     const { data: r } = await supabase.from("stock_receipts").select("code").eq("id", data as string).maybeSingle();
-    setDone(`Đã lưu phiếu nhập ${r?.code ?? ""}: ${totalQty} đơn vị vào ${wh.name}.`);
+    setDone(`Đã lưu phiếu nhập ${r?.code ?? ""}: ${totalQty} đơn vị vào ${wh.name}${grandTotal > 0 ? ` · tổng ${formatVnd(grandTotal)}` : ""}.`);
     setLines([]);
+    setExtras([]);
     setSupplier("");
     setNote("");
     setFlash(null);
@@ -283,6 +294,9 @@ export default function ReceiveForm({
                 </label>
                 {l.cost > 0 && <span className="ml-auto text-ink/60">= {formatVnd(l.cost * l.qty)}</span>}
               </div>
+              {extraTotal > 0 && (
+                <p className="mt-1 text-right text-xs text-brown">Giá vốn sau phân bổ chi phí: {formatVnd(landed(l))} / {p.unit}</p>
+              )}
             </div>
           );
         })}
@@ -290,6 +304,60 @@ export default function ReceiveForm({
           <input className="input py-2 text-sm" placeholder="Nhà cung cấp (không bắt buộc)" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
           <input className="input py-2 text-sm" placeholder="Ghi chú (không bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
+
+        {/* chi phí khác */}
+        <div className="space-y-2 rounded-xl bg-cream p-3">
+          <p className="text-sm font-semibold text-navy">Chi phí khác <span className="font-normal text-ink/55">(tiền ship, bốc xếp…)</span></p>
+          {extras.map((x) => (
+            <div key={x.key} className="flex items-center gap-2">
+              <input
+                className="min-w-0 flex-1 rounded-lg border border-beige-dark bg-white px-3 py-2 text-sm"
+                placeholder="Tên chi phí"
+                value={x.label}
+                onChange={(e) => setExtras((xs) => xs.map((y) => (y.key === x.key ? { ...y, label: e.target.value } : y)))}
+              />
+              <MoneyInput
+                value={x.amount}
+                onChange={(n) => setExtras((xs) => xs.map((y) => (y.key === x.key ? { ...y, amount: n } : y)))}
+                className="w-28"
+                ariaLabel="Số tiền"
+              />
+              <button className="px-1 text-ink/40 hover:text-[#8A2323]" onClick={() => setExtras((xs) => xs.filter((y) => y.key !== x.key))} aria-label="Xoá chi phí">
+                ✕
+              </button>
+            </div>
+          ))}
+          <div className="flex flex-wrap gap-2">
+            {EXTRA_PRESETS.map((label) => (
+              <button
+                key={label}
+                className="rounded-full border border-navy/30 bg-white px-3 py-1.5 text-xs font-semibold text-navy"
+                onClick={() => setExtras((xs) => [...xs, { key: Date.now(), label: label === "Khác" ? "" : label, amount: 0 }])}
+              >
+                + {label}
+              </button>
+            ))}
+          </div>
+          {extraTotal > 0 && (
+            <p className="text-xs text-ink/60">Chi phí khác được cộng vào giá vốn từng sản phẩm theo tỷ lệ giá trị hàng.</p>
+          )}
+        </div>
+
+        {(totalCost > 0 || extraTotal > 0) && (
+          <dl className="space-y-1 border-t border-beige pt-3 text-sm">
+            <div className="flex justify-between"><dt className="text-ink/65">Tiền hàng</dt><dd>{formatVnd(totalCost)}</dd></div>
+            {extraTotal > 0 && (
+              <div className="flex justify-between"><dt className="text-ink/65">Chi phí khác</dt><dd>{formatVnd(extraTotal)}</dd></div>
+            )}
+            <div className="flex justify-between font-semibold text-navy"><dt>Tổng phiếu nhập</dt><dd>{formatVnd(grandTotal)}</dd></div>
+          </dl>
+        )}
+
+        <button className="btn-primary w-full py-3" disabled={saving || !wh || lines.length === 0} onClick={save}>
+          {saving ? "Đang lưu…" : "Lưu phiếu nhập"}
+        </button>
+        {error && <p className="text-sm text-[#8A2323]">{error}</p>}
+        {done && <p className="rounded-lg bg-[#D6EDD8] px-3 py-2 text-sm text-[#22612A]">✓ {done}</p>}
       </div>
 
       {recent.length > 0 && (
@@ -315,7 +383,7 @@ export default function ReceiveForm({
 
       {camera && <CameraScanner onScan={handleCode} onClose={() => setCamera(false)} />}
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-beige-dark bg-white/95 px-4 py-3 backdrop-blur">
+      <div className="action-bar fixed inset-x-0 z-10 border-t border-beige-dark bg-white/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3">
           <div className="min-w-0 flex-1 text-xs">
             {error ? (
@@ -324,7 +392,7 @@ export default function ReceiveForm({
               <p className="text-[#22612A]">{done}</p>
             ) : (
               <p>
-                {lines.length} sản phẩm · {totalQty} đơn vị{totalCost > 0 ? ` · ${formatVnd(totalCost)}` : ""}
+                {lines.length} sản phẩm · {totalQty} đơn vị{grandTotal > 0 ? ` · ${formatVnd(grandTotal)}` : ""}
               </p>
             )}
           </div>

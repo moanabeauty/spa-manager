@@ -138,7 +138,7 @@ export default function OffHoursForm({
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#E6DDCC] bg-white px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
+      <div className="action-bar fixed inset-x-0 z-40 border-t border-[#E6DDCC] bg-white px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
         <div className="mx-auto max-w-3xl space-y-1.5">
           {error && <p className="text-center text-xs text-[#B3261E]">{error}</p>}
           <button className="min-h-[52px] w-full rounded-[14px] bg-navy text-base font-semibold text-white disabled:opacity-50" disabled={busy} onClick={submit}>

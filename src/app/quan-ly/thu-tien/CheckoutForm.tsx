@@ -1132,7 +1132,7 @@ export default function CheckoutForm({
       </div>
 
       {/* ---- NÚT THU ---- */}
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-beige-dark bg-white/95 px-4 py-3 backdrop-blur">
+      <div className="action-bar fixed inset-x-0 z-10 border-t border-beige-dark bg-white/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3">
           <div className="min-w-0 flex-1 text-xs">
             {error ? (

@@ -181,7 +181,7 @@ export default function SkinRecordForm({
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-beige-dark bg-white/95 backdrop-blur">
+      <div className="action-bar fixed inset-x-0 z-10 border-t border-beige-dark bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <div className="flex-1 text-sm">
             {error ? <p className="text-xs font-medium text-[#8A2323]">{error}</p> : <span className="text-ink/60">Khách thấy màu, đề xuất và hướng dẫn tại nhà trong tài khoản của họ.</span>}

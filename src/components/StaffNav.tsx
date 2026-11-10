@@ -99,7 +99,7 @@ export default function StaffNav({ groups }: { groups: NavGroup[] }) {
         <>
           {more && (
             <div className="fixed inset-0 z-30 bg-black/30 sm:hidden" onClick={() => setMore(false)}>
-              <div className="absolute inset-x-0 bottom-16 rounded-t-2xl bg-white p-3 shadow-lg" onClick={(e) => e.stopPropagation()}>
+              <div className="absolute inset-x-0 bottom-[var(--bottom-nav-h)] rounded-t-2xl bg-white p-3 shadow-lg" onClick={(e) => e.stopPropagation()}>
                 {rest.map((g) => (
                   <div key={g.key} className="border-b border-beige py-2 last:border-0">
                     <p className="flex items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-wide text-brown">
@@ -120,12 +120,12 @@ export default function StaffNav({ groups }: { groups: NavGroup[] }) {
               </div>
             </div>
           )}
-          <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-beige-dark bg-white/95 backdrop-blur sm:hidden print:hidden">
-            <div className="mx-auto flex max-w-3xl">
+          <nav className="staff-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-beige-dark bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden print:hidden">
+            <div className="mx-auto flex h-[3.75rem] max-w-3xl">
               {primary.map((g) => {
                 const on = g.key === group?.key && !more;
                 return (
-                  <Link key={g.key} href={href(g)} className={`relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] ${on ? "font-bold text-navy" : "text-ink/60"}`}>
+                  <Link key={g.key} href={href(g)} className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] ${on ? "font-bold text-navy" : "text-ink/60"}`}>
                     <Icon name={g.icon} />
                     {g.label}
                     {g.badge > 0 && <span className="absolute right-[22%] top-1 h-2 w-2 rounded-full bg-[#C2410C]" />}
@@ -135,7 +135,7 @@ export default function StaffNav({ groups }: { groups: NavGroup[] }) {
               {rest.length > 0 && (
                 <button
                   onClick={() => setMore(!more)}
-                  className={`relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] ${more || restActive ? "font-bold text-navy" : "text-ink/60"}`}
+                  className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] ${more || restActive ? "font-bold text-navy" : "text-ink/60"}`}
                 >
                   <Icon name="more" />
                   Thêm
