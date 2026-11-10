@@ -22,15 +22,16 @@ export type RecentReceipt = {
   code: string;
   supplier: string | null;
   created_at: string;
+  status: "pending" | "approved";
   warehouses: { name: string } | null;
   profiles: { full_name: string | null } | null;
   stock_movements: { quantity: number }[];
 };
 
-type Line = { productId: string; qty: number; cost: number };
+type Line = { productId: string; qty: number };
 type Extra = { key: number; label: string; amount: number };
 
-const EXTRA_PRESETS = ["Tiền ship", "Phí bốc xếp", "Khác"];
+const EXTRA_PRESETS = ["Tiền ship", "Chi phí khác"];
 
 export default function ReceiveForm({
   branches,
@@ -38,7 +39,6 @@ export default function ReceiveForm({
   defaultType,
   warehouses,
   initialProducts,
-  costs,
   recent,
 }: {
   branches: { id: string; name: string }[];
@@ -46,7 +46,6 @@ export default function ReceiveForm({
   defaultType: WarehouseType;
   warehouses: Warehouse[];
   initialProducts: Product[];
-  costs: Record<string, number | null>;
   recent: RecentReceipt[];
 }) {
   const router = useRouter();
@@ -81,7 +80,7 @@ export default function ReceiveForm({
     setLines((ls) => {
       const i = ls.findIndex((l) => l.productId === p.id);
       if (i >= 0) return ls.map((l, k) => (k === i ? { ...l, qty: l.qty + qty } : l));
-      return [{ productId: p.id, qty, cost: Number(costs[p.id] ?? 0) }, ...ls];
+      return [{ productId: p.id, qty }, ...ls];
     });
     setFlash(`+${qty} ${productLabel(p)}`);
     setDone(null);
@@ -111,12 +110,7 @@ export default function ReceiveForm({
   }, [search, products]);
 
   const totalQty = lines.reduce((a, l) => a + l.qty, 0);
-  const totalCost = lines.reduce((a, l) => a + l.qty * l.cost, 0);
   const extraTotal = extras.reduce((a, x) => a + (x.amount || 0), 0);
-  const grandTotal = totalCost + extraTotal;
-  // giá vốn sau khi phân bổ chi phí khác (theo giá trị hàng; chưa có giá thì chia theo số lượng)
-  const landed = (l: Line) =>
-    extraTotal <= 0 ? l.cost : Math.round(l.cost + (totalCost > 0 ? (extraTotal * l.cost) / totalCost : extraTotal / Math.max(1, totalQty)));
 
   async function save() {
     if (!wh || lines.length === 0) return;
@@ -126,13 +120,13 @@ export default function ReceiveForm({
       p_warehouse_id: wh.id,
       p_supplier: supplier,
       p_note: note,
-      p_items: lines.map((l) => ({ product_id: l.productId, quantity: l.qty, unit_cost: l.cost || null })),
+      p_items: lines.map((l) => ({ product_id: l.productId, quantity: l.qty })),
       p_extra_costs: extras.filter((x) => x.amount > 0).map((x) => ({ label: x.label, amount: x.amount })),
     });
     setSaving(false);
     if (error) return setError(vnError(error.message));
     const { data: r } = await supabase.from("stock_receipts").select("code").eq("id", data as string).maybeSingle();
-    setDone(`Đã lưu phiếu nhập ${r?.code ?? ""}: ${totalQty} đơn vị vào ${wh.name}${grandTotal > 0 ? ` · tổng ${formatVnd(grandTotal)}` : ""}.`);
+    setDone(`Đã lưu phiếu nhập ${r?.code ?? ""}: ${totalQty} đơn vị vào ${wh.name}. Phiếu chờ chủ spa nhập giá & duyệt.`);
     setLines([]);
     setExtras([]);
     setSupplier("");
@@ -283,20 +277,7 @@ export default function ReceiveForm({
                   </button>
                   <span className="ml-1">{p.unit}</span>
                 </span>
-                <label className="flex items-center gap-1">
-                  Giá nhập / {p.unit}
-                  <MoneyInput
-                    value={l.cost}
-                    onChange={(n) => setLines((ls) => ls.map((x) => (x.productId === l.productId ? { ...x, cost: n } : x)))}
-                    className="w-28"
-                    ariaLabel="Giá nhập"
-                  />
-                </label>
-                {l.cost > 0 && <span className="ml-auto text-ink/60">= {formatVnd(l.cost * l.qty)}</span>}
               </div>
-              {extraTotal > 0 && (
-                <p className="mt-1 text-right text-xs text-brown">Giá vốn sau phân bổ chi phí: {formatVnd(landed(l))} / {p.unit}</p>
-              )}
             </div>
           );
         })}
@@ -307,7 +288,7 @@ export default function ReceiveForm({
 
         {/* chi phí khác */}
         <div className="space-y-2 rounded-xl bg-cream p-3">
-          <p className="text-sm font-semibold text-navy">Chi phí khác <span className="font-normal text-ink/55">(tiền ship, bốc xếp…)</span></p>
+          <p className="text-sm font-semibold text-navy">Chi phí <span className="font-normal text-ink/55">(tiền ship khi nhận hàng, chi phí khác…)</span></p>
           {extras.map((x) => (
             <div key={x.key} className="flex items-center gap-2">
               <input
@@ -332,26 +313,15 @@ export default function ReceiveForm({
               <button
                 key={label}
                 className="rounded-full border border-navy/30 bg-white px-3 py-1.5 text-xs font-semibold text-navy"
-                onClick={() => setExtras((xs) => [...xs, { key: Date.now(), label: label === "Khác" ? "" : label, amount: 0 }])}
+                onClick={() => setExtras((xs) => [...xs, { key: Date.now(), label, amount: 0 }])}
               >
                 + {label}
               </button>
             ))}
           </div>
-          {extraTotal > 0 && (
-            <p className="text-xs text-ink/60">Chi phí khác được cộng vào giá vốn từng sản phẩm theo tỷ lệ giá trị hàng.</p>
-          )}
+          {extraTotal > 0 && <p className="text-right text-sm font-semibold text-navy">Tổng chi phí: {formatVnd(extraTotal)}</p>}
         </div>
-
-        {(totalCost > 0 || extraTotal > 0) && (
-          <dl className="space-y-1 border-t border-beige pt-3 text-sm">
-            <div className="flex justify-between"><dt className="text-ink/65">Tiền hàng</dt><dd>{formatVnd(totalCost)}</dd></div>
-            {extraTotal > 0 && (
-              <div className="flex justify-between"><dt className="text-ink/65">Chi phí khác</dt><dd>{formatVnd(extraTotal)}</dd></div>
-            )}
-            <div className="flex justify-between font-semibold text-navy"><dt>Tổng phiếu nhập</dt><dd>{formatVnd(grandTotal)}</dd></div>
-          </dl>
-        )}
+        <p className="text-xs text-ink/55">Giá nhập sản phẩm do chủ spa nhập khi duyệt phiếu.</p>
 
         <button className="btn-primary w-full py-3" disabled={saving || !wh || lines.length === 0} onClick={save}>
           {saving ? "Đang lưu…" : "Lưu phiếu nhập"}
@@ -374,7 +344,12 @@ export default function ReceiveForm({
                     {r.supplier ? ` · ${r.supplier}` : ""}
                   </span>
                 </span>
-                <span className="shrink-0">{r.stock_movements.reduce((a, m) => a + Number(m.quantity), 0)} đơn vị</span>
+                <span className="shrink-0 text-right">
+                  {r.stock_movements.reduce((a, m) => a + Number(m.quantity), 0)} đơn vị
+                  <span className={`mt-0.5 block rounded-full px-2 py-0.5 text-[11px] ${r.status === "pending" ? "bg-[#FFE8BA] text-[#7A5600]" : "bg-[#D6EDD8] text-[#22612A]"}`}>
+                    {r.status === "pending" ? "Chờ duyệt giá" : "Đã duyệt"}
+                  </span>
+                </span>
               </li>
             ))}
           </ul>
@@ -392,7 +367,7 @@ export default function ReceiveForm({
               <p className="text-[#22612A]">{done}</p>
             ) : (
               <p>
-                {lines.length} sản phẩm · {totalQty} đơn vị{grandTotal > 0 ? ` · ${formatVnd(grandTotal)}` : ""}
+                {lines.length} sản phẩm · {totalQty} đơn vị{extraTotal > 0 ? ` · chi phí ${formatVnd(extraTotal)}` : ""}
               </p>
             )}
           </div>

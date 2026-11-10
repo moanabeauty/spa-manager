@@ -25,8 +25,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   ]);
   if (!data) return <p className="card text-sm">Không tìm thấy sản phẩm.</p>;
   const p = data as Product;
-  let cost: number | null = null;
-  if (canEdit) {
+  // giá nhập chỉ chủ spa / quản lý xem & sửa; quản lý kho không thấy
+  const showCost = profile?.role === "owner" || profile?.role === "manager";
+  let cost: number | null | undefined = undefined;
+  if (canEdit && showCost) {
     const { data: costs } = await supabase.rpc("product_costs");
     cost = ((costs ?? []) as { product_id: string; cost_price: number | null }[]).find((c) => c.product_id === id)?.cost_price ?? null;
   }

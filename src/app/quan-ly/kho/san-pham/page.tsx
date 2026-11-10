@@ -21,7 +21,7 @@ export default async function ProductsPage() {
           Danh mục dùng chung cho cả 2 chi nhánh. Bấm vào sản phẩm để xem đầy đủ thông tin, tồn kho{canEdit ? " và sửa" : ""}.
         </p>
       </div>
-      <ProductEditor products={(products ?? []) as Product[]} costs={{}} defaultPct={pct} isOwner={profile?.role === "owner"} canEdit={canEdit} />
+      <ProductEditor products={(products ?? []) as Product[]} costs={{}} defaultPct={pct} isOwner={profile?.role === "owner"} canEdit={canEdit} showCost={profile?.role === "owner" || profile?.role === "manager"} />
     </div>
   );
 }

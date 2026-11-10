@@ -14,6 +14,7 @@ export type NavCounts = {
   care: number; // nhắc chăm sóc đến hạn
   stockRequests: number; // phiếu xin xuất chờ duyệt
   stockCounts: number; // phiếu kiểm kho lệch chờ chủ duyệt
+  receipts: number; // phiếu nhập chờ chủ nhập giá & duyệt
   attendance: number; // chấm công + tăng ca chờ duyệt
   leaves: number; // đơn nghỉ phép chờ duyệt
   ktv: number; // KTV xin đổi sản phẩm + chấm vào sớm + xin sửa công
@@ -73,7 +74,7 @@ export function buildNav(role: Role, c: NavCounts): NavGroup[] {
       icon: "box",
       items: [
         ...item(!MK, "/quan-ly/kho", "Tồn kho"),
-        ...item(stockManage, "/quan-ly/kho/nhap-hang", "Nhập hàng"),
+        ...item(stockManage, "/quan-ly/kho/nhap-hang", "Nhập hàng", O ? c.receipts : 0),
         ...item(!MK, "/quan-ly/kho/xin-xuat", stockManage ? "Phiếu xin xuất" : "Xin xuất hàng", stockManage ? c.stockRequests : 0),
         ...item(stockManage, "/quan-ly/kho/kiem-kho", "Kiểm kho", O ? c.stockCounts : 0),
         ...item(stockManage, "/quan-ly/kho/chuyen-kho", "Chuyển kho"),

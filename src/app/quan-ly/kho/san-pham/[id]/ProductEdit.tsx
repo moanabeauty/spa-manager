@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Product } from "@/lib/inventory";
 import { ProductForm } from "../ProductEditor";
 
-export default function ProductEdit({ product, cost, defaultPct }: { product: Product; cost: number | null; defaultPct: number }) {
+export default function ProductEdit({ product, cost, defaultPct }: { product: Product; cost: number | null | undefined; defaultPct: number }) {
   const [open, setOpen] = useState(false);
   if (!open)
     return (

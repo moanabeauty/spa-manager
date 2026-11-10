@@ -24,13 +24,14 @@ export const loadNavCounts = cache(async (role: string, branchId: string | null)
   let discQ = supabase.from("discount_requests").select("id", head).eq("status", "pending");
   if (!O) discQ = discQ.eq("kind", "debt");
 
-  const [disc, vouchers, promos, care, stock, counts, att, ot, leaves, chg, early, fix, mk] = await Promise.all([
+  const [disc, vouchers, promos, care, stock, counts, receipts, att, ot, leaves, chg, early, fix, mk] = await Promise.all([
     M ? discQ : zero,
     M ? supabase.from("cashbook_entries").select("id", head).eq("source", "counter").eq("status", "pending") : zero,
     !L ? supabase.from("promotion_registrations").select("id", head).eq("status", "pending") : zero,
     !L ? careQ : zero,
     M || W ? stockQ : zero,
     O ? supabase.from("stock_counts").select("id", head).eq("status", "pending") : zero,
+    O ? supabase.from("stock_receipts").select("id", head).eq("status", "pending") : zero,
     O ? supabase.from("staff_attendance").select("staff_id", head).eq("approval_status", "pending") : zero,
     M ? supabase.from("staff_attendance").select("staff_id", head).eq("ot_status", "pending") : zero,
     M ? supabase.from("staff_leaves").select("id", head).eq("status", "pending") : zero,
@@ -46,6 +47,7 @@ export const loadNavCounts = cache(async (role: string, branchId: string | null)
     care: care.count ?? 0,
     stockRequests: stock.count ?? 0,
     stockCounts: counts.count ?? 0,
+    receipts: receipts.count ?? 0,
     attendance: (att.count ?? 0) + (ot.count ?? 0),
     leaves: leaves.count ?? 0,
     ktv: (chg.count ?? 0) + (early.count ?? 0) + (fix.count ?? 0),

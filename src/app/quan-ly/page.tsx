@@ -39,6 +39,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     { n: counts.vouchers, label: "Phiếu thu / chi tại quầy", href: "/quan-ly/phieu-thu-chi" },
     { n: counts.stockRequests, label: "Phiếu xin xuất kho", href: "/quan-ly/kho/xin-xuat" },
     { n: counts.stockCounts, label: "Kiểm kho bị lệch", href: "/quan-ly/kho/kiem-kho" },
+    { n: counts.receipts, label: "Phiếu nhập chờ duyệt giá", href: "/quan-ly/kho/nhap-hang" },
     { n: counts.promos, label: "Khách đăng ký khuyến mãi", href: "/quan-ly/khuyen-mai" },
     { n: counts.attendance, label: "Chấm công / tăng ca", href: "/quan-ly/cham-cong" },
     { n: counts.leaves, label: "Đơn nghỉ phép", href: "/quan-ly/nghi-phep" },

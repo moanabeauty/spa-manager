@@ -17,12 +17,14 @@ export default function ProductEditor({
   defaultPct,
   isOwner,
   canEdit,
+  showCost,
 }: {
   products: Product[];
   costs: Record<string, number | null>;
   defaultPct: number;
   isOwner: boolean;
   canEdit: boolean;
+  showCost: boolean;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -104,7 +106,7 @@ export default function ProductEditor({
             </button>
           )}
         </div>
-        {open === "new" && <ProductForm key={newBarcode} initialBarcode={newBarcode} cost={null} defaultPct={defaultPct} onDone={() => setOpen(null)} />}
+        {open === "new" && <ProductForm key={newBarcode} initialBarcode={newBarcode} cost={showCost ? null : undefined} defaultPct={defaultPct} onDone={() => setOpen(null)} />}
       </div>
 
       <div className="card p-0">
@@ -186,7 +188,7 @@ export function ProductForm({
 }: {
   product?: Product;
   initialBarcode?: string;
-  cost: number | null;
+  cost: number | null | undefined; // undefined = không được xem giá nhập (ẩn ô, không gửi lên)
   defaultPct: number;
   onDone: () => void;
 }) {
@@ -246,7 +248,7 @@ export function ProductForm({
       category: f.category || null,
       used_in: f.used_in || null,
       retail_price: f.retail_price || null,
-      cost_price: f.cost_price || null,
+      ...(cost !== undefined ? { cost_price: f.cost_price || null } : {}),
       max_staff_discount_pct: pctNum,
       min_stock: Math.max(0, Math.floor(Number(f.min_stock) || 0)),
       for_treatment: f.for_treatment,
@@ -319,10 +321,12 @@ export function ProductForm({
         Giá niêm yết (bán lẻ)
         <MoneyInput value={f.retail_price} onChange={(n) => set({ retail_price: n })} className="w-full" ariaLabel="Giá niêm yết" />
       </label>
-      <label>
-        Giá nhập
-        <MoneyInput value={f.cost_price} onChange={(n) => set({ cost_price: n })} className="w-full" ariaLabel="Giá nhập" />
-      </label>
+      {cost !== undefined && (
+        <label>
+          Giá nhập
+          <MoneyInput value={f.cost_price} onChange={(n) => set({ cost_price: n })} className="w-full" ariaLabel="Giá nhập" />
+        </label>
+      )}
       <label>
         Giảm tối đa riêng (%) – bỏ trống = theo mức chung {defaultPct}%
         <input type="number" min={0} max={100} className={input} value={f.pct} onChange={(e) => set({ pct: e.target.value })} />
