@@ -44,7 +44,7 @@ export default function ReceiveForm({
 }: {
   branches: { id: string; name: string }[];
   defaultBranchId: string;
-  defaultType: WarehouseType;
+  defaultType: WarehouseType | null;
   warehouses: Warehouse[];
   initialProducts: Product[];
   recent: RecentReceipt[];
@@ -57,7 +57,7 @@ export default function ReceiveForm({
   const byBarcode = useMemo(() => new Map(products.filter((p) => p.barcode).map((p) => [p.barcode!, p])), [products]);
 
   const [branchId, setBranchId] = useState(defaultBranchId);
-  const [type, setType] = useState<WarehouseType>(defaultType);
+  const [type, setType] = useState<WarehouseType | null>(defaultType);
   const wh = warehouses.find((w) => w.branch_id === branchId && w.type === type);
 
   const [lines, setLines] = useState<Line[]>([]);
@@ -120,6 +120,7 @@ export default function ReceiveForm({
   const noExp = lines.filter((l) => !l.exp).length;
 
   async function save() {
+    if (!type) return setError("Hãy tick chọn nhập vào Kho liệu trình hay Kho bán lẻ.");
     if (!wh || lines.length === 0) return;
     if (noExp > 0 && !window.confirm(`Còn ${noExp} sản phẩm chưa nhập hạn sử dụng. Vẫn lưu phiếu?`)) return;
     setSaving(true);
@@ -146,28 +147,16 @@ export default function ReceiveForm({
 
   return (
     <div className="space-y-4 pb-24">
-      {/* kho nhận */}
-      <div className="card space-y-3 p-4">
-        {branches.length > 1 && (
+      {/* chi nhánh nhận */}
+      {branches.length > 1 && (
+        <div className="card p-4">
           <select className="input py-2" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
             {branches.map((b) => (
               <option key={b.id} value={b.id}>{b.name}</option>
             ))}
           </select>
-        )}
-        <div className="flex gap-2">
-          {(["treatment", "retail"] as const).map((t) => (
-            <button
-              key={t}
-              className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold ${t === type ? "bg-navy text-white" : "bg-cream text-navy"}`}
-              onClick={() => setType(t)}
-            >
-              Nhập vào {WAREHOUSE_LABEL[t].toLowerCase()}
-            </button>
-          ))}
         </div>
-        {!wh && <p className="text-sm text-[#8A2323]">Chi nhánh này chưa có kho loại này.</p>}
-      </div>
+      )}
 
       {/* quét mã */}
       <div className="card space-y-3 p-4">
@@ -299,6 +288,27 @@ export default function ReceiveForm({
             </div>
           );
         })}
+        <div className="rounded-xl border border-beige-dark p-3 text-sm">
+          <p className="font-semibold text-navy">Nhập vào kho <span className="text-[#8A2323]">*</span></p>
+          <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
+            {(["treatment", "retail"] as const).map((t) => (
+              <label key={t} className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="h-5 w-5 accent-navy"
+                  checked={type === t}
+                  onChange={(e) => {
+                    setType(e.target.checked ? t : null);
+                    setError(null);
+                  }}
+                />
+                {WAREHOUSE_LABEL[t]}
+              </label>
+            ))}
+          </div>
+          {!type && <p className="mt-1 text-xs text-[#7A5600]">Tick chọn 1 kho trước khi lưu phiếu.</p>}
+          {type && !wh && <p className="mt-1 text-xs text-[#8A2323]">Chi nhánh này chưa có kho loại này.</p>}
+        </div>
         <div className="grid gap-2 sm:grid-cols-2">
           <input className="input py-2 text-sm" placeholder="Nhà cung cấp" list="ncc-list" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
           <datalist id="ncc-list">
@@ -346,7 +356,7 @@ export default function ReceiveForm({
         </div>
         <p className="text-xs text-ink/55">Giá nhập sản phẩm do chủ spa nhập khi duyệt phiếu.</p>
 
-        <button className="btn-primary w-full py-3" disabled={saving || !wh || lines.length === 0} onClick={save}>
+        <button className="btn-primary w-full py-3" disabled={saving || lines.length === 0} onClick={save}>
           {saving ? "Đang lưu…" : "Lưu phiếu nhập"}
         </button>
         {error && <p className="text-sm text-[#8A2323]">{error}</p>}
@@ -394,7 +404,7 @@ export default function ReceiveForm({
               </p>
             )}
           </div>
-          <button className="btn-primary" disabled={saving || !wh || lines.length === 0} onClick={save}>
+          <button className="btn-primary" disabled={saving || lines.length === 0} onClick={save}>
             {saving ? "Đang lưu…" : "Lưu phiếu nhập"}
           </button>
         </div>
@@ -412,7 +422,7 @@ function UnknownBarcode({
   onCancel,
 }: {
   barcode: string;
-  warehouseType: WarehouseType;
+  warehouseType: WarehouseType | null;
   products: Product[];
   onLinked: (p: Product) => void;
   onCancel: () => void;

@@ -80,7 +80,7 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
       <ReceiveForm
         branches={(branches ?? []).filter((b) => canSwitch || b.id === branchId)}
         defaultBranchId={branchId}
-        defaultType={sp.kho === "retail" ? "retail" : "treatment"}
+        defaultType={sp.kho === "retail" ? "retail" : sp.kho === "treatment" ? "treatment" : null}
         warehouses={warehouses}
         initialProducts={(products ?? []) as Product[]}
         recent={(receipts ?? []) as unknown as RecentReceipt[]}
