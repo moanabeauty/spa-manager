@@ -20,11 +20,18 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
     supabase.from("warehouses").select("id, branch_id, type, name"),
     supabase.from("products").select(PRODUCT_COLUMNS).order("name"),
     isOwner ? supabase.rpc("product_costs") : Promise.resolve({ data: [] }),
-    supabase
-      .from("stock_receipts")
-      .select("id, code, supplier, created_at, status, warehouses(name), profiles!stock_receipts_created_by_fkey(full_name), stock_receipt_items(quantity)")
-      .order("created_at", { ascending: false })
-      .limit(10),
+    (() => {
+      // NV kho: chỉ phiếu mình tạo; chủ / quản lý: mọi phiếu
+      let q = supabase
+        .from("stock_receipts")
+        .select(
+          "id, code, supplier, note, created_at, approved_at, rejected_at, reject_reason, status, warehouses(name), profiles!stock_receipts_created_by_fkey(full_name), stock_receipt_items(id, product_id, quantity, expiry_date)",
+        )
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (profile!.role !== "owner" && profile!.role !== "manager") q = q.eq("created_by", profile!.id);
+      return q;
+    })(),
     isOwner
       ? supabase
           .from("stock_receipts")
@@ -44,6 +51,13 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
     const k = r.supplier.toLowerCase();
     debts[k] = (debts[k] ?? 0) + Number(r.payable) - Number(r.paid);
   });
+  // chi phí (ship, chi phí khác) của các phiếu trong danh sách – không có giá nhập
+  const recentRows = (receipts ?? []) as unknown as RecentReceipt[];
+  const { data: myExtra } = recentRows.length
+    ? await supabase.rpc("my_receipt_extra_costs", { p_receipt_ids: recentRows.map((r) => r.id) })
+    : { data: [] };
+  const myExtraMap = new Map(((myExtra ?? []) as { receipt_id: string; extra_costs: { label: string; amount: number }[] }[]).map((e) => [e.receipt_id, e.extra_costs]));
+  const recent: RecentReceipt[] = recentRows.map((r) => ({ ...r, extra_costs: myExtraMap.get(r.id) ?? [] }));
   const warehouses = ((whs ?? []) as Warehouse[]).filter((w) => (canSwitch ? true : w.branch_id === branchId));
   // chủ spa: phiếu chờ duyệt kèm chi phí kho đã ghi
   type PendingRow = {
@@ -83,7 +97,8 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
         defaultType={sp.kho === "retail" ? "retail" : sp.kho === "treatment" ? "treatment" : null}
         warehouses={warehouses}
         initialProducts={(products ?? []) as Product[]}
-        recent={(receipts ?? []) as unknown as RecentReceipt[]}
+        recent={recent}
+        recentTitle={profile!.role !== "owner" && profile!.role !== "manager" ? "Phiếu nhập của tôi" : "Phiếu nhập gần đây"}
         suppliers={((sups ?? []) as { name: string }[]).map((x) => x.name)}
       />
     </div>

@@ -21,12 +21,20 @@ export type RecentReceipt = {
   id: string;
   code: string;
   supplier: string | null;
+  note: string | null;
   created_at: string;
+  approved_at: string | null;
+  rejected_at: string | null;
+  reject_reason: string | null;
   status: "pending" | "approved" | "rejected";
   warehouses: { name: string } | null;
   profiles: { full_name: string | null } | null;
-  stock_receipt_items: { quantity: number }[];
+  stock_receipt_items: { id: string; product_id: string; quantity: number; expiry_date: string | null }[];
+  extra_costs?: { label: string; amount: number }[];
 };
+
+const vnDate = (iso: string) => new Date(iso).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+const vnDay = (d: string) => d.split("-").reverse().join("/");
 
 type Line = { productId: string; qty: number; exp: string };
 type Extra = { key: number; label: string; amount: number };
@@ -40,6 +48,7 @@ export default function ReceiveForm({
   warehouses,
   initialProducts,
   recent,
+  recentTitle = "Phiếu nhập gần đây",
   suppliers,
 }: {
   branches: { id: string; name: string }[];
@@ -48,6 +57,7 @@ export default function ReceiveForm({
   warehouses: Warehouse[];
   initialProducts: Product[];
   recent: RecentReceipt[];
+  recentTitle?: string;
   suppliers: string[];
 }) {
   const router = useRouter();
@@ -365,26 +375,71 @@ export default function ReceiveForm({
 
       {recent.length > 0 && (
         <div className="card p-0">
-          <p className="px-4 pt-3 text-sm font-semibold text-navy">Phiếu nhập gần đây</p>
-          <ul className="divide-y divide-beige text-sm">
-            {recent.map((r) => (
-              <li key={r.id} className="flex justify-between gap-3 px-4 py-2">
-                <span className="min-w-0">
-                  <b>{r.code}</b> · {r.warehouses?.name}
-                  <span className="block text-xs text-ink/55">
-                    {formatTime(r.created_at)} {new Date(r.created_at).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })} ·{" "}
-                    {r.profiles?.full_name ?? "?"}
-                    {r.supplier ? ` · ${r.supplier}` : ""}
-                  </span>
-                </span>
-                <span className="shrink-0 text-right">
-                  {r.stock_receipt_items.reduce((a, m) => a + Number(m.quantity), 0)} đơn vị
-                  <span className={`mt-0.5 block rounded-full px-2 py-0.5 text-[11px] ${r.status === "pending" ? "bg-[#FFE8BA] text-[#7A5600]" : r.status === "rejected" ? "bg-[#F6D5D5] text-[#8A2323]" : "bg-[#D6EDD8] text-[#22612A]"}`}>
-                    {r.status === "pending" ? "Chờ duyệt giá" : r.status === "rejected" ? "Không duyệt" : "Đã duyệt"}
-                  </span>
-                </span>
-              </li>
-            ))}
+          <p className="px-4 pt-3 text-sm font-semibold text-navy">{recentTitle}</p>
+          <p className="px-4 text-xs text-ink/55">Bấm vào phiếu để xem chi tiết.</p>
+          <ul className="mt-1 divide-y divide-beige text-sm">
+            {recent.map((r) => {
+              const extras = (r.extra_costs ?? []).filter((x) => Number(x.amount) > 0);
+              return (
+                <li key={r.id}>
+                  <details>
+                    <summary className="flex cursor-pointer list-none justify-between gap-3 px-4 py-2 hover:bg-cream">
+                      <span className="min-w-0">
+                        <b>{r.code}</b> · {r.warehouses?.name}
+                        <span className="block text-xs text-ink/55">
+                          {formatTime(r.created_at)} {vnDate(r.created_at)} · {r.profiles?.full_name ?? "?"}
+                          {r.supplier ? ` · ${r.supplier}` : ""}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        {r.stock_receipt_items.reduce((a, m) => a + Number(m.quantity), 0)} đơn vị
+                        <span className={`mt-0.5 block rounded-full px-2 py-0.5 text-[11px] ${r.status === "pending" ? "bg-[#FFE8BA] text-[#7A5600]" : r.status === "rejected" ? "bg-[#F6D5D5] text-[#8A2323]" : "bg-[#D6EDD8] text-[#22612A]"}`}>
+                          {r.status === "pending" ? "Chờ duyệt giá" : r.status === "rejected" ? "Không duyệt" : "Đã duyệt"}
+                        </span>
+                      </span>
+                    </summary>
+                    <div className="space-y-2 bg-cream px-4 py-3 text-xs">
+                      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                        <span className="text-ink/55">Kho nhận</span><span>{r.warehouses?.name ?? "—"}</span>
+                        <span className="text-ink/55">Nhà cung cấp</span><span>{r.supplier ?? "—"}</span>
+                        <span className="text-ink/55">Người lập</span><span>{r.profiles?.full_name ?? "—"} · {formatTime(r.created_at)} {vnDate(r.created_at)}</span>
+                        {r.note && (<><span className="text-ink/55">Ghi chú</span><span>{r.note}</span></>)}
+                        {r.status === "approved" && r.approved_at && (<><span className="text-ink/55">Đã duyệt</span><span>{formatTime(r.approved_at)} {vnDate(r.approved_at)} · hàng đã vào kho</span></>)}
+                        {r.status === "rejected" && (<><span className="text-ink/55">Không duyệt</span><span className="text-[#8A2323]">{r.rejected_at ? `${vnDate(r.rejected_at)} · ` : ""}{r.reject_reason || "không ghi lý do"}</span></>)}
+                        {r.status === "pending" && (<><span className="text-ink/55">Trạng thái</span><span>Chờ chủ spa duyệt giá – hàng chưa vào kho</span></>)}
+                      </div>
+                      <table className="w-full rounded-lg bg-white">
+                        <thead>
+                          <tr className="text-left text-ink/55">
+                            <th className="px-2 py-1 font-normal">Sản phẩm</th>
+                            <th className="px-2 py-1 text-right font-normal">SL</th>
+                            <th className="px-2 py-1 text-right font-normal">HSD</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-beige">
+                          {r.stock_receipt_items.map((it) => {
+                            const p = byId.get(it.product_id);
+                            return (
+                              <tr key={it.id}>
+                                <td className="px-2 py-1">{p ? productLabel(p) : "(sản phẩm đã xoá)"}</td>
+                                <td className="px-2 py-1 text-right">{it.quantity}{p ? ` ${p.unit}` : ""}</td>
+                                <td className={`px-2 py-1 text-right ${it.expiry_date ? "" : "text-[#7A5600]"}`}>{it.expiry_date ? vnDay(it.expiry_date) : "chưa nhập"}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      {extras.length > 0 && (
+                        <p>
+                          Chi phí: {extras.map((x) => `${x.label} ${formatVnd(Number(x.amount))}`).join(" · ")}
+                        </p>
+                      )}
+                      {r.status === "approved" && <p className="text-ink/55">Số lượng là số chủ spa đã duyệt.</p>}
+                    </div>
+                  </details>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
