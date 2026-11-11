@@ -6,6 +6,7 @@ import {
   type Product, type Warehouse,
 } from "@/lib/inventory";
 import ProductEdit from "./ProductEdit";
+import DeleteProduct from "./DeleteProduct";
 
 export const metadata = { title: "Chi tiết sản phẩm – Moana Beauty" };
 
@@ -83,6 +84,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         </dl>
       </div>
       {canEdit && <ProductEdit product={p} cost={cost} defaultPct={pct} />}
+      {showCost && <DeleteProduct product={p} />}
 
       <div className="card p-0">
         <p className="px-4 pt-3 text-sm font-semibold text-navy">Tồn kho</p>
