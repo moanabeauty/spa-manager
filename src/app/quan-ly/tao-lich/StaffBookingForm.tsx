@@ -26,7 +26,7 @@ export type StaffService = {
   price: number | null;
   branch_id: string | null;
 };
-type Customer = { id: string; full_name: string; phone: string | null; note: string | null };
+type Customer = { id: string; full_name: string; phone: string | null; note: string | null; code?: string | null };
 type Item = { key: number; serviceId: string; technicianId: string; minutes?: number };
 
 const MAX_ITEMS = 10;
