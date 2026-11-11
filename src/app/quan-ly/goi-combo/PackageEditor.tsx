@@ -15,6 +15,7 @@ export type Pkg = {
   is_active: boolean;
   category: string | null;
   sort_order: number;
+  menu_tier: "public" | "private";
   package_items: {
     id: string;
     label: string;
@@ -35,6 +36,7 @@ type Draft = {
   validity: string;
   category: string;
   is_active: boolean;
+  menu_tier: "public" | "private";
   parts: Part[];
 };
 
@@ -92,6 +94,7 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
       validity: p.validity_days ? String(p.validity_days) : "",
       category: p.category ?? "",
       is_active: p.is_active,
+      menu_tier: p.menu_tier,
       parts: [...p.package_items]
         .sort((a, b) => a.sort_order - b.sort_order)
         .map((i) => ({
@@ -116,7 +119,8 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
     if (!draft) return;
     setSaving(true);
     setError(null);
-    const { error } = await createClient().rpc("save_package", {
+    const supabase = createClient();
+    const { data: savedId, error } = await supabase.rpc("save_package", {
       p_id: draft.id,
       p_name: draft.name,
       p_price: draft.price,
@@ -132,8 +136,16 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
         service_ids: p.service_ids,
       })),
     });
+    if (error) {
+      setSaving(false);
+      return setError(vnError(error.message));
+    }
+    const { error: tierError } = await supabase
+      .from("packages")
+      .update({ menu_tier: draft.menu_tier })
+      .eq("id", (savedId as string) ?? draft.id);
     setSaving(false);
-    if (error) return setError(vnError(error.message));
+    if (tierError) return setError(vnError(tierError.message));
     setDraft(null);
     router.refresh();
   }
@@ -148,7 +160,7 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
           <p className="text-sm text-ink/70">{packages.filter((p) => p.is_active).length} gói đang bán. Bấm vào gói để sửa.</p>
         </div>
         {!draft && (
-          <button className="btn-primary" onClick={() => { setError(null); setDraft({ id: null, name: "", description: "", price: 0, validity: "", category: "", is_active: true, parts: [newPart()] }); }}>
+          <button className="btn-primary" onClick={() => { setError(null); setDraft({ id: null, name: "", description: "", price: 0, validity: "", category: "", is_active: true, menu_tier: "private", parts: [newPart()] }); }}>
             + Tạo gói
           </button>
         )}
@@ -266,6 +278,16 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
             <input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} />
             Đang bán
           </label>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="label mb-0">Hiển thị trên app</span>
+            <button
+              type="button"
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${draft.menu_tier === "public" ? "bg-[#D6EDD8] text-[#22612A]" : "bg-[#DCE3F5] text-navy"}`}
+              onClick={() => setDraft({ ...draft, menu_tier: draft.menu_tier === "public" ? "private" : "public" })}
+            >
+              {draft.menu_tier === "public" ? "👁 Public – khách có tài khoản thấy" : "🔒 Private – chỉ nhân viên thấy"}
+            </button>
+          </div>
           <p className="text-xs text-ink/50">
             Giá lẻ / buổi dùng để tính tiền hoàn khi khách huỷ gói (giá gói − số buổi đã dùng × giá lẻ). Sửa gói không ảnh hưởng gói khách đã mua.
           </p>
@@ -284,6 +306,9 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
             <div className="flex justify-between gap-3">
               <p className="font-semibold">
                 {p.name} {!p.is_active && <span className="text-xs font-normal text-ink/60">(ngừng bán)</span>}
+                <span className={`ml-1.5 rounded-full px-2 text-[10px] font-normal ${p.menu_tier === "public" ? "bg-[#D6EDD8] text-[#22612A]" : "bg-[#DCE3F5] text-navy"}`}>
+                  {p.menu_tier === "public" ? "👁 Public" : "🔒 Private"}
+                </span>
               </p>
               <p className="shrink-0 font-bold text-navy">{formatVnd(Number(p.price))}</p>
             </div>

@@ -28,6 +28,7 @@ type Pkg = {
   validity_days: number | null;
   category: string | null;
   sort_order: number;
+  menu_tier: string;
   package_items: { id: string; label: string; quantity: number | null; sort_order: number }[];
 };
 
@@ -143,9 +144,10 @@ async function SingleMenu({ staff }: { staff: boolean }) {
 
 async function ComboMenu({ staff }: { staff: boolean }) {
   const { supabase } = await getCurrentUser();
+  // Public: khách đã có tài khoản xem được; Private: chỉ nhân viên (cơ sở dữ liệu tự lọc)
   const { data } = await supabase
     .from("packages")
-    .select("id, name, description, price, validity_days, category, sort_order, package_items(id, label, quantity, sort_order)")
+    .select("id, name, description, price, validity_days, category, sort_order, menu_tier, package_items(id, label, quantity, sort_order)")
     .eq("is_active", true)
     .order("sort_order")
     .order("name");
@@ -186,7 +188,12 @@ async function ComboMenu({ staff }: { staff: boolean }) {
               <li key={p.id} className="px-5 py-3">
                 <div className="flex justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold uppercase tracking-wide text-navy">{p.name}</p>
+                    <p className="text-sm font-semibold uppercase tracking-wide text-navy">
+                      {p.name}
+                      {staff && p.menu_tier !== "public" && (
+                        <span className="ml-1.5 rounded-full bg-[#DCE3F5] px-2 align-middle text-[10px] font-normal normal-case tracking-normal text-navy">🔒 Nội bộ</span>
+                      )}
+                    </p>
                     {p.description && <p className="mt-0.5 text-xs text-ink/70">{p.description}</p>}
                   </div>
                   <p className="shrink-0 text-sm font-semibold text-navy">{formatVnd(Number(p.price))}</p>
