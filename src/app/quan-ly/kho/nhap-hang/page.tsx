@@ -22,13 +22,13 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
     isOwner ? supabase.rpc("product_costs") : Promise.resolve({ data: [] }),
     supabase
       .from("stock_receipts")
-      .select("id, code, supplier, created_at, status, warehouses(name), profiles!stock_receipts_created_by_fkey(full_name), stock_movements(quantity)")
+      .select("id, code, supplier, created_at, status, warehouses(name), profiles!stock_receipts_created_by_fkey(full_name), stock_receipt_items(quantity)")
       .order("created_at", { ascending: false })
       .limit(10),
     isOwner
       ? supabase
           .from("stock_receipts")
-          .select("id, code, supplier, note, created_at, warehouses(name), profiles!stock_receipts_created_by_fkey(full_name), stock_movements(id, product_id, quantity, expiry_date)")
+          .select("id, code, supplier, note, created_at, warehouses(name), profiles!stock_receipts_created_by_fkey(full_name), stock_receipt_items(id, product_id, quantity, expiry_date)")
           .eq("status", "pending")
           .order("created_at")
       : Promise.resolve({ data: [] }),
@@ -49,7 +49,7 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
   type PendingRow = {
     id: string; code: string; supplier: string | null; note: string | null; created_at: string;
     warehouses: { name: string } | null; profiles: { full_name: string | null } | null;
-    stock_movements: { id: string; product_id: string; quantity: number; expiry_date: string | null }[];
+    stock_receipt_items: { id: string; product_id: string; quantity: number; expiry_date: string | null }[];
   };
   const pendingRows = (pendingData ?? []) as unknown as PendingRow[];
   const { data: extraData } = pendingRows.length
@@ -65,7 +65,7 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
     warehouse: r.warehouses?.name ?? "",
     creator: r.profiles?.full_name ?? "?",
     extra_costs: extraMap.get(r.id) ?? [],
-    items: r.stock_movements.map((m) => ({ movement_id: m.id, product_id: m.product_id, quantity: Number(m.quantity), expiry_date: m.expiry_date })),
+    items: r.stock_receipt_items.map((m) => ({ item_id: m.id, product_id: m.product_id, quantity: Number(m.quantity), expiry_date: m.expiry_date })),
   }));
   const costMap = Object.fromEntries(((costs ?? []) as { product_id: string; cost_price: number | null }[]).map((c) => [c.product_id, c.cost_price]));
 
@@ -73,7 +73,7 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-navy">Nhập hàng</h1>
-        <p className="text-sm text-ink/70">Quét mã vạch trên vỏ hộp (máy quét hoặc camera điện thoại), nhập số lượng, hạn sử dụng + tiền ship / chi phí khác rồi lưu phiếu. Chủ spa nhập giá và duyệt phiếu.</p>
+        <p className="text-sm text-ink/70">Quét mã vạch trên vỏ hộp (máy quét hoặc camera điện thoại), nhập số lượng, hạn sử dụng + tiền ship / chi phí khác rồi lưu phiếu. Chủ spa nhập giá và duyệt phiếu — hàng chỉ cộng vào kho khi chủ duyệt.</p>
       </div>
       <KhoNav active="nhap" role={profile!.role} />
       {isOwner && <ApproveReceipts receipts={pending} products={(products ?? []) as Product[]} listPrices={listPrices} costs={costMap} debts={debts} suppliers={((sups ?? []) as { name: string }[]).map((x) => x.name)} />}

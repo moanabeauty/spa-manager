@@ -83,7 +83,7 @@ export default async function ApprovalsPage() {
     O
       ? supabase
           .from("stock_receipts")
-          .select("id, code, supplier, created_at, warehouses(name), profiles!stock_receipts_created_by_fkey(full_name), stock_movements(quantity)")
+          .select("id, code, supplier, created_at, warehouses(name), profiles!stock_receipts_created_by_fkey(full_name), stock_receipt_items(quantity)")
           .eq("status", "pending")
           .order("created_at")
       : none,
@@ -119,7 +119,7 @@ export default async function ApprovalsPage() {
   }[];
   const receipts = (recR.data ?? []) as unknown as {
     id: string; code: string; supplier: string | null; created_at: string; warehouses: { name: string } | null;
-    profiles: Named; stock_movements: { quantity: number }[];
+    profiles: Named; stock_receipt_items: { quantity: number }[];
   }[];
   const posts = (mkR.data ?? []) as unknown as { id: string; title: string; publish_date: string | null; due_date: string | null; channels: string[] | null }[];
   const otStart = (cfgR.data?.value as { ot_start?: string } | null)?.ot_start ?? "18:30";
@@ -338,7 +338,7 @@ export default async function ApprovalsPage() {
               <span>
                 <b>{r.code}</b> · {r.supplier ?? "NCC"} · {r.warehouses?.name}
                 <span className="block text-xs text-ink/60">
-                  {r.profiles?.full_name ?? "?"} · {when(r.created_at)} · {r.stock_movements.reduce((a, m) => a + Number(m.quantity), 0)} sản phẩm
+                  {r.profiles?.full_name ?? "?"} · {when(r.created_at)} · {r.stock_receipt_items.reduce((a, m) => a + Number(m.quantity), 0)} sản phẩm
                 </span>
               </span>
               <span className="shrink-0 font-semibold text-navy">Nhập giá ›</span>

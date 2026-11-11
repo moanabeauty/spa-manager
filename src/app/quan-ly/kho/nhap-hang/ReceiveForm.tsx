@@ -25,7 +25,7 @@ export type RecentReceipt = {
   status: "pending" | "approved" | "rejected";
   warehouses: { name: string } | null;
   profiles: { full_name: string | null } | null;
-  stock_movements: { quantity: number }[];
+  stock_receipt_items: { quantity: number }[];
 };
 
 type Line = { productId: string; qty: number; exp: string };
@@ -134,7 +134,7 @@ export default function ReceiveForm({
     setSaving(false);
     if (error) return setError(vnError(error.message));
     const { data: r } = await supabase.from("stock_receipts").select("code").eq("id", data as string).maybeSingle();
-    setDone(`Đã lưu phiếu nhập ${r?.code ?? ""}: ${totalQty} đơn vị vào ${wh.name}. Phiếu chờ chủ spa nhập giá & duyệt.`);
+    setDone(`Đã lưu phiếu nhập ${r?.code ?? ""} (${totalQty} đơn vị, ${wh.name}). Hàng sẽ cộng vào kho khi chủ spa duyệt phiếu.`);
     setLines([]);
     setExtras([]);
     setSupplier("");
@@ -368,7 +368,7 @@ export default function ReceiveForm({
                   </span>
                 </span>
                 <span className="shrink-0 text-right">
-                  {r.stock_movements.reduce((a, m) => a + Number(m.quantity), 0)} đơn vị
+                  {r.stock_receipt_items.reduce((a, m) => a + Number(m.quantity), 0)} đơn vị
                   <span className={`mt-0.5 block rounded-full px-2 py-0.5 text-[11px] ${r.status === "pending" ? "bg-[#FFE8BA] text-[#7A5600]" : r.status === "rejected" ? "bg-[#F6D5D5] text-[#8A2323]" : "bg-[#D6EDD8] text-[#22612A]"}`}>
                     {r.status === "pending" ? "Chờ duyệt giá" : r.status === "rejected" ? "Không duyệt" : "Đã duyệt"}
                   </span>

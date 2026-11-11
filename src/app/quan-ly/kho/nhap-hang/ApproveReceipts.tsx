@@ -16,7 +16,7 @@ export type PendingReceipt = {
   warehouse: string;
   creator: string;
   extra_costs: { label: string; amount: number }[];
-  items: { movement_id: string; product_id: string; quantity: number; expiry_date: string | null }[];
+  items: { item_id: string; product_id: string; quantity: number; expiry_date: string | null }[];
 };
 
 /** Chủ spa: nhập giá niêm yết NCC / chiết khấu / giá nhập cho phiếu do kho lập, sửa phiếu rồi duyệt hoặc không duyệt */
@@ -55,7 +55,7 @@ export default function ApproveReceipts({
 type Extra = { key: number; label: string; amount: number };
 type Line = {
   key: string;
-  movement_id: string | null;
+  item_id: string | null;
   product_id: string;
   quantity: number;
   expiry_date: string | null;
@@ -86,8 +86,8 @@ function ReceiptCard({
   const router = useRouter();
   const [lines, setLines] = useState<Line[]>(() =>
     r.items.map((i) => ({
-      key: i.movement_id,
-      movement_id: i.movement_id,
+      key: i.item_id,
+      item_id: i.item_id,
       product_id: i.product_id,
       quantity: i.quantity,
       expiry_date: i.expiry_date,
@@ -139,7 +139,7 @@ function ReceiptCard({
   function addProduct(p: Product) {
     setLines((ls) => [
       ...ls,
-      { key: `new-${Date.now()}`, movement_id: null, product_id: p.id, quantity: 1, expiry_date: null, list: Number(listPrices[p.id] ?? 0), pct: null, price: 0 },
+      { key: `new-${Date.now()}`, item_id: null, product_id: p.id, quantity: 1, expiry_date: null, list: Number(listPrices[p.id] ?? 0), pct: null, price: 0 },
     ]);
     setSearch("");
     setAdding(false);
@@ -157,7 +157,7 @@ function ReceiptCard({
     const { error } = await createClient().rpc("approve_stock_receipt_v2", {
       p_receipt_id: r.id,
       p_items: lines.map((l) => ({
-        movement_id: l.movement_id,
+        item_id: l.item_id,
         product_id: l.product_id,
         quantity: l.quantity,
         expiry_date: l.expiry_date,
@@ -226,7 +226,7 @@ function ReceiptCard({
               <div className="min-w-0 flex-1">
                 <p className="font-medium">
                   {p ? productLabel(p) : "Sản phẩm"}
-                  {!l.movement_id && <span className="ml-1 rounded-full bg-[#D6EDD8] px-2 py-0.5 text-[11px] text-[#22612A]">chủ thêm</span>}
+                  {!l.item_id && <span className="ml-1 rounded-full bg-[#D6EDD8] px-2 py-0.5 text-[11px] text-[#22612A]">chủ thêm</span>}
                 </p>
                 <p className="text-xs text-ink/55">
                   {[p?.brand, l.expiry_date ? `HSD ${new Date(l.expiry_date).toLocaleDateString("vi-VN")}` : "chưa ghi HSD", last ? `giá vốn lần trước ${formatVnd(Number(last))}` : null]
