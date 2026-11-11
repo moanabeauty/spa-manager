@@ -27,7 +27,7 @@ export default async function StaffBookingPage({ searchParams }: { searchParams:
       initialDate={sp.ngay && /^\d{4}-\d{2}-\d{2}$/.test(sp.ngay) ? sp.ngay : undefined}
       initialTime={sp.gio && /^\d{2}:\d{2}$/.test(sp.gio) ? sp.gio : undefined}
       canOverbook={profile?.role === "owner" || profile?.role === "manager"}
-      initialPhone={sp.sdt ?? ""}
+      initialPhone={sp.sdt && sp.sdt !== "null" ? sp.sdt : ""}
       branches={branches ?? []}
       categories={categories ?? []}
       services={(services ?? []) as StaffService[]}

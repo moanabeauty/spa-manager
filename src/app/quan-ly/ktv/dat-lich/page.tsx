@@ -6,7 +6,7 @@ import KtvBookingForm from "./KtvBookingForm";
 
 export const metadata = { title: "Đặt lịch cho khách – Moana Beauty" };
 
-/** KTV đặt lịch: chỉ thấy khung giờ trống / kín của chi nhánh mình, không thấy lịch KTV khác */
+/** KTV / NV Kho đặt lịch: chỉ thấy khung giờ trống / kín của chi nhánh mình, không thấy lịch KTV khác */
 export default async function KtvBookingPage() {
   const { supabase, profile } = await getCurrentUser();
   if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
@@ -16,7 +16,8 @@ export default async function KtvBookingPage() {
     supabase.from("services").select("id, name, name_en, duration_minutes, branch_id, service_categories(name, sort_order)").eq("is_active", true),
   ]);
   const list = (branches ?? []) as { id: string; name: string; max_per_slot: number | null }[];
-  const branch = list.find((b) => b.id === profile.branch_id) ?? (profile.role === "technician" ? null : list[0]);
+  const ownBranchOnly = profile.role === "technician" || profile.role === "warehouse";
+  const branch = list.find((b) => b.id === profile.branch_id) ?? (ownBranchOnly ? null : list[0]);
   if (!branch) {
     return <div className="card text-sm">Tài khoản của bạn chưa được gắn chi nhánh. Vui lòng nhờ chủ spa cấp chi nhánh.</div>;
   }
@@ -31,6 +32,7 @@ export default async function KtvBookingPage() {
       branchName={branch.name}
       capacity={branch.max_per_slot ?? DEFAULT_CAPACITY}
       services={services}
+      inKtvApp={profile.role === "technician"}
     />
   );
 }

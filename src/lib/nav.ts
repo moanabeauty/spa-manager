@@ -55,6 +55,7 @@ export function buildNav(role: Role, c: NavCounts): NavGroup[] {
       icon: "desk",
       items: [
         ...item(!L, "/quan-ly/lich-hen", "Lịch hẹn"),
+        ...item(W, "/quan-ly/ktv/dat-lich", "Đặt lịch cho khách"),
         ...item(!L, "/quan-ly/thu-tien", "Thu tiền"),
         ...item(!L, "/quan-ly/hoa-don", "Hoá đơn"),
         ...item(true, "/quan-ly/phieu-thu-chi", "Thu chi tiền mặt tại spa", M ? c.vouchers : 0),

@@ -75,6 +75,8 @@ export default function StaffBookingForm({
   const [searching, setSearching] = useState(false);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newMode, setNewMode] = useState(false); // bấm "+ Khách mới"
 
   // dịch vụ
   const [items, setItems] = useState<Item[]>([]);
@@ -95,31 +97,42 @@ export default function StaffBookingForm({
   const [done, setDone] = useState<{ id: string; start: string; name: string; confirmed: boolean } | null>(null);
 
   const byId = useMemo(() => new Map(services.map((s) => [s.id, s])), [services]);
-  const digits = normalizePhone(phone);
+  // ô tìm khách: tên, SĐT hoặc mã KH
+  const q = phone.trim();
+  const qIsPhone = /^[\d\s.+-]+$/.test(q);
+  const digits = qIsPhone ? normalizePhone(q) : "";
+  const newDigits = normalizePhone(newPhone);
 
-  // tìm khách theo SĐT (gõ từ 4 số)
   useEffect(() => {
     setCustomer(null);
-    if (digits.length < 4) {
+    if (qIsPhone ? digits.length < 4 : q.length < 2) {
       setMatches(null);
+      setSearching(false);
       return;
     }
     let cancelled = false;
     setSearching(true);
     const t = setTimeout(async () => {
-      const { data } = await supabase.rpc("search_customers", { p_q: digits, p_limit: 8 });
+      const { data } = await supabase.rpc("search_customers", { p_q: q, p_limit: 8 });
       if (cancelled) return;
       const list = (data ?? []) as Customer[];
       setMatches(list);
       setSearching(false);
-      const exact = list.find((c) => c.phone === digits);
+      const exact = digits.length >= 9 ? list.find((c) => c.phone === digits) : undefined;
       if (exact) setCustomer(exact);
     }, 300);
     return () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [digits, supabase]);
+  }, [q, qIsPhone, digits, supabase]);
+
+  // gợi ý sẵn cho khách mới từ ô tìm
+  useEffect(() => {
+    if (!q) return;
+    if (qIsPhone) setNewPhone(q);
+    else setNewName(q);
+  }, [q, qIsPhone]);
 
   // lịch bận của KTV trong ngày
   useEffect(() => {
@@ -203,14 +216,14 @@ export default function StaffBookingForm({
     });
   }
 
-  const isNew = !customer && digits.length >= 9 && matches !== null && !matches.some((c) => c.phone === digits);
+  const isNew = !customer && (newMode || matches !== null);
 
   async function submit() {
     setError(null);
     if (!branchId) return setError("Vui lòng chọn chi nhánh.");
     if (!customer) {
-      if (digits.length < 9 || digits.length > 11) return setError("Vui lòng nhập số điện thoại khách (9–11 số).");
-      if (!newName.trim()) return setError("Khách mới: vui lòng nhập tên khách.");
+      if (!newName.trim()) return setError("Vui lòng chọn khách có sẵn, hoặc nhập tên khách mới.");
+      if (newDigits && (newDigits.length < 9 || newDigits.length > 11)) return setError("Số điện thoại phải có 9–11 số – hoặc để trống.");
     }
     if (!consult && items.length === 0)
       return setError("Vui lòng chọn dịch vụ, hoặc chọn “Chưa chọn liệu trình – Hẹn tư vấn”.");
@@ -224,7 +237,7 @@ export default function StaffBookingForm({
         p_source: source,
         p_customer_id: customer?.id ?? null,
         p_customer_name: customer ? null : newName.trim(),
-        p_customer_phone: customer ? null : digits,
+        p_customer_phone: customer || !newDigits ? null : newDigits,
         p_technician_id: consultTech || null,
         p_note: note.trim() || null,
       });
@@ -240,7 +253,7 @@ export default function StaffBookingForm({
       p_items: items.map((it) => ({ service_id: it.serviceId, technician_id: it.technicianId || null, ...(it.minutes ? { minutes: it.minutes } : {}) })),
       p_customer_id: customer?.id ?? null,
       p_customer_name: customer ? null : newName.trim(),
-      p_customer_phone: customer ? null : digits,
+      p_customer_phone: customer || !newDigits ? null : newDigits,
       p_note: note.trim() || null,
     });
     setSaving(false);
@@ -257,6 +270,8 @@ export default function StaffBookingForm({
     setDone(null);
     setPhone("");
     setNewName("");
+    setNewPhone("");
+    setNewMode(false);
     setCustomer(null);
     setItems([]);
     setConsult(false);
@@ -327,23 +342,22 @@ export default function StaffBookingForm({
       {/* Khách */}
       <section className="card">
         <h2 className="mb-3 font-semibold text-navy">1. Khách hàng</h2>
-        <label className="label" htmlFor="phone">Số điện thoại</label>
+        <label className="label" htmlFor="phone">Tìm khách</label>
         <input
           id="phone"
           className="input"
-          inputMode="tel"
-          placeholder="Nhập SĐT khách để tìm"
+          placeholder="Tên, số điện thoại hoặc mã KH"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           autoFocus
         />
-        {searching && digits.length >= 4 && <p className="mt-2 text-xs text-ink/50">Đang tìm…</p>}
+        {searching && <p className="mt-2 text-xs text-ink/50">Đang tìm…</p>}
 
         {customer ? (
           <div className="mt-3 flex items-start justify-between gap-3 rounded-xl bg-[#D6EDD8]/60 p-3">
             <div>
               <p className="font-semibold">{customer.full_name}</p>
-              <p className="text-sm text-ink/70">{customer.phone}</p>
+              <p className="text-sm text-ink/70">{customer.phone ?? "Chưa có SĐT"}</p>
               {customer.note && <p className="mt-1 text-xs text-ink/70">Ghi chú: {customer.note}</p>}
             </div>
             <button type="button" className="text-sm text-navy underline" onClick={() => setCustomer(null)}>Đổi</button>
@@ -354,9 +368,9 @@ export default function StaffBookingForm({
             <ul className="mt-3 divide-y divide-beige rounded-xl border border-beige-dark/70">
               {matches.map((c) => (
                 <li key={c.id}>
-                  <button type="button" onClick={() => setCustomer(c)} className="flex w-full justify-between px-4 py-2.5 text-left text-sm hover:bg-cream">
+                  <button type="button" onClick={() => setCustomer(c)} className="flex w-full justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-cream">
                     <span className="font-medium">{c.full_name}</span>
-                    <span className="text-ink/60">{c.phone}</span>
+                    <span className="text-ink/60">{c.phone ?? c.code ?? ""}</span>
                   </button>
                 </li>
               ))}
@@ -364,10 +378,18 @@ export default function StaffBookingForm({
           )
         )}
 
+        {!customer && !isNew && (
+          <button type="button" className="mt-3 text-sm font-semibold text-navy underline" onClick={() => setNewMode(true)}>
+            + Khách mới
+          </button>
+        )}
         {isNew && (
-          <div className="mt-3 rounded-xl bg-cream p-3">
-            <p className="mb-2 text-sm"><b>Khách mới</b> – chưa có hồ sơ với SĐT {digits}. Nhập tên để tạo hồ sơ:</p>
-            <input className="input" placeholder="Họ tên khách" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <div className="mt-3 space-y-2 rounded-xl bg-cream p-3">
+            <p className="text-sm">
+              <b>Khách mới</b>{matches && matches.length > 0 ? " (không phải các khách ở trên)" : ""} – chỉ cần tên, số điện thoại có thể để trống:
+            </p>
+            <input className="input" placeholder="Họ tên khách *" value={newName} onChange={(e) => setNewName(e.target.value)} />
+            <input className="input" inputMode="tel" placeholder="Số điện thoại (có thể để trống)" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
           </div>
         )}
       </section>

@@ -16,11 +16,14 @@ export default function KtvBookingForm({
   branchName,
   capacity,
   services,
+  inKtvApp = true,
 }: {
   branchId: string;
   branchName: string;
   capacity: number;
   services: PickService[];
+  /** true = app KTV (thanh 5 tab dưới đáy); false = NV Kho / nhân viên khác dùng menu chung */
+  inKtvApp?: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
   // khách
@@ -93,7 +96,8 @@ export default function KtvBookingForm({
     setError(null);
     if (!customer && !isNew) return setError("Vui lòng chọn khách hàng.");
     const phone = normalizePhone(newPhone);
-    if (isNew && (!newName.trim() || phone.length < 9 || phone.length > 11)) return setError("Khách mới: nhập tên và số điện thoại (9–11 số).");
+    if (isNew && !newName.trim()) return setError("Khách mới: vui lòng nhập tên khách.");
+    if (isNew && phone && (phone.length < 9 || phone.length > 11)) return setError("Số điện thoại phải có 9–11 số – hoặc để trống.");
     if (mode === "service" && !pick) return setError("Vui lòng chọn liệu trình, hoặc chọn Hẹn tư vấn.");
     if (!time) return setError("Vui lòng chọn khung giờ còn trống.");
     setSaving(true);
@@ -102,7 +106,7 @@ export default function KtvBookingForm({
       p_start_at: vnDateTime(date, time).toISOString(),
       p_customer_id: customer?.id ?? null,
       p_customer_name: customer ? null : newName.trim(),
-      p_customer_phone: customer ? null : phone,
+      p_customer_phone: customer || !phone ? null : phone,
       p_service_id: mode === "service" ? pick!.serviceId : null,
       p_package_item_id: mode === "service" ? pick!.itemId : null,
       p_note: note.trim() || null,
@@ -132,7 +136,7 @@ export default function KtvBookingForm({
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#D6EDD8] text-2xl text-[#22612A]">✓</div>
         <p className="font-semibold text-navy">{done}</p>
         <div className="mt-5 flex flex-wrap justify-center gap-3">
-          <Link href="/quan-ly" className="btn-primary">Về Hôm nay</Link>
+          <Link href="/quan-ly" className="btn-primary">{inKtvApp ? "Về Hôm nay" : "Về Tổng quan"}</Link>
           <button className="btn-outline" onClick={reset}>Đặt lịch khác</button>
         </div>
       </div>
@@ -165,9 +169,9 @@ export default function KtvBookingForm({
             </div>
           ) : isNew ? (
             <div className="space-y-2 rounded-xl bg-white p-3 ring-1 ring-beige-dark">
-              <p className="text-xs text-[#646464]">Khách mới: tạo hồ sơ khi đặt lịch</p>
-              <input className="input py-2.5" placeholder="Tên khách" value={newName} onChange={(e) => setNewName(e.target.value)} />
-              <input className="input py-2.5" placeholder="Số điện thoại" inputMode="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
+              <p className="text-xs text-[#646464]">Khách mới: chỉ cần tên – số điện thoại có thể để trống</p>
+              <input className="input py-2.5" placeholder="Tên khách *" value={newName} onChange={(e) => setNewName(e.target.value)} />
+              <input className="input py-2.5" placeholder="Số điện thoại (có thể để trống)" inputMode="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
               <button className="text-sm font-semibold text-navy underline" onClick={() => setIsNew(false)}>Tìm khách cũ</button>
             </div>
           ) : (
@@ -281,13 +285,15 @@ export default function KtvBookingForm({
         </section>
       </div>
 
-      <div className="fixed inset-x-0 bottom-[68px] z-20 border-t border-[#E6DDCC] bg-white px-4 py-3">
+      <div className={`fixed inset-x-0 z-20 ${inKtvApp ? "bottom-[68px]" : "bottom-[var(--bottom-nav-h)]"}`}>
+      <div className="border-t border-[#E6DDCC] bg-white px-4 py-3">
         <div className="mx-auto max-w-3xl space-y-1.5">
           {error && <p className="text-center text-xs text-[#B3261E]">{error}</p>}
           <button className="min-h-[52px] w-full rounded-[14px] bg-navy text-base font-semibold text-white disabled:opacity-50" disabled={saving} onClick={submit}>
             {saving ? "Đang đặt…" : cta}
           </button>
         </div>
+      </div>
       </div>
     </div>
   );

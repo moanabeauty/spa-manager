@@ -90,6 +90,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
   const actions = W
     ? [
+        { href: "/quan-ly/ktv/dat-lich", label: "+ Đặt lịch cho khách" },
         { href: "/quan-ly/kho/nhap-hang", label: "Nhập hàng" },
         { href: "/quan-ly/kho/kiem-kho", label: "Kiểm kho" },
         { href: "/quan-ly/kho/chuyen-kho", label: "Chuyển kho" },
