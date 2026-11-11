@@ -61,12 +61,14 @@ type Line = {
   expiry_date: string | null;
   list: number; // 0 = chưa có giá niêm yết
   pct: number | null;
+  pctText: string; // ô chiết khấu đang gõ (cho phép "12," "12.5")
   price: number;
 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const priceFrom = (list: number, pct: number) => Math.round((list * (100 - pct)) / 100);
 const pctFrom = (list: number, price: number) => (list > 0 && price > 0 ? Math.max(0, round2((1 - price / list) * 100)) : null);
+const pctStr = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
 
 function ReceiptCard({
   r,
@@ -84,6 +86,8 @@ function ReceiptCard({
   debts: Record<string, number>;
 }) {
   const router = useRouter();
+  // giá niêm yết: giá NCC đã lưu, chưa có thì lấy "Giá niêm yết" của sản phẩm trong kho
+  const defaultList = (pid: string) => Number(listPrices[pid] ?? byId.get(pid)?.retail_price ?? 0);
   const [lines, setLines] = useState<Line[]>(() =>
     r.items.map((i) => ({
       key: i.item_id,
@@ -91,8 +95,9 @@ function ReceiptCard({
       product_id: i.product_id,
       quantity: i.quantity,
       expiry_date: i.expiry_date,
-      list: Number(listPrices[i.product_id] ?? 0),
+      list: defaultList(i.product_id),
       pct: null,
+      pctText: "",
       price: 0,
     })),
   );
@@ -115,17 +120,28 @@ function ReceiptCard({
   const setList = (key: string, list: number) =>
     update(key, (l) => {
       if (list > 0 && l.pct != null) return { ...l, list, price: priceFrom(list, l.pct) };
-      return { ...l, list, pct: pctFrom(list, l.price) };
+      const pct = pctFrom(list, l.price);
+      return { ...l, list, pct, pctText: pctStr(pct) };
     });
-  const setPct = (key: string, pct: number | null) =>
-    update(key, (l) => (pct != null && l.list > 0 ? { ...l, pct, price: priceFrom(l.list, pct) } : { ...l, pct }));
-  const setPrice = (key: string, price: number) => update(key, (l) => ({ ...l, price, pct: pctFrom(l.list, price) }));
+  const setPctText = (key: string, text: string) =>
+    update(key, (l) => {
+      const t = text.replace(/[^\d.,]/g, "");
+      if (t.trim() === "") return { ...l, pctText: t, pct: null };
+      const n = Number(t.replace(",", "."));
+      if (Number.isNaN(n) || n < 0 || n > 100) return l;
+      return l.list > 0 ? { ...l, pctText: t, pct: n, price: priceFrom(l.list, n) } : { ...l, pctText: t, pct: n };
+    });
+  const setPrice = (key: string, price: number) =>
+    update(key, (l) => {
+      const pct = pctFrom(l.list, price);
+      return { ...l, price, pct, pctText: pctStr(pct) };
+    });
 
   function applyGlobal() {
     const pct = Number(globalPct.replace(",", "."));
     if (!globalPct.trim() || Number.isNaN(pct) || pct < 0 || pct > 100) return setError("Chiết khấu chung phải từ 0 đến 100%.");
     setError(null);
-    setLines((ls) => ls.map((l) => (l.list > 0 ? { ...l, pct, price: priceFrom(l.list, pct) } : l)));
+    setLines((ls) => ls.map((l) => (l.list > 0 ? { ...l, pct, pctText: pctStr(pct), price: priceFrom(l.list, pct) } : l)));
   }
 
   const matches = useMemo(() => {
@@ -139,7 +155,7 @@ function ReceiptCard({
   function addProduct(p: Product) {
     setLines((ls) => [
       ...ls,
-      { key: `new-${Date.now()}`, item_id: null, product_id: p.id, quantity: 1, expiry_date: null, list: Number(listPrices[p.id] ?? 0), pct: null, price: 0 },
+      { key: `new-${Date.now()}`, item_id: null, product_id: p.id, quantity: 1, expiry_date: null, list: defaultList(p.id), pct: null, pctText: "", price: 0 },
     ]);
     setSearch("");
     setAdding(false);
@@ -214,7 +230,7 @@ function ReceiptCard({
         <button className="rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white" onClick={applyGlobal}>
           Áp cho tất cả
         </button>
-        <p className="w-full text-xs text-ink/55">Áp cho các dòng có giá niêm yết. Sau đó vẫn sửa riêng từng dòng được.</p>
+        <p className="w-full text-xs text-ink/55">Áp cho các dòng có giá niêm yết. Sau đó vẫn sửa riêng từng dòng được. Dòng chưa có giá niêm yết: gõ giá niêm yết thì giá nhập tự tính theo %.</p>
       </div>
 
       {lines.map((l) => {
@@ -261,16 +277,10 @@ function ReceiptCard({
                 <span className="block text-ink/60">Chiết khấu %</span>
                 <input
                   inputMode="decimal"
-                  disabled={!(l.list > 0)}
-                  className="w-full rounded-lg border border-beige-dark bg-white px-2 py-1.5 text-right text-sm disabled:bg-cream disabled:text-ink/40"
-                  placeholder={l.list > 0 ? "0" : "—"}
-                  value={l.pct ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(",", ".");
-                    if (v.trim() === "") return setPct(l.key, null);
-                    const n = Number(v);
-                    if (!Number.isNaN(n) && n >= 0 && n <= 100) setPct(l.key, n);
-                  }}
+                  className="w-full rounded-lg border border-beige-dark bg-white px-2 py-1.5 text-right text-sm"
+                  placeholder="0"
+                  value={l.pctText}
+                  onChange={(e) => setPctText(l.key, e.target.value)}
                   aria-label="Chiết khấu %"
                 />
               </label>
