@@ -185,7 +185,9 @@ export function ProductForm({
   cost,
   defaultPct,
   onDone,
+  canMerge = false,
 }: {
+  canMerge?: boolean; // gộp sản phẩm: chỉ chủ spa / quản lý
   product?: Product;
   initialBarcode?: string;
   cost: number | null | undefined; // undefined = không được xem giá nhập (ẩn ô, không gửi lên)
@@ -356,14 +358,18 @@ export function ProductForm({
           </p>
           <p className="text-ink/60">
             {product
-              ? "Gộp: giữ sản phẩm kia, bật cả Hàng liệu trình + Hàng bán lẻ; tồn kho, lịch sử nhập/xuất và hóa đơn của sản phẩm này chuyển sang; ô nào bên kia còn trống (giá, % giảm…) lấy từ sản phẩm này. Sản phẩm này chuyển sang Ngừng lưu hành. Chủ, quản lý và NV kho đều gộp được."
+              ? "Gộp: giữ sản phẩm kia, bật cả Hàng liệu trình + Hàng bán lẻ; tồn kho, lịch sử nhập/xuất và hóa đơn của sản phẩm này chuyển sang; ô nào bên kia còn trống (giá, % giảm…) lấy từ sản phẩm này. Sản phẩm này chuyển sang Ngừng lưu hành. Chỉ chủ spa / quản lý gộp được."
               : "Không tạo thêm sản phẩm mới – bật cả Hàng liệu trình + Hàng bán lẻ cho sản phẩm có sẵn."}
           </p>
           <div className="flex flex-wrap justify-end gap-2">
             <button className="btn-ghost py-1.5" onClick={() => setTwin(null)}>Để sau</button>
-            <button className="btn-primary py-1.5" disabled={busy} onClick={useBoth}>
-              {product ? "Gộp – dùng cả liệu trình + bán lẻ" : "Dùng cả liệu trình + bán lẻ"}
-            </button>
+            {product && !canMerge ? (
+              <span className="self-center text-[#7A5600]">Báo chủ spa / quản lý để gộp.</span>
+            ) : (
+              <button className="btn-primary py-1.5" disabled={busy} onClick={useBoth}>
+                {product ? "Gộp – dùng cả liệu trình + bán lẻ" : "Dùng cả liệu trình + bán lẻ"}
+              </button>
+            )}
           </div>
         </div>
       )}

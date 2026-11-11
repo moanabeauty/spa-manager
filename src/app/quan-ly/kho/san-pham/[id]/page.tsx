@@ -88,7 +88,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           ))}
         </dl>
       </div>
-      {canEdit && !p.deleted_at && <ProductEdit product={p} cost={cost} defaultPct={pct} />}
+      {canEdit && !p.deleted_at && <ProductEdit product={p} cost={cost} defaultPct={pct} canMerge={(profile?.roles ?? []).some((r: string) => r === "owner" || r === "manager")} />}
       {canEdit && !p.deleted_at && <DeleteProduct product={p} />}
 
       <div className="card p-0">
