@@ -28,11 +28,13 @@ export default async function ManagerLayout({ children }: { children: React.Reac
     );
   }
   const role = profile!.role;
+  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
   // KTV dùng giao diện app riêng: 5 tab dưới đáy, chấm công nằm ở màn Hôm nay
   if (role === "technician") {
     return (
       <div className="space-y-4 pb-24">
         <KtvNav />
+        {vapidKey && <PushToggle publicKey={vapidKey} hideWhenOn />}
         <RoleSwitcher roles={profile!.roles} active={role} />
         <KtvTopSearch />
         {children}
@@ -54,12 +56,11 @@ export default async function ManagerLayout({ children }: { children: React.Reac
   ]);
   const otStart = (cfg?.value as { ot_start?: string } | null)?.ot_start ?? "18:30";
   const groups = buildNav(role, counts);
-  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
   return (
     <div className="space-y-4 pb-20 sm:pb-0">
       {role !== "owner" && <CheckInBar today={attendance} otStart={otStart} />}
-      {role === "owner" && vapidKey && <PushToggle publicKey={vapidKey} hideWhenOn />}
+      {vapidKey && <PushToggle publicKey={vapidKey} hideWhenOn />}
       <StaffNav groups={groups} />
       <RoleSwitcher roles={profile!.roles} active={role} />
       {children}

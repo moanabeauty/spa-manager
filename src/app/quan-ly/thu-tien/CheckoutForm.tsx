@@ -541,12 +541,7 @@ export default function CheckoutForm({
     setReqBusy(false);
     if (error) return setReqError(vnError(error.message));
     setRequest({ id: data as string, amount: reqAmount, reason: reqReason, status: "pending", review_note: null });
-    // báo lên điện thoại chủ spa (không chờ, lỗi cũng không ảnh hưởng việc thu tiền)
-    fetch("/api/thong-bao/giam-gia", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestId: data }),
-    }).catch(() => {});
+    // điện thoại chủ spa tự được báo (cơ sở dữ liệu tạo thông báo)
   }
   async function sendDebtRequest() {
     setDebtReqBusy(true);
@@ -560,11 +555,6 @@ export default function CheckoutForm({
     setDebtReqBusy(false);
     if (error) return setDebtReqError(vnError(error.message));
     setDebtReq({ id: data as string, amount: debt, reason: debtReason, status: "pending", review_note: null });
-    fetch("/api/thong-bao/giam-gia", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestId: data }),
-    }).catch(() => {});
   }
   async function refreshDebtRequest() {
     if (!debtReq) return;

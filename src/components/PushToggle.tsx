@@ -15,7 +15,7 @@ function keyBytes(base64url: string): ArrayBuffer {
 
 type State = "loading" | "unsupported" | "ios-install" | "denied" | "off" | "on";
 
-/** Bật / tắt thông báo trên điện thoại này (yêu cầu giảm giá...) */
+/** Bật / tắt thông báo trên điện thoại này (khách đặt lịch, yêu cầu cần duyệt...) */
 export default function PushToggle({ publicKey, hideWhenOn }: { publicKey: string; hideWhenOn?: boolean }) {
   const [state, setState] = useState<State>("loading");
   const [busy, setBusy] = useState(false);
@@ -95,7 +95,8 @@ export default function PushToggle({ publicKey, hideWhenOn }: { publicKey: strin
     <div className="card flex flex-wrap items-center gap-2 p-3 text-sm print:hidden">
       <span className="text-lg">🔔</span>
       <div className="min-w-0 flex-1">
-        <p className="font-semibold text-navy">Báo lên điện thoại khi có yêu cầu giảm giá</p>
+        <p className="font-semibold text-navy">Thông báo “ting ting” trên điện thoại</p>
+        <p className="text-xs text-ink/70">Có khách đặt lịch, có yêu cầu cần duyệt, kết quả duyệt… kể cả khi đang tắt app.</p>
         {state === "on" && <p className="text-xs text-[#22612A]">Đang bật trên máy này.</p>}
         {state === "off" && <p className="text-xs text-ink/60">Bật trên từng điện thoại / máy tính muốn nhận.</p>}
         {state === "denied" && (

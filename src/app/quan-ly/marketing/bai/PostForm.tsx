@@ -70,10 +70,7 @@ export default function PostForm({ post, people, me, isOwner, defaultPublish }: 
       }
       id = data.id as string;
     }
-    // gửi duyệt → báo điện thoại chủ spa (không chặn nếu lỗi)
-    if (extra.status === "review" && !isOwner && id) {
-      fetch("/api/thong-bao/marketing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ postId: id }) }).catch(() => {});
-    }
+    // gửi duyệt → điện thoại chủ spa tự được báo (cơ sở dữ liệu tạo thông báo)
     setBusy(false);
     setMsg({ ok: true, t: ok });
     if (!post && id) router.push(`/quan-ly/marketing/bai/${id}`);

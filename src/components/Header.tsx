@@ -1,11 +1,18 @@
 import Link from "next/link";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
+import NotificationBell from "@/components/NotificationBell";
 
 const link = "shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-navy hover:bg-beige";
 
 export default async function Header() {
   const { user, profile } = await getCurrentUser();
   const staff = isStaffRole(profile?.role);
+  let unread = 0;
+  if (staff && user) {
+    const { supabase } = await getCurrentUser();
+    const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null);
+    unread = count ?? 0;
+  }
 
   return (
     <header className="sticky top-0 z-20 border-b border-gold/40 bg-[#FBF8F2]/95 backdrop-blur print:hidden">
@@ -17,6 +24,7 @@ export default async function Header() {
         <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto text-sm">
           {staff ? (
             <>
+              <NotificationBell userId={user!.id} initialUnread={unread} />
               <Link href="/quan-ly" className={link}>Quản lý</Link>
               <Link href="/" className={link}>Trang khách</Link>
             </>
