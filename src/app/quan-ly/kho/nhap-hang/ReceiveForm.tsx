@@ -64,7 +64,7 @@ export default function ReceiveForm({
   const supabase = useMemo(() => createClient(), []);
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
-  const byBarcode = useMemo(() => new Map(products.filter((p) => p.barcode).map((p) => [p.barcode!, p])), [products]);
+  const byBarcode = useMemo(() => new Map(products.filter((p) => p.barcode && !p.deleted_at).map((p) => [p.barcode!, p])), [products]);
 
   const [branchId, setBranchId] = useState(defaultBranchId);
   const [type, setType] = useState<WarehouseType | null>(defaultType);
@@ -117,6 +117,7 @@ export default function ReceiveForm({
     const q = normalizeText(search.trim());
     if (!q) return [];
     return products
+      .filter((p) => !p.deleted_at)
       .filter((p) => normalizeText(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""}`).includes(q))
       .slice(0, 8);
   }, [search, products]);
@@ -492,7 +493,7 @@ function UnknownBarcode({
   const candidates = useMemo(() => {
     const t = normalizeText(q.trim());
     return products
-      .filter((p) => !p.barcode)
+      .filter((p) => !p.barcode && !p.deleted_at)
       .filter((p) => !t || normalizeText(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""}`).includes(t))
       .slice(0, 8);
   }, [q, products]);

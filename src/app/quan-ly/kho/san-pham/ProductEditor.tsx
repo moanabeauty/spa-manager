@@ -356,7 +356,7 @@ export function ProductForm({
           </p>
           <p className="text-ink/60">
             {product
-              ? "Gộp: giữ sản phẩm kia, bật cả Hàng liệu trình + Hàng bán lẻ; tồn kho, lịch sử nhập/xuất và hóa đơn của sản phẩm này chuyển sang; ô nào bên kia còn trống (giá, % giảm…) lấy từ sản phẩm này. Sản phẩm này chuyển sang Ngừng lưu hành. Chỉ chủ / quản lý gộp được."
+              ? "Gộp: giữ sản phẩm kia, bật cả Hàng liệu trình + Hàng bán lẻ; tồn kho, lịch sử nhập/xuất và hóa đơn của sản phẩm này chuyển sang; ô nào bên kia còn trống (giá, % giảm…) lấy từ sản phẩm này. Sản phẩm này chuyển sang Ngừng lưu hành. Chủ, quản lý và NV kho đều gộp được."
               : "Không tạo thêm sản phẩm mới – bật cả Hàng liệu trình + Hàng bán lẻ cho sản phẩm có sẵn."}
           </p>
           <div className="flex flex-wrap justify-end gap-2">

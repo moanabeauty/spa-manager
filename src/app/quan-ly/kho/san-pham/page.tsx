@@ -9,7 +9,7 @@ export default async function ProductsPage() {
   if (!isStaffRole(profile?.role)) return <p className="card text-sm">Trang dành cho nhân viên.</p>;
   const canEdit = canEditProducts(profile?.roles);
   const [{ data: products }, pct] = await Promise.all([
-    supabase.from("products").select(PRODUCT_COLUMNS).order("name"),
+    supabase.from("products").select(PRODUCT_COLUMNS).is("deleted_at", null).order("name"),
     fetchDefaultDiscountPct(supabase),
   ]);
 

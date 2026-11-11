@@ -148,6 +148,7 @@ function ReceiptCard({
     const q = search.trim().toLowerCase();
     if (!q) return [];
     return products
+      .filter((p) => !p.deleted_at)
       .filter((p) => [p.name, p.brand, p.sku, p.barcode, p.capacity].filter(Boolean).join(" ").toLowerCase().includes(q))
       .slice(0, 8);
   }, [search, products]);

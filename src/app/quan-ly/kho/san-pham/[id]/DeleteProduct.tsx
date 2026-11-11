@@ -6,8 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 import { vnError } from "@/lib/format";
 import { productLabel, type Product } from "@/lib/inventory";
 
-// Xoá mã sản phẩm tạo nhầm / trùng. Chỉ chủ spa & quản lý thấy nút này.
-// Sản phẩm đã có nhập/xuất, phiếu nhập, hoá đơn… thì hệ thống không cho xoá (báo lý do) → dùng "Ngừng lưu hành".
+// Xoá mã sản phẩm: chủ spa, quản lý, NV kho. Chỉ xoá được khi tổng tồn kho = 0 và không còn chứng từ đang chờ
+// (phiếu nhập / yêu cầu xuất / kiểm kho chờ duyệt, hoá đơn chưa thanh toán, khuyến mãi đang chạy).
+// Mã chưa từng dùng → xoá hẳn. Mã đã có lịch sử → ẩn khỏi app, lịch sử & giá vốn đã xuất (nhập trước xuất trước) giữ nguyên.
 export default function DeleteProduct({ product }: { product: Product }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -15,7 +16,7 @@ export default function DeleteProduct({ product }: { product: Product }) {
 
   async function remove() {
     const label = [product.sku, productLabel(product)].filter(Boolean).join(" · ");
-    if (!window.confirm(`Xoá hẳn mã sản phẩm "${label}"?\nKhông khôi phục lại được.`)) return;
+    if (!window.confirm(`Xoá mã sản phẩm "${label}"?\n\nChỉ xoá được khi đã hết tồn kho. Lịch sử nhập / xuất và giá vốn cũ vẫn được giữ để tính sổ sách.\nSản phẩm sẽ biến mất khỏi danh sách, tìm kiếm và quét mã.`)) return;
     setBusy(true);
     setError(null);
     const { error } = await createClient().rpc("delete_product", { p_id: product.id });

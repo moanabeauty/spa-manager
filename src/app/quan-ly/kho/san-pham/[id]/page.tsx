@@ -68,6 +68,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="space-y-4">
       <Link href="/quan-ly/kho/san-pham" className="text-sm font-semibold text-navy">← Danh sách sản phẩm</Link>
+      {p.deleted_at && (
+        <p className="rounded-lg bg-[#FBEAEA] px-3 py-2 text-sm text-[#8A2323]">
+          Mã sản phẩm này đã bị xoá. Chỉ còn giữ để xem lại lịch sử nhập / xuất và giá vốn cũ.
+        </p>
+      )}
       <div>
         <h1 className="text-2xl font-bold text-navy">{productLabel(p)}</h1>
         {p.brand && <p className="text-sm text-ink/70">{p.brand}</p>}
@@ -83,8 +88,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           ))}
         </dl>
       </div>
-      {canEdit && <ProductEdit product={p} cost={cost} defaultPct={pct} />}
-      {showCost && <DeleteProduct product={p} />}
+      {canEdit && !p.deleted_at && <ProductEdit product={p} cost={cost} defaultPct={pct} />}
+      {canEdit && !p.deleted_at && <DeleteProduct product={p} />}
 
       <div className="card p-0">
         <p className="px-4 pt-3 text-sm font-semibold text-navy">Tồn kho</p>
