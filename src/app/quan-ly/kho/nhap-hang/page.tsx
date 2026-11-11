@@ -16,7 +16,7 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
   const { branchId, canSwitch } = pickBranch(profile, branches ?? [], sp.cn);
 
   const isOwner = profile!.role === "owner";
-  const [{ data: whs }, { data: products }, { data: costs }, { data: receipts }, { data: pendingData }, { data: sups }, { data: ledger }] = await Promise.all([
+  const [{ data: whs }, { data: products }, { data: costs }, { data: receipts }, { data: pendingData }, { data: sups }, { data: ledger }, { data: lp }] = await Promise.all([
     supabase.from("warehouses").select("id, branch_id, type, name"),
     supabase.from("products").select(PRODUCT_COLUMNS).order("name"),
     isOwner ? supabase.rpc("product_costs") : Promise.resolve({ data: [] }),
@@ -34,7 +34,9 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
       : Promise.resolve({ data: [] }),
     supabase.from("suppliers").select("name").order("name"),
     isOwner ? supabase.rpc("supplier_ledger") : Promise.resolve({ data: [] }),
+    isOwner ? supabase.rpc("product_supplier_prices") : Promise.resolve({ data: [] }),
   ]);
+  const listPrices = Object.fromEntries(((lp ?? []) as { product_id: string; supplier_list_price: number }[]).map((x) => [x.product_id, Number(x.supplier_list_price)]));
   // dư nợ hiện tại theo nhà cung cấp (tên viết thường)
   const debts: Record<string, number> = {};
   ((ledger ?? []) as { supplier: string | null; payable: number; paid: number }[]).forEach((r) => {
@@ -74,7 +76,7 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
         <p className="text-sm text-ink/70">Quét mã vạch trên vỏ hộp (máy quét hoặc camera điện thoại), nhập số lượng, hạn sử dụng + tiền ship / chi phí khác rồi lưu phiếu. Chủ spa nhập giá và duyệt phiếu.</p>
       </div>
       <KhoNav active="nhap" role={profile!.role} />
-      {isOwner && <ApproveReceipts receipts={pending} products={(products ?? []) as Product[]} costs={costMap} debts={debts} suppliers={((sups ?? []) as { name: string }[]).map((x) => x.name)} />}
+      {isOwner && <ApproveReceipts receipts={pending} products={(products ?? []) as Product[]} listPrices={listPrices} costs={costMap} debts={debts} suppliers={((sups ?? []) as { name: string }[]).map((x) => x.name)} />}
       <ReceiveForm
         branches={(branches ?? []).filter((b) => canSwitch || b.id === branchId)}
         defaultBranchId={branchId}

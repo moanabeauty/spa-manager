@@ -22,7 +22,7 @@ export type RecentReceipt = {
   code: string;
   supplier: string | null;
   created_at: string;
-  status: "pending" | "approved";
+  status: "pending" | "approved" | "rejected";
   warehouses: { name: string } | null;
   profiles: { full_name: string | null } | null;
   stock_movements: { quantity: number }[];
@@ -369,8 +369,8 @@ export default function ReceiveForm({
                 </span>
                 <span className="shrink-0 text-right">
                   {r.stock_movements.reduce((a, m) => a + Number(m.quantity), 0)} đơn vị
-                  <span className={`mt-0.5 block rounded-full px-2 py-0.5 text-[11px] ${r.status === "pending" ? "bg-[#FFE8BA] text-[#7A5600]" : "bg-[#D6EDD8] text-[#22612A]"}`}>
-                    {r.status === "pending" ? "Chờ duyệt giá" : "Đã duyệt"}
+                  <span className={`mt-0.5 block rounded-full px-2 py-0.5 text-[11px] ${r.status === "pending" ? "bg-[#FFE8BA] text-[#7A5600]" : r.status === "rejected" ? "bg-[#F6D5D5] text-[#8A2323]" : "bg-[#D6EDD8] text-[#22612A]"}`}>
+                    {r.status === "pending" ? "Chờ duyệt giá" : r.status === "rejected" ? "Không duyệt" : "Đã duyệt"}
                   </span>
                 </span>
               </li>
