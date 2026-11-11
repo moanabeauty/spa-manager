@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/supabase/server";
-import { PRODUCT_COLUMNS, canManageStock, fetchStock, type Product, type Warehouse } from "@/lib/inventory";
+import { PRODUCT_COLUMNS, canManageStock, fetchOpened, fetchStock, type Product, type Warehouse } from "@/lib/inventory";
 import { KhoNav, pickBranch } from "../shared";
 import RequestForm from "./RequestForm";
 import RequestCard, { type StockRequest } from "./RequestCard";
@@ -22,9 +22,10 @@ export default async function StockRequestPage({ searchParams }: { searchParams:
   // quản lý kho chỉ duyệt kho chi nhánh mình; chủ / quản lý duyệt mọi kho
   const reviewWh = profile?.role === "warehouse" ? treatment.filter((w) => w.branch_id === profile!.branch_id) : treatment;
 
-  const [{ data: products }, stock, { data: mine }, { data: toReview }] = await Promise.all([
+  const [{ data: products }, stock, opened, { data: mine }, { data: toReview }] = await Promise.all([
     supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).eq("for_treatment", true).order("name"),
     fetchStock(supabase, wh ? [wh.id] : []),
+    fetchOpened(supabase, wh?.id ?? ""),
     supabase.from("stock_requests").select(SELECT).eq("requested_by", profile!.id).order("created_at", { ascending: false }).limit(20),
     manage
       ? supabase
@@ -46,7 +47,7 @@ export default async function StockRequestPage({ searchParams }: { searchParams:
       <div>
         <h1 className="text-2xl font-bold text-navy">{manage ? "Phiếu xin xuất hàng" : "Xin xuất hàng làm liệu trình"}</h1>
         <p className="text-sm text-ink/70">
-          KTV gửi phiếu xin hàng từ kho liệu trình; quản lý kho duyệt thì hàng tự trừ khỏi kho, từ chối thì ghi lý do.
+          KTV gửi phiếu xin hàng từ kho liệu trình; quản lý kho duyệt thì hàng tự trừ khỏi kho và mỗi chai xuất ra hiện ở mục “Chai đang mở”. Từ chối thì ghi lý do.
         </p>
       </div>
       <KhoNav active="xuat" role={profile!.role} pending={pending.length} />
@@ -72,6 +73,7 @@ export default async function StockRequestPage({ searchParams }: { searchParams:
               branchId={branchId}
               products={(products ?? []) as Product[]}
               qty={qty}
+              opened={Object.fromEntries([...opened].map(([k, v]) => [k, v.map((o) => (o.source === "opening" ? o.remaining_pct : 100))]))}
             />
           )}
         </section>

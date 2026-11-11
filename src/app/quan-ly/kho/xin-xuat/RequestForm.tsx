@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeText, vnError } from "@/lib/format";
-import { productLabel, type Product } from "@/lib/inventory";
+import { openLevelLabel, productLabel, type Product } from "@/lib/inventory";
 
 type Line = { productId: string; qty: number };
 
@@ -13,11 +13,13 @@ export default function RequestForm({
   branchId,
   products,
   qty,
+  opened = {},
 }: {
   branches: { id: string; name: string }[]; // có = được chọn chi nhánh (chủ / quản lý)
   branchId: string;
   products: Product[];
   qty: Record<string, number>;
+  opened?: Record<string, number[]>; // chai đang mở của sản phẩm ở chi nhánh (mức còn %)
 }) {
   const router = useRouter();
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
@@ -113,6 +115,11 @@ export default function RequestForm({
             <span className="min-w-0 flex-1">
               {productLabel(p)}
               <span className="block text-xs text-ink/50">Kho còn {have} {p.unit}</span>
+              {(opened[l.productId]?.length ?? 0) > 0 && (
+                <span className="block text-xs font-semibold text-[#7A5600]">
+                  ⚠ Chi nhánh đang mở {opened[l.productId].length} chai ({opened[l.productId].map(openLevelLabel).join(", ")}) — dùng hết rồi bấm “Hết chai” trước khi lấy chai mới
+                </span>
+              )}
             </span>
             <input
               type="number"

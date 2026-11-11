@@ -82,6 +82,7 @@ export function buildNav(role: Role, c: NavCounts): NavGroup[] {
       items: [
         ...item(!MK, "/quan-ly/kho", "Tồn kho"),
         ...item(stockManage, "/quan-ly/kho/nhap-hang", "Nhập hàng", O ? c.receipts : 0),
+        ...item(!MK, "/quan-ly/kho/chai-dang-mo", "Chai đang mở"),
         ...item(!MK, "/quan-ly/kho/xin-xuat", stockManage ? "Phiếu xin xuất" : "Xin xuất hàng", stockManage ? c.stockRequests : 0),
         ...item(stockManage, "/quan-ly/kho/kiem-kho", "Kiểm kho", O ? c.stockCounts : 0),
         ...item(stockManage, "/quan-ly/kho/chuyen-kho", "Chuyển kho"),

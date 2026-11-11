@@ -112,3 +112,45 @@ export function canEditProducts(roles: readonly string[] | null | undefined): bo
 export function canManageStock(role: string | null | undefined): boolean {
   return role === "owner" || role === "manager" || role === "warehouse";
 }
+
+/** Mức còn của chai đang dở khi kiểm đầu kỳ (ước lượng bằng mắt) */
+export const OPEN_LEVELS: { pct: number; label: string }[] = [
+  { pct: 75, label: "3/4" },
+  { pct: 66.67, label: "2/3" },
+  { pct: 50, label: "1/2" },
+  { pct: 33.33, label: "1/3" },
+  { pct: 25, label: "1/4" },
+  { pct: 10, label: "Gần hết" },
+];
+
+/** 50 → "1/2", 100 → "Nguyên chai" */
+export function openLevelLabel(pct: number): string {
+  if (pct >= 100) return "Nguyên chai";
+  const hit = OPEN_LEVELS.find((l) => Math.abs(l.pct - pct) < 0.5);
+  return hit ? hit.label : `${Math.round(pct)}%`;
+}
+
+/** Hàng dùng 1 lần: xuất ra là hết, không thành "chai đang mở" — giống hàm is_single_use_unit */
+export function isSingleUseUnit(unit: string | null | undefined): boolean {
+  return ["cái", "miếng", "gói", "ống", "túi"].includes((unit ?? "").toLowerCase());
+}
+
+export type OpenedItem = { id: string; product_id: string; remaining_pct: number; source: "opening" | "request"; opened_at: string };
+
+/** Chai đang mở theo sản phẩm của 1 kho liệu trình */
+export async function fetchOpened(supabase: Db, warehouseId: string): Promise<Map<string, OpenedItem[]>> {
+  const out = new Map<string, OpenedItem[]>();
+  if (!warehouseId) return out;
+  const { data } = await supabase
+    .from("opened_items")
+    .select("id, product_id, remaining_pct, source, opened_at")
+    .eq("warehouse_id", warehouseId)
+    .eq("status", "open")
+    .order("opened_at");
+  ((data ?? []) as OpenedItem[]).forEach((o) => {
+    const l = out.get(o.product_id) ?? [];
+    l.push({ ...o, remaining_pct: Number(o.remaining_pct) });
+    out.set(o.product_id, l);
+  });
+  return out;
+}

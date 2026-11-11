@@ -25,6 +25,7 @@ const SUB: { group: string; items: { href: string; label: string }[] }[] = [
     group: "/quan-ly/kho",
     items: [
       { href: "/quan-ly/kho", label: "Tồn kho" },
+      { href: "/quan-ly/kho/chai-dang-mo", label: "Chai đang mở" },
       { href: "/quan-ly/kho/xin-xuat", label: "Xin xuất hàng" },
       { href: "/quan-ly/kho/san-pham", label: "Sản phẩm" },
       { href: "/quan-ly/kho/lich-su", label: "Lịch sử" },

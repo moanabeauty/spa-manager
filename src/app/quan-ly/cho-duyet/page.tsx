@@ -76,7 +76,7 @@ export default async function ApprovalsPage() {
     O
       ? supabase
           .from("stock_counts")
-          .select("id, code, note, created_at, warehouses(name), creator:profiles!stock_counts_created_by_fkey(full_name), stock_count_items(product_id, system_qty, counted_qty, products(name, capacity))")
+          .select("id, code, kind, note, created_at, warehouses(name), creator:profiles!stock_counts_created_by_fkey(full_name), stock_count_opened(product_id), stock_count_items(product_id, system_qty, counted_qty, products(name, capacity))")
           .eq("status", "pending")
           .order("created_at")
       : none,
@@ -114,7 +114,8 @@ export default async function ApprovalsPage() {
   }[];
   const stockReqs = (reqR.data ?? []) as unknown as StockRequest[];
   const counts = (countR.data ?? []) as unknown as {
-    id: string; code: string; note: string | null; created_at: string; warehouses: { name: string } | null; creator: Named;
+    id: string; code: string; kind: string; note: string | null; created_at: string; warehouses: { name: string } | null; creator: Named;
+    stock_count_opened: { product_id: string }[];
     stock_count_items: { product_id: string; system_qty: number; counted_qty: number; products: { name: string; capacity: string | null } | null }[];
   }[];
   const receipts = (recR.data ?? []) as unknown as {
@@ -304,9 +305,16 @@ export default async function ApprovalsPage() {
             return (
               <div key={c.id} className={item}>
                 <p>
+                  {c.kind === "opening" && <span className="mr-1 rounded bg-navy px-1.5 py-0.5 text-[10px] text-white">ĐẦU KỲ</span>}
                   <b>{c.code}</b> · {c.warehouses?.name} · {c.creator?.full_name ?? "?"} · {when(c.created_at)}
                 </p>
-                {c.note && <p className="text-xs">Lý do: {c.note}</p>}
+                {c.note && <p className="text-xs">{c.kind === "opening" ? "Ghi chú" : "Lý do"}: {c.note}</p>}
+                {c.kind === "opening" && (
+                  <p className="text-xs text-ink/60">
+                    Kiểm {c.stock_count_items.length} sản phẩm · {c.stock_count_opened?.length ?? 0} chai đang dở —{" "}
+                    <a href="/quan-ly/kho/kiem-kho?loai=dau-ky" className="font-semibold text-navy underline">xem đủ chi tiết</a>
+                  </p>
+                )}
                 <ul className="mt-1 space-y-0.5 text-xs">
                   {diffs.map((i) => (
                     <li key={i.product_id} className="flex justify-between gap-2">
