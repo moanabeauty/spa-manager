@@ -3,11 +3,11 @@ import Link from "next/link";
 import { createClient, getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import CheckInBar from "@/components/CheckInBar";
 import PushToggle from "@/components/PushToggle";
-import StaffNav from "@/components/StaffNav";
+import StaffShell from "@/components/StaffShell";
 import KtvNav from "@/components/KtvNav";
 import KtvTopSearch from "./ktv/KtvTopSearch";
 import RoleSwitcher from "@/components/RoleSwitcher";
-import { todayVn } from "@/lib/format";
+import { ROLE_LABEL, todayVn } from "@/lib/format";
 import { buildNav } from "@/lib/nav";
 import { loadNavCounts } from "@/lib/navCounts";
 
@@ -43,7 +43,7 @@ export default async function ManagerLayout({ children }: { children: React.Reac
     );
   }
   const supabase = await createClient();
-  const [counts, { data: cfg }, { data: attendance }] = await Promise.all([
+  const [counts, { data: cfg }, { data: attendance }, { count: unread }] = await Promise.all([
     loadNavCounts(role, profile!.branch_id),
     payrollSettings(),
     role !== "owner"
@@ -54,17 +54,23 @@ export default async function ManagerLayout({ children }: { children: React.Reac
           .eq("work_date", todayVn())
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
   ]);
   const otStart = (cfg?.value as { ot_start?: string } | null)?.ot_start ?? "18:30";
   const groups = buildNav(role, counts);
 
   return (
-    <div className="space-y-4 pb-20 sm:pb-0">
+    <StaffShell
+      groups={groups}
+      userId={user.id}
+      unread={unread ?? 0}
+      fullName={profile!.full_name ?? "Nhân viên"}
+      roleLabel={ROLE_LABEL[role] ?? role}
+    >
       {role !== "owner" && <CheckInBar today={attendance} otStart={otStart} />}
       {vapidKey && <PushToggle publicKey={vapidKey} hideWhenOn />}
-      <StaffNav groups={groups} />
       <RoleSwitcher roles={profile!.roles} active={role} />
       {children}
-    </div>
+    </StaffShell>
   );
 }

@@ -18,6 +18,8 @@ const display = Cormorant_Garamond({
   display: "swap",
 });
 
+const THEME_SCRIPT = `try{if(localStorage.getItem("moana-theme")==="dark")document.documentElement.classList.add("dark")}catch(e){}`;
+
 export const metadata: Metadata = {
   title: "Moana Beauty – Đặt lịch",
   description: "Đặt lịch chăm sóc da tại Moana Beauty: 67 Lưu Quang Vũ và 109 Nguyễn Sơn, Hà Nội",
@@ -34,7 +36,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="vi" className={`${font.variable} ${display.variable}`}>
+    <html lang="vi" className={`${font.variable} ${display.variable}`} suppressHydrationWarning>
+      <head>
+        {/* chế độ tối của khu nhân viên: bật trước khi trang hiện để không nháy trắng */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-screen font-sans antialiased">
         <Header />
         <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6">{children}</main>
