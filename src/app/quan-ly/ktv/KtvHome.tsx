@@ -1,3 +1,4 @@
+import { payrollSettings } from "@/lib/refData";
 import Link from "next/link";
 import type { Profile } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
@@ -21,7 +22,7 @@ export default async function KtvHome({ profile }: { profile: Profile }) {
       .eq("work_date", today)
       .maybeSingle(),
     profile.branch_id ? supabase.from("branches").select("name").eq("id", profile.branch_id).maybeSingle() : Promise.resolve({ data: null }),
-    supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
+    payrollSettings(),
     supabase.rpc("ktv_open_bookings", { p_days: 14 }),
   ]);
   const open = (openData ?? []) as OpenBooking[];

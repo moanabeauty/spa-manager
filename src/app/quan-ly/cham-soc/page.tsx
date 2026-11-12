@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { fillPhones } from "@/lib/phones";
@@ -44,7 +45,7 @@ export default async function CarePage({ searchParams }: { searchParams: Promise
   // (chạy cùng lúc với việc lấy danh sách chi nhánh)
   const [, { data: branchData }] = await Promise.all([
     supabase.rpc("refresh_care_reminders"),
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    activeBranches(),
   ]);
   const branches = (branchData ?? []) as { id: string; name: string }[];
   const defaultBranch = role === "owner" || role === "manager" ? "" : profile?.branch_id ?? "";

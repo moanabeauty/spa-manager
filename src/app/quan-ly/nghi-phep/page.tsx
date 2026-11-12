@@ -1,3 +1,4 @@
+import { payrollSettings } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { todayVn } from "@/lib/format";
@@ -34,7 +35,7 @@ export default async function LeavePage({ searchParams }: { searchParams: Promis
       .in("role", ["manager", "receptionist", "technician", "warehouse", "marketing"])
       .eq("is_active", true)
       .order("full_name"),
-    supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
+    payrollSettings(),
   ]);
   const std = Number((cfg?.value as { standard_days?: number } | null)?.standard_days ?? 27);
   const quota = Math.max(0, Number(monthEnd(month).slice(8, 10)) - std);

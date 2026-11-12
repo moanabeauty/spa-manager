@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -112,7 +113,7 @@ export default async function SkinPage({ searchParams }: { searchParams: Promise
 
   // ---------- Danh sách ----------
   const today = todayVn();
-  const { data: branches } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+  const { data: branches } = await activeBranches();
   const branchId = sp.cn ?? profile.branch_id ?? branches?.[0]?.id ?? "";
   const color = SKIN_COLORS.some((c) => c.key === sp.mau) ? (sp.mau as SkinColor) : null;
 

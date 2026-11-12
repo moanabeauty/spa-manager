@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { fillPhones } from "@/lib/phones";
 import { redirect } from "next/navigation";
@@ -101,7 +102,7 @@ export default async function StaffAppointmentsPage({
   // đến giờ hẹn mà KTV chưa xác nhận -> tự nhận (chạy cùng lúc với lấy chi nhánh)
   const [, { data: branchData }] = await Promise.all([
     supabase.rpc("ktv_auto_accept"),
-    supabase.from("branches").select("id, name, max_per_slot").eq("is_active", true).order("name"),
+    activeBranches(),
   ]);
   const branches = (branchData ?? []) as { id: string; name: string; max_per_slot: number | null }[];
   const branchId = sp.cn ?? profile?.branch_id ?? branches[0]?.id ?? "";

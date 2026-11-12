@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import { getCurrentUser } from "@/lib/supabase/server";
 import MenuEditor, { type MenuService } from "./MenuEditor";
 
@@ -15,7 +16,7 @@ export default async function ServiceMenuPage() {
       .select("id, category_id, name, name_en, internal_name, internal_note, duration_minutes, price, member_price, card_allowed, commission_eligible, fee_once_per_visit, is_active, branch_id, menu_tier, followup_days, recall_days")
       .order("name"),
     supabase.rpc("service_internal_costs"),
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    activeBranches(),
   ]);
   const feeById = new Map(((costs ?? []) as { service_id: string; technician_fee: number }[]).map((c) => [c.service_id, c.technician_fee]));
   const rows = ((services ?? []) as Omit<MenuService, "technician_fee">[]).map((s) => ({

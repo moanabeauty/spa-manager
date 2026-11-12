@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { DEFAULT_CAPACITY } from "@/lib/calendar";
@@ -12,7 +13,7 @@ export default async function KtvBookingPage() {
   if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   if (!profile) return null;
   const [{ data: branches }, { data: svcs }] = await Promise.all([
-    supabase.from("branches").select("id, name, max_per_slot").eq("is_active", true).order("name"),
+    activeBranches(),
     supabase.from("services").select("id, name, name_en, duration_minutes, branch_id, service_categories(name, sort_order)").eq("is_active", true),
   ]);
   const list = (branches ?? []) as { id: string; name: string; max_per_slot: number | null }[];

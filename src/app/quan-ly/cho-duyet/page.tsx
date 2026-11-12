@@ -1,3 +1,4 @@
+import { allBranches, payrollSettings } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatShortDate, formatTime, formatVnd, vnDateTime } from "@/lib/format";
@@ -72,7 +73,7 @@ export default async function ApprovalsPage() {
       .eq("status", "pending")
       .order("created_at"),
     supabase.from("stock_requests").select(STOCK_REQ_SELECT).eq("status", "pending").order("created_at"),
-    supabase.from("branches").select("id, name"),
+    allBranches(),
     O
       ? supabase
           .from("stock_counts")
@@ -89,7 +90,7 @@ export default async function ApprovalsPage() {
       : none,
     O ? supabase.from("marketing_posts").select("id, title, publish_date, due_date, channels").eq("status", "review").order("publish_date") : none,
     supabase.from("profiles").select("id, full_name"),
-    supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
+    payrollSettings(),
   ]);
 
   const disc = (discR.data ?? []) as unknown as {

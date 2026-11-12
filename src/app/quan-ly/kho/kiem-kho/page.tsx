@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatShortDate, formatTime } from "@/lib/format";
@@ -26,7 +27,7 @@ export default async function StockCountPage({ searchParams }: { searchParams: P
   const sp = await searchParams;
   const type: WarehouseType = sp.kho === "retail" ? "retail" : "treatment";
   const opening = sp.loai === "dau-ky";
-  const { data: branches } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+  const { data: branches } = await activeBranches();
   const { branchId, canSwitch } = pickBranch(profile, branches ?? [], sp.cn);
   const [{ data: whs }, { data: products }] = await Promise.all([
     supabase.from("warehouses").select("id, branch_id, type, name"),

@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
@@ -89,7 +90,7 @@ async function SingleMenu({ staff }: { staff: boolean }) {
       .select("id, category_id, name, name_en, internal_name, internal_note, duration_minutes, price, member_price, branch_id, menu_tier")
       .eq("is_active", true)
       .order("name_en"),
-    supabase.from("branches").select("id, name").eq("is_active", true),
+    activeBranches(),
   ]);
   const services = (svcData ?? []) as Svc[];
   const branches = (branchData ?? []) as { id: string; name: string }[];

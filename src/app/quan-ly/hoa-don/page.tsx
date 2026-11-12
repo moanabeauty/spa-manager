@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { fillPhones } from "@/lib/phones";
@@ -44,7 +45,7 @@ export default async function InvoicesPage({
   const sp = await searchParams;
   const tab: Tab = sp.loai === "online" || sp.loai === "no" ? sp.loai : "quay";
   const date = sp.ngay && /^\d{4}-\d{2}-\d{2}$/.test(sp.ngay) ? sp.ngay : todayVn();
-  const { data: branches } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+  const { data: branches } = await activeBranches();
   const branchId = sp.cn === "tat-ca" ? "" : (sp.cn ?? profile?.branch_id ?? (tab === "quay" ? branches?.[0]?.id : "") ?? "");
   const shipFilter = sp.gh && sp.gh in SHIP_STATUS ? sp.gh : "";
   const from = vnDateTime(date, "00:00").toISOString();

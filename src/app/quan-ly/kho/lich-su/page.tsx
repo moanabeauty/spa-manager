@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatTime } from "@/lib/format";
@@ -21,7 +22,7 @@ export default async function StockHistoryPage({ searchParams }: { searchParams:
   const { supabase, profile } = await getCurrentUser();
   const sp = await searchParams;
   const type: WarehouseType = sp.kho === "retail" ? "retail" : "treatment";
-  const { data: branches } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+  const { data: branches } = await activeBranches();
   const { branchId, canSwitch } = pickBranch(profile, branches ?? [], sp.cn);
   const { data: whs } = await supabase.from("warehouses").select("id, branch_id, type, name").eq("branch_id", branchId).eq("type", type);
   const wh = ((whs ?? []) as Warehouse[])[0];

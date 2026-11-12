@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatShortDate } from "@/lib/format";
@@ -21,7 +22,7 @@ export default async function OpenedPage({ searchParams }: { searchParams: Promi
   const { supabase, profile } = await getCurrentUser();
   if (profile?.role === "marketing") return <p className="card text-sm">Trang dành cho nhân viên làm liệu trình và kho.</p>;
   const sp = await searchParams;
-  const { data: branches } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+  const { data: branches } = await activeBranches();
   const { branchId, canSwitch } = pickBranch(profile, branches ?? [], sp.cn);
   const { data: wh } = await supabase.from("warehouses").select("id").eq("branch_id", branchId).eq("type", "treatment").maybeSingle();
 

@@ -63,6 +63,25 @@ export default function NotificationBell({ userId, initialUnread }: { userId: st
   // thông báo mới theo thời gian thực khi app đang mở
   useEffect(() => {
     const supabase = createClient();
+    // Nhiều thông báo đến cùng lúc (VD lịch mới báo cho tất cả) -> gộp thành 1 lần tải lại sau 3 giây;
+    // app đang ẩn thì đợi lúc mở lại mới tải (tránh mọi máy cùng tải lại trang một lúc)
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let pending = false;
+    const softRefresh = () => {
+      if (document.visibilityState !== "visible") {
+        pending = true;
+        return;
+      }
+      clearTimeout(timer);
+      timer = setTimeout(() => router.refresh(), 3000);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && pending) {
+        pending = false;
+        router.refresh();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
     const ch = supabase
       .channel(`tb-${userId}`)
       .on(
@@ -71,7 +90,7 @@ export default function NotificationBell({ userId, initialUnread }: { userId: st
         (p) => {
           const r = p.new as { id: string; title: string; body: string | null; url: string | null };
           show({ id: r.id, title: r.title, body: r.body, url: r.url }, true);
-          router.refresh(); // cập nhật số việc chờ trên menu
+          softRefresh(); // cập nhật số việc chờ trên menu
         },
       )
       .subscribe();
@@ -84,6 +103,8 @@ export default function NotificationBell({ userId, initialUnread }: { userId: st
     };
     navigator.serviceWorker?.addEventListener("message", onMsg);
     return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
       supabase.removeChannel(ch);
       navigator.serviceWorker?.removeEventListener("message", onMsg);
     };

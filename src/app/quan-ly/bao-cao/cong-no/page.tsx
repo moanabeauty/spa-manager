@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -18,7 +19,7 @@ export default async function DebtReportPage({ searchParams }: { searchParams: P
   let q = supabase.from("invoice_debts").select("*").gt("outstanding", 0).order("paid_at");
   if (branch) q = q.eq("branch_id", branch);
   const [{ data: branches }, { data }] = await Promise.all([
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    activeBranches(),
     q,
   ]);
   const debts = (data ?? []) as Debt[];

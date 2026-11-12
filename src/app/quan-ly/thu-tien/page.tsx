@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { fillPhones } from "@/lib/phones";
@@ -117,7 +118,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       .order("name"),
     loadRetailStock(),
     fetchDefaultDiscountPct(supabase),
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    activeBranches(),
     supabase
       .from("services")
       .select("id, name, name_en, price, member_price, card_allowed, duration_minutes, branch_id, is_active")

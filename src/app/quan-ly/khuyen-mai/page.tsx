@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { fillPhones } from "@/lib/phones";
@@ -70,7 +71,7 @@ export default async function PromotionRegistrationsPage({ searchParams }: { sea
   const isAdmin = profile?.role === "owner" || profile?.role === "manager";
 
   const [{ data: branches }, { data: promoData }, taken] = await Promise.all([
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    activeBranches(),
     supabase.from("promotions").select(PROMO_SELECT).eq("is_active", true).order("sort_order").order("created_at", { ascending: false }),
     fetchTakenCounts(supabase),
   ]);

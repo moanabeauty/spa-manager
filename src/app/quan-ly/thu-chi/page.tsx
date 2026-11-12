@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatVnd, todayVn } from "@/lib/format";
@@ -32,7 +33,7 @@ export default async function CashbookPage({ searchParams }: { searchParams: Pro
     .order("created_at", { ascending: false });
   if (branch) eq = eq.eq("branch_id", branch);
   const [{ data: branches }, { data: flowData, error }, { data: cats }, { data: entryData }] = await Promise.all([
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    activeBranches(),
     supabase.rpc("cashflow_report", { p_year: year, p_branch: branch || null }),
     supabase.from("cashbook_categories").select("id, kind, name, sort_order, is_active").order("sort_order"),
     eq,

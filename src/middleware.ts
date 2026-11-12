@@ -21,9 +21,9 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims(): làm mới phiên khi hết hạn + kiểm tra chữ ký ngay tại chỗ (nhanh hơn getUser – không gọi mạng mỗi lần)
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims?.sub ? data.claims : null;
 
   const path = request.nextUrl.pathname;
   if (!user && PROTECTED.some((p) => path === p || path.startsWith(p + "/"))) {

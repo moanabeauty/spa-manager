@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { PRODUCT_COLUMNS, canManageStock, fetchOpened, fetchStock, type Product, type Warehouse } from "@/lib/inventory";
 import { KhoNav, pickBranch } from "../shared";
@@ -12,7 +13,7 @@ const SELECT =
 export default async function StockRequestPage({ searchParams }: { searchParams: Promise<{ cn?: string }> }) {
   const { supabase, profile } = await getCurrentUser();
   const sp = await searchParams;
-  const { data: branches } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+  const { data: branches } = await activeBranches();
   const { branchId, canSwitch } = pickBranch(profile, branches ?? [], sp.cn);
   const manage = canManageStock(profile?.role);
 

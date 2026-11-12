@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatDmy2, formatVnd, normalizeText, todayVn } from "@/lib/format";
@@ -30,7 +31,7 @@ export default async function LiabilitiesPage({ searchParams }: { searchParams: 
   const search = normalizeText(sp.q ?? "").trim();
 
   const [{ data: branches }, { data: cardData }, { data: pkgData }, { data: soldData }] = await Promise.all([
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    activeBranches(),
     supabase.rpc("card_liabilities"),
     supabase.rpc("package_liabilities"),
     supabase.rpc("sales_by_item", { p_from: `${month}-01`, p_to: monthEnd(month), p_branch: branch || null }),

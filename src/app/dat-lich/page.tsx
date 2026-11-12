@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import BookingForm, { type Branch, type Category, type Service } from "./BookingForm";
@@ -9,7 +10,7 @@ export default async function BookingPage() {
   if (!user) redirect("/dang-nhap?next=/dat-lich");
 
   const [{ data: branches }, { data: categories }, { data: services }, { data: customer }] = await Promise.all([
-    supabase.from("branches").select("id, name, address, max_per_slot").eq("is_active", true).order("name"),
+    activeBranches(),
     supabase.from("service_categories").select("id, name, sort_order").order("sort_order"),
     supabase
       .from("services")

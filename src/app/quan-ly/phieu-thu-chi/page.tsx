@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import { formatShortDate, formatTime, formatVnd } from "@/lib/format";
 import { CASH_METHOD_LABEL } from "@/lib/reports";
@@ -22,7 +23,7 @@ export default async function VoucherPage() {
   if (!isStaffRole(profile?.role)) return <p className="card text-sm">Trang dành cho nhân viên.</p>;
   const manage = profile!.role === "owner" || profile!.role === "manager";
   const [{ data: branches }, { data: cats }, { data }] = await Promise.all([
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    activeBranches(),
     supabase.from("cashbook_categories").select("id, kind, name").eq("is_active", true).eq("counter", true).order("sort_order"),
     supabase
       .from("cashbook_entries")

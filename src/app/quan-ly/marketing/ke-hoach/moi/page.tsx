@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { isDate } from "@/lib/reports";
 import { DENIED_TEXT, loadMarketingContext } from "../../shared";
@@ -9,7 +10,7 @@ export default async function NewPlanPage({ searchParams }: { searchParams: Prom
   const ctx = await loadMarketingContext();
   if (!ctx.allowed) return <p className="card text-sm">{DENIED_TEXT}</p>;
   const sp = await searchParams;
-  const { data: branches } = await ctx.supabase.from("branches").select("name").eq("is_active", true).order("name");
+  const { data: branches } = await activeBranches();
   return (
     <div className="space-y-4">
       <div>

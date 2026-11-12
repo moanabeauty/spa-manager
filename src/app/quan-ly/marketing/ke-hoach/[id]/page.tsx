@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { PLAN_COLS, PLAN_KIND, PLAN_STATUS, type MkPlan } from "@/lib/marketing";
 import { vnDayOf } from "@/lib/calendar";
@@ -15,7 +16,7 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
   const [{ data: plan }, { data: comments }, { data: branches }] = await Promise.all([
     supabase.from("marketing_plans").select(PLAN_COLS).eq("id", id).maybeSingle<MkPlan>(),
     supabase.from("marketing_comments").select("id, author_id, body, created_at").eq("plan_id", id).order("created_at"),
-    supabase.from("branches").select("name").eq("is_active", true).order("name"),
+    activeBranches(),
   ]);
   if (!plan) return <p className="card text-sm">Không tìm thấy kế hoạch (có thể đã bị xoá).</p>;
   const k = PLAN_KIND[plan.kind] ?? PLAN_KIND.other;

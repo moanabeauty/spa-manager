@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import { getCurrentUser } from "@/lib/supabase/server";
 import AccountList, { type Account } from "./AccountList";
 
@@ -10,7 +11,7 @@ export default async function StaffAccountsPage() {
   }
   const [{ data: accounts, error }, { data: branches }] = await Promise.all([
     supabase.rpc("list_accounts_v2"),
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    activeBranches(),
   ]);
 
   return (

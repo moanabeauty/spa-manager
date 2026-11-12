@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatShortDate, formatTime } from "@/lib/format";
@@ -18,7 +19,7 @@ export default async function TransferPage({ searchParams }: { searchParams: Pro
   if (!canManageStock(profile?.role)) return <p className="card text-sm">Trang dành cho quản lý kho, quản lý và chủ spa.</p>;
   const sp = await searchParams;
   const toTreatment = sp.huong !== "ban-le"; // mặc định: bán lẻ → liệu trình
-  const { data: branches } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+  const { data: branches } = await activeBranches();
   const { branchId, canSwitch } = pickBranch(profile, branches ?? [], sp.cn);
   const [{ data: whs }, { data: products }] = await Promise.all([
     supabase.from("warehouses").select("id, branch_id, type, name").eq("branch_id", branchId),

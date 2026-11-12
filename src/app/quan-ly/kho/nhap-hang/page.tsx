@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { PRODUCT_COLUMNS, canManageStock, type Product, type Warehouse } from "@/lib/inventory";
 import { KhoNav, pickBranch } from "../shared";
@@ -12,7 +13,7 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
     return <p className="card text-sm">Chỉ quản lý kho, quản lý và chủ spa được nhập hàng.</p>;
   }
   const sp = await searchParams;
-  const { data: branches } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+  const { data: branches } = await activeBranches();
   const { branchId, canSwitch } = pickBranch(profile, branches ?? [], sp.cn);
 
   const isOwner = profile!.role === "owner";

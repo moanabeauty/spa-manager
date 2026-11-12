@@ -9,8 +9,18 @@ import { vnError } from "@/lib/format";
 export function AutoRefresh({ seconds = 15 }: { seconds?: number }) {
   const router = useRouter();
   useEffect(() => {
-    const t = setInterval(() => router.refresh(), seconds * 1000);
-    return () => clearInterval(t);
+    // chỉ tải lại khi màn hình đang mở (khoá máy / chuyển app thì dừng, mở lại thì tải ngay)
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, seconds * 1000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [router, seconds]);
   return null;
 }

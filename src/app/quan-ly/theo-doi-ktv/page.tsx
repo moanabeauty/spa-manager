@@ -1,3 +1,4 @@
+import { allBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatShortDate, formatTime, todayVn, vnDateTime } from "@/lib/format";
@@ -67,7 +68,7 @@ export default async function KtvMonitorPage() {
       .gte("start_at", new Date().toISOString())
       .lt("start_at", soon)
       .order("start_at"),
-    supabase.from("branches").select("id, name"),
+    allBranches(),
   ]);
   const live = (liveR.data ?? []) as unknown as Live[];
   const ids = [...new Set(live.map((l) => l.service_id))];

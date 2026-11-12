@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { PROMO_SELECT, fetchTakenCounts, type Promotion } from "@/lib/promotions";
@@ -12,7 +13,7 @@ export default async function PromotionProgramsPage() {
   }
   const [{ data: promos }, { data: branches }, { data: services }, { data: packages }, { data: products }, taken] = await Promise.all([
     supabase.from("promotions").select(PROMO_SELECT).order("is_active", { ascending: false }).order("created_at", { ascending: false }),
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    activeBranches(),
     supabase.from("services").select("id, name, name_en, price").eq("is_active", true).order("name"),
     supabase.from("packages").select("id, name, price, is_active").order("name"),
     supabase.from("products").select("id, name, brand, capacity, retail_price").eq("is_active", true).eq("for_retail", true).not("retail_price", "is", null).order("name"),

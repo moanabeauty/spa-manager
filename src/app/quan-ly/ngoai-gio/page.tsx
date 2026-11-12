@@ -1,3 +1,4 @@
+import { payrollSettings } from "@/lib/refData";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { todayVn } from "@/lib/format";
 import type { MyDayRow } from "@/lib/ktv";
@@ -13,7 +14,7 @@ export default async function OffHoursPage({ searchParams }: { searchParams: Pro
   const kind = sp.kieu === "vao" ? "vao" : "ra";
   const [{ data: rows }, { data: cfg }] = await Promise.all([
     supabase.rpc("ktv_my_day", { p_date: todayVn() }),
-    supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
+    payrollSettings(),
   ]);
   const v = (cfg?.value ?? {}) as { shift_end?: string; shift_start?: string; ot_start?: string; early_start?: string };
   const customers = ((rows ?? []) as MyDayRow[]).map((r) => ({

@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import { POST_KIND, PostCard, type Post } from "@/lib/posts";
@@ -5,7 +6,7 @@ import { POST_KIND, PostCard, type Post } from "@/lib/posts";
 export default async function Home() {
   const { supabase, user, profile } = await getCurrentUser();
   const [{ data: branches }, { data: postData }] = await Promise.all([
-    supabase.from("branches").select("id, name, address").eq("is_active", true).order("name"),
+    activeBranches(),
     supabase
       .from("posts")
       .select("slug, title, summary, cover_url, published_at, kind")

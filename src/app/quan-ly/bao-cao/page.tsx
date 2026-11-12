@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatVnd, todayVn } from "@/lib/format";
@@ -60,7 +61,7 @@ export default async function RevenuePage({
   const view = sp.xem === "thang" || sp.xem === "ngay" ? sp.xem : days > 62 ? "thang" : "ngay";
 
   const [{ data: branches }, { data, error }, { data: itemData }] = await Promise.all([
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    activeBranches(),
     supabase.rpc("revenue_report", { p_from: from, p_to: to, p_branch: branch || null }),
     supabase.rpc("sales_by_item", { p_from: from, p_to: to, p_branch: branch || null }),
   ]);

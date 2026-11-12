@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { PRODUCT_COLUMNS, WAREHOUSE_LABEL, canManageStock, fetchStock, type Product, type Warehouse, type WarehouseType } from "@/lib/inventory";
@@ -11,7 +12,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const type: WarehouseType = sp.kho === "retail" ? "retail" : "treatment";
 
-  const { data: branches } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+  const { data: branches } = await activeBranches();
   const { branchId, canSwitch } = pickBranch(profile, branches ?? [], sp.cn);
 
   const [{ data: whs }, { data: products }] = await Promise.all([

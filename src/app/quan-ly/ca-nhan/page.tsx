@@ -1,3 +1,4 @@
+import { payrollSettings } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatShortDate, formatTime, formatVnd, todayVn } from "@/lib/format";
@@ -20,7 +21,7 @@ export default async function PersonalPage() {
     profile.role === "owner" ? Promise.resolve({ data: null }) : supabase.rpc("my_payslip", { p_month: from }),
     supabase.from("staff_monthly_commissions").select("sales_amount, rate, commission_amount").eq("month", from).eq("staff_id", profile.id).maybeSingle(),
     supabase.from("technician_monthly_fees").select("services_done, fee_amount").eq("month", from).eq("technician_id", profile.id).maybeSingle(),
-    supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
+    payrollSettings(),
     supabase.from("staff_leaves").select("leave_date, half_day, status, kind").eq("staff_id", profile.id).gte("leave_date", from).lte("leave_date", to).in("status", ["pending", "approved"]),
     supabase.from("staff_attendance").select("work_date, check_in, check_out, approval_status, ot_status, ot_hours_approved, in_status").eq("staff_id", profile.id).gte("work_date", from).lte("work_date", to).order("work_date", { ascending: false }),
     supabase.from("attendance_fix_requests").select("id, work_date, reason").eq("staff_id", profile.id).eq("status", "pending"),

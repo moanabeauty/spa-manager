@@ -1,3 +1,4 @@
+import { payrollSettings } from "@/lib/refData";
 import Link from "next/link";
 import { createClient, getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import CheckInBar from "@/components/CheckInBar";
@@ -44,7 +45,7 @@ export default async function ManagerLayout({ children }: { children: React.Reac
   const supabase = await createClient();
   const [counts, { data: cfg }, { data: attendance }] = await Promise.all([
     loadNavCounts(role, profile!.branch_id),
-    supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
+    payrollSettings(),
     role !== "owner"
       ? supabase
           .from("staff_attendance")

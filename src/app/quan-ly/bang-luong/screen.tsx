@@ -1,3 +1,4 @@
+import { allBranches, payrollSettings } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { todayVn } from "@/lib/format";
@@ -39,7 +40,7 @@ export default async function PayrollScreen({ mode, thang }: { mode: PayrollMode
       .select("id, full_name, role, branch_id, is_active")
       .in("role", ["owner", "manager", "receptionist", "technician", "warehouse", "marketing"])
       .order("full_name"),
-    supabase.from("branches").select("id, name, latitude, longitude").order("name"),
+    allBranches(),
     supabase.from("payroll_entries").select("staff_id, work_days, overtime_hours, other_allowance, other_deduction, note").eq("month", m1),
     supabase
       .from("staff_penalties")
@@ -49,7 +50,7 @@ export default async function PayrollScreen({ mode, thang }: { mode: PayrollMode
       .order("penalty_date", { ascending: false }),
     monthly ? supabase.rpc("attendance_month", { p_month: m1 }) : Promise.resolve({ data: [] }),
     monthly ? supabase.rpc("attendance_report", { p_month: m1 }) : Promise.resolve({ data: [] }),
-    supabase.from("app_settings").select("value").eq("key", "payroll").maybeSingle(),
+    payrollSettings(),
   ]);
   const { data: holidays } = await supabase
     .from("public_holidays")

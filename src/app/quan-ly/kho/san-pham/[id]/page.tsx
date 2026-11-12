@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import { formatShortDate, formatVnd, todayVn } from "@/lib/format";
@@ -18,7 +19,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const [{ data }, { data: whs }, { data: branches }, { data: levels }, { data: moves }, pct] = await Promise.all([
     supabase.from("products").select(PRODUCT_COLUMNS).eq("id", id).maybeSingle(),
     supabase.from("warehouses").select("id, branch_id, type, name"),
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    activeBranches(),
     supabase.from("stock_levels").select("warehouse_id, quantity").eq("product_id", id),
     supabase.from("stock_movements").select("id, warehouse_id, movement_type, quantity, note, created_at").eq("product_id", id)
       .order("created_at", { ascending: false }).limit(30),

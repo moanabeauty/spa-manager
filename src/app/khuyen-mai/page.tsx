@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatVnd } from "@/lib/format";
@@ -30,7 +31,7 @@ export default async function PromotionsPage() {
       .eq("show_online", true)
       .order("sort_order")
       .order("created_at", { ascending: false }),
-    supabase.from("branches").select("id, name, address").eq("is_active", true).order("name"),
+    activeBranches(),
     fetchTakenCounts(supabase),
   ]);
   const promos = ((data ?? []) as unknown as Promotion[]).filter((p) => isOpen(p));

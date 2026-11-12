@@ -1,3 +1,4 @@
+import { activeBranches } from "@/lib/refData";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canViewCustomerPhone, fillPhones } from "@/lib/phones";
@@ -56,7 +57,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
 
   const [{ data: groupData }, { data: branchData }] = await Promise.all([
     supabase.from("customer_groups").select("id, name, color, description, sort_order").order("sort_order").order("name"),
-    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
+    activeBranches(),
   ]);
   const groups = (groupData ?? []) as Group[];
   const branches = (branchData ?? []) as { id: string; name: string }[];
