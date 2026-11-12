@@ -313,7 +313,7 @@ export default async function StaffAppointmentsPage({
         />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
         {/* ===== Lịch trong ngày: cột theo KTV ===== */}
         <div className="card min-w-0 p-3 sm:p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -498,7 +498,7 @@ export default async function StaffAppointmentsPage({
 
       <h2 className="pt-2 text-navy">Chi tiết từng lịch hẹn</h2>
       {/* ===== Chi tiết từng lịch ===== */}
-      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         {rows.map((r) => {
           const items = [...r.appointment_services].sort((x, y) => x.start_at.localeCompare(y.start_at));
           const total = items.reduce((a, s) => a + (s.price ?? 0), 0);

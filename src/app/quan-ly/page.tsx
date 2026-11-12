@@ -185,7 +185,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         </p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* lịch hẹn hôm nay */}
         {!W && (
           <section className="card space-y-4 lg:col-span-2">
