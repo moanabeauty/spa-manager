@@ -16,6 +16,7 @@ import {
   WEEKDAYS,
   addDays,
   assignLanes,
+  daySlots,
   fullSlots,
   loadLevel,
   monthGrid,
@@ -28,6 +29,7 @@ import {
   vnTime,
 } from "@/lib/calendar";
 import { SkinBadge, SkinDot, type SkinColor } from "@/lib/skin";
+import StatTile, { Delta } from "@/components/StatTile";
 
 export const metadata = { title: "Lịch hẹn spa – Moana Beauty" };
 
@@ -59,15 +61,15 @@ const SOURCE_LABEL: Record<string, string> = { online: "Online", walk_in: "Khác
 // màu khối trên timeline theo trạng thái
 const BLOCK_STYLE: Record<string, string> = {
   pending: "bg-[#FFF3D6] border-[#E0A526] text-[#5C4100]",
-  confirmed: "bg-[#E6EBF8] border-navy text-navy",
-  in_progress: "bg-[#EEE6FA] border-[#6B45A8] text-[#3A2163]",
+  confirmed: "bg-[#E9EAF3] border-navy text-navy",
+  in_progress: "bg-[#F3ECE1] border-[#A0845E] text-[#5E4B30]",
   completed: "bg-[#E3F3E5] border-[#3E9B4F] text-[#1D5224]",
   cancelled: "bg-[#F1F1F1] border-[#999] text-[#777] line-through",
   no_show: "bg-[#FCE4E4] border-[#C94A4A] text-[#8A2323] line-through",
 };
 
 const LEVEL_STYLE = {
-  empty: "bg-white",
+  empty: "bg-cream/60",
   light: "bg-[#E9EAF3]",
   busy: "bg-[#F3ECE1]",
   full: "bg-[#FCE4E4]",
@@ -198,13 +200,6 @@ export default async function StaffAppointmentsPage({
     if (sMin < startMin) startMin = Math.max(sMin, 0);
   }
   const dayZero = vnTime(date, "00:00");
-  const blocks = assignLanes(
-    rows.map((r) => {
-      const s = new Date(r.start_at).getTime();
-      return { row: r, s, e: r.end_at ? new Date(r.end_at).getTime() : s + 60 * 60000 };
-    }),
-  );
-  const lanes = Math.max(cap, ...blocks.map((b) => b.lane + 1), 1);
   const height = (dayEndMin - startMin) * PPM;
   const hours: number[] = [];
   for (let m = startMin; m <= dayEndMin; m += 60) hours.push(m);
@@ -215,198 +210,295 @@ export default async function StaffAppointmentsPage({
   const dayFull = fullSlots(intervals, date, cap);
   const manager = profile?.role === "owner" || profile?.role === "manager";
 
+  // ---- timeline chia cột theo KTV: mỗi dịch vụ là 1 thẻ nằm ở cột KTV làm dịch vụ đó ----
+  type Card = { key: string; r: Row; s: number; e: number; title: string; col: string };
+  const cards: Card[] = [];
+  for (const r of rows) {
+    if (r.appointment_services.length === 0) {
+      const s0 = new Date(r.start_at).getTime();
+      cards.push({ key: r.id, r, s: s0, e: r.end_at ? new Date(r.end_at).getTime() : s0 + 3600000, title: "Hẹn tư vấn", col: r.consult_technician_id ?? "none" });
+    } else {
+      for (const x of r.appointment_services)
+        cards.push({ key: x.id, r, s: new Date(x.start_at).getTime(), e: new Date(x.end_at).getTime(), title: x.services?.name ?? "Dịch vụ", col: x.technician_id ?? "none" });
+    }
+  }
+  const techName = new Map(technicians.map((t) => [t.id, t.full_name ?? "KTV"]));
+  const colIds: string[] = technicians.filter((t) => t.role === "technician" && t.branch_id === branchId).map((t) => t.id);
+  for (const c of cards) if (c.col !== "none" && !colIds.includes(c.col)) colIds.push(c.col);
+  if (cards.some((c) => c.col === "none") || colIds.length === 0) colIds.push("none");
+  const columns = colIds.map((id) => {
+    const mine = cards.filter((c) => c.col === id);
+    const placed = assignLanes(mine);
+    return {
+      id,
+      name: id === "none" ? "Chưa xếp KTV" : techName.get(id) ?? "KTV khác",
+      placed,
+      lanes: Math.max(1, ...placed.map((p) => p.lane + 1)),
+      count: new Set(mine.filter((c) => !["cancelled", "no_show"].includes(c.r.status)).map((c) => c.r.id)).size,
+    };
+  });
+  const COL_MIN = 150;
+
+  // ---- chỉ số trên cùng ----
+  const prevDay = addDays(date, -1);
+  const prevKnown = prevDay >= gridFrom && date < gridTo;
+  const prevCount = (byDay.get(prevDay) ?? []).length;
+  const slotsTotal = daySlots().length;
+  const freeSlots = slotsTotal - dayFull;
+  const expected = active.reduce((a, r) => a + r.appointment_services.reduce((b, x) => b + Number(x.price ?? 0), 0), 0);
+  const initialsOf = (n: string) =>
+    n === "Chưa xếp KTV" ? "?" : n.trim().split(/\s+/).slice(-1)[0]?.[0]?.toUpperCase() ?? "K";
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-2">
+    <div className="page-wide space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-navy">Lịch hẹn spa</h1>
-          <p className="text-sm text-ink/70">
-            Tối đa <b>{cap} khách</b> cùng lúc mỗi ca{manager && " (chủ / quản lý vẫn xếp thêm được)"}
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brown">Lịch hẹn spa</p>
+          <h1 className="mt-1 capitalize text-navy">{formatDate(vnDateTime(date, "12:00").toISOString())}</h1>
+          <p className="mt-1 text-sm text-ink/60">
+            Tối đa <b>{cap} khách</b> cùng lúc mỗi chi nhánh{manager && " (chủ / quản lý vẫn xếp thêm được)"}
           </p>
         </div>
-        <Link href="/quan-ly/tao-lich" className="btn-primary py-2">+ Tạo lịch</Link>
+        <Link href={`/quan-ly/tao-lich?cn=${branchId}&ngay=${date}`} className="btn-primary px-6 py-3 shadow-[0_8px_20px_-8px_rgba(43,45,100,0.6)]">
+          <span className="text-lg leading-none">+</span> Tạo lịch
+        </Link>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {branches.map((b) => (
-          <Link
-            key={b.id}
-            href={link({ cn: b.id })}
-            className={`rounded-full px-4 py-2 text-sm font-semibold ${b.id === branchId ? "bg-navy text-white" : "bg-white text-navy ring-1 ring-beige-dark"}`}
-          >
-            {b.name}
-          </Link>
-        ))}
-      </div>
-
-      {/* ===== Lịch tháng ===== */}
-      <div className="card p-3 sm:p-4">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <Link href={link({ thang: shiftMonth(ym, -1) })} className="btn-ghost px-3 py-1.5" aria-label="Tháng trước">‹</Link>
-          <div className="text-center">
-            <p className="font-bold text-navy">{monthLabel(ym)}</p>
-            {ym !== monthOf(today) && (
-              <Link href={link({ ngay: today, thang: null })} className="text-xs text-navy underline">Về hôm nay</Link>
-            )}
-          </div>
-          <Link href={link({ thang: shiftMonth(ym, 1) })} className="btn-ghost px-3 py-1.5" aria-label="Tháng sau">›</Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex rounded-full bg-surface p-1 ring-1 ring-beige-dark/70">
+          {branches.map((b) => (
+            <Link
+              key={b.id}
+              href={link({ cn: b.id })}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${b.id === branchId ? "bg-navy text-white shadow" : "text-navy/70 hover:text-navy"}`}
+            >
+              {b.name}
+            </Link>
+          ))}
         </div>
-        <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-ink/50">
-          {WEEKDAYS.map((w) => <div key={w} className={w === "CN" ? "text-[#8A2323]" : ""}>{w}</div>)}
-        </div>
-        <div className="mt-1 grid grid-cols-7 gap-1">
-          {grid.flat().map((g) => {
-            const list = byDay.get(g.date) ?? [];
-            const iv = toIntervals(list);
-            const full = list.length ? fullSlots(iv, g.date, cap) : 0;
-            const level = loadLevel(full, list.length);
-            const pend = list.filter((x) => x.status === "pending").length;
-            const selected = g.date === date;
-            const isToday = g.date === today;
-            const past = g.date < today;
-            return (
-              <Link
-                key={g.date}
-                href={link({ ngay: g.date, thang: null })}
-                className={`relative flex min-h-14 flex-col items-center justify-start rounded-lg border p-1 transition sm:min-h-20 sm:items-start sm:p-1.5 ${
-                  selected ? "border-navy ring-2 ring-navy" : "border-beige-dark/60 hover:border-navy"
-                } ${LEVEL_STYLE[level]} ${g.inMonth ? "" : "opacity-40"} ${past && !selected ? "opacity-70" : ""}`}
-              >
-                <span
-                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
-                    isToday ? "bg-navy text-white" : "text-ink"
-                  }`}
-                >
-                  {Number(g.date.slice(8))}
-                </span>
-                {list.length > 0 && (
-                  <span className="mt-0.5 text-[10px] font-semibold leading-tight text-navy sm:text-xs">
-                    {list.length}<span className="hidden sm:inline"> khách</span>
-                  </span>
-                )}
-                {full > 0 && <span className="hidden text-[10px] leading-tight text-[#8A2323] sm:block">{full} suất kín</span>}
-                {pend > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#E0A526]" title={`${pend} chờ xác nhận`} />}
-              </Link>
-            );
-          })}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink/60">
-          <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-[#E9EAF3] ring-1 ring-beige-dark" /> Còn chỗ</span>
-          <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-[#F3ECE1] ring-1 ring-beige-dark" /> Có giờ đã kín</span>
-          <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-[#FCE4E4] ring-1 ring-beige-dark" /> Kín cả ngày</span>
-          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#E0A526]" /> Có lịch chờ xác nhận</span>
+        <div className="ml-auto flex items-center gap-1 rounded-full bg-surface p-1 ring-1 ring-beige-dark/70">
+          <Link href={link({ ngay: addDays(date, -1), thang: null })} className="rounded-full px-3 py-1.5 text-navy hover:bg-cream" aria-label="Ngày trước">‹</Link>
+          <Link href={link({ ngay: today, thang: null })} className={`rounded-full px-3 py-1.5 text-sm font-semibold ${date === today ? "bg-gold-soft text-navy" : "text-navy/70 hover:bg-cream"}`}>Hôm nay</Link>
+          <Link href={link({ ngay: addDays(date, 1), thang: null })} className="rounded-full px-3 py-1.5 text-navy hover:bg-cream" aria-label="Ngày sau">›</Link>
         </div>
       </div>
 
-      {/* ===== Timeline trong ngày ===== */}
-      <div className="card p-3 sm:p-4">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <Link href={link({ ngay: addDays(date, -1), thang: null })} className="btn-ghost px-3 py-1.5">‹</Link>
-          <div className="flex-1 text-center">
-            <p className="font-bold capitalize text-navy">{formatDate(vnDateTime(date, "12:00").toISOString())}</p>
-            <p className="text-xs text-ink/60">
+      {/* ===== Chỉ số trong ngày ===== */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <StatTile
+          label={date === today ? "Khách hôm nay" : "Khách trong ngày"}
+          icon="users"
+          value={active.length}
+          foot={prevKnown ? <Delta now={active.length} prev={prevCount} label="so với hôm trước" /> : <span className="text-xs text-ink/55">Đông nhất {dayPeak}/{cap} cùng lúc</span>}
+        />
+        <StatTile
+          label="Khung giờ còn trống"
+          icon="clock"
+          value={<>{freeSlots}<span className="text-base font-semibold text-ink/40">/{slotsTotal}</span></>}
+          tone={freeSlots === 0 ? "alert" : dayFull > 0 ? "gold" : "default"}
+          foot={<span className="text-xs text-ink/55">Suất 30 phút, 9:00 – 19:30{dayFull > 0 ? ` · ${dayFull} suất đã kín` : ""}</span>}
+        />
+        <StatTile
+          label="Doanh thu dự kiến"
+          icon="money"
+          value={<span className="text-[0.8em]">{formatVnd(expected)}</span>}
+          foot={<span className="text-xs text-ink/55">Theo giá dịch vụ đã đặt</span>}
+        />
+        <StatTile
+          label="Chờ xác nhận"
+          icon="alert"
+          value={pendingCount}
+          tone={pendingCount ? "gold" : "default"}
+          foot={<span className="text-xs text-ink/55">{pendingCount ? "Cần KTV nhận / chọn KTV" : "Đã xác nhận hết"}</span>}
+        />
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
+        {/* ===== Lịch trong ngày: cột theo KTV ===== */}
+        <div className="card min-w-0 p-3 sm:p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-navy">Lịch theo kỹ thuật viên</h2>
+            <p className="text-xs text-ink/55">
               {active.length} khách · đông nhất {dayPeak}/{cap} cùng lúc
               {dayFull > 0 && <span className="text-[#8A2323]"> · {dayFull} suất đã kín</span>}
-              {pendingCount > 0 && <> · <b className="text-[#7A5600]">{pendingCount} chờ xác nhận</b></>}
             </p>
           </div>
-          <Link href={link({ ngay: addDays(date, 1), thang: null })} className="btn-ghost px-3 py-1.5">›</Link>
-        </div>
+          {error && <p className="text-sm text-[#8A2323]">Không tải được lịch: {error.message}</p>}
 
-        {error && <p className="text-sm text-[#8A2323]">Không tải được lịch: {error.message}</p>}
-
-        <div className="flex">
-          {/* trục giờ */}
-          <div className="relative w-12 shrink-0" style={{ height }}>
-            {hours.map((m) => (
-              <span key={m} className="absolute -translate-y-1/2 text-[11px] font-semibold text-ink/60" style={{ top: (m - startMin) * PPM }}>
-                {String(Math.floor(m / 60)).padStart(2, "0")}:00
-              </span>
-            ))}
-          </div>
-          {/* vùng lịch */}
-          <div className="relative flex-1 overflow-hidden rounded-lg border border-beige-dark/60 bg-cream/40" style={{ height }}>
-            {halfHours.map((m) => {
-              const s = dayZero + m * 60000;
-              const n = intervals.filter((x) => x.s < s + 30 * 60000 && x.e > s).length;
-              const isFull = n >= cap;
-              const hhmm = `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-              const bookable = s + 30 * 60000 > Date.now() && (!isFull || manager);
-              const cls = `absolute inset-x-0 block border-t ${m % 60 === 0 ? "border-beige-dark/70" : "border-dashed border-beige-dark/40"} ${isFull ? "bg-[#FCE4E4]/60" : ""} ${bookable ? "hover:bg-navy/5" : ""}`;
-              const pos = { top: (m - startMin) * PPM, height: 30 * PPM };
-              const label =
-                n > 0 ? (
-                  <span className={`absolute right-1 top-0.5 z-0 text-[10px] font-semibold ${isFull ? "text-[#8A2323]" : "text-ink/40"}`}>
-                    {n}/{cap}
-                  </span>
-                ) : null;
-              return bookable ? (
-                <a key={m} href={`/quan-ly/tao-lich?cn=${branchId}&ngay=${date}&gio=${hhmm}`} title={`Tạo lịch lúc ${hhmm}`} className={cls} style={pos}>
-                  {label}
-                </a>
-              ) : (
-                <div key={m} className={cls} style={pos}>
-                  {label}
-                </div>
-              );
-            })}
-            {nowMin !== null && nowMin >= startMin && nowMin <= dayEndMin && (
-              <div className="absolute inset-x-0 z-20 border-t-2 border-[#C94A4A]" style={{ top: (nowMin - startMin) * PPM }}>
-                <span className="absolute -left-1 -top-1.5 h-3 w-3 rounded-full bg-[#C94A4A]" />
+          <div className="-mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
+            <div style={{ minWidth: 60 + columns.length * COL_MIN }}>
+              {/* tên KTV trên đầu cột */}
+              <div className="sticky top-0 z-30 flex border-b border-beige-dark/60 bg-surface pb-2">
+                <div className="w-[60px] shrink-0" />
+                {columns.map((c) => (
+                  <div key={c.id} className="flex min-w-0 flex-1 items-center gap-2 px-2" style={{ minWidth: COL_MIN }}>
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-display text-sm font-bold ${c.id === "none" ? "bg-[#ECECEC] text-[#666]" : "bg-linear-to-br from-gold to-brown text-white"}`}>
+                      {initialsOf(c.name)}
+                    </span>
+                    <span className="min-w-0 leading-tight">
+                      <span className="block truncate text-sm font-semibold">{c.name}</span>
+                      <span className="block text-[11px] text-ink/50">{c.count ? `${c.count} khách` : "Trống lịch"}</span>
+                    </span>
+                  </div>
+                ))}
               </div>
-            )}
-            {blocks.map(({ item, lane }) => {
-              const r = item.row;
-              const top = ((item.s - dayZero) / 60000 - startMin) * PPM;
-              const h = Math.max(((item.e - item.s) / 60000) * PPM - 2, 22);
-              const skin = skinOfAppt.get(r.id);
-              const names = [...r.appointment_services]
-                .sort((x, y) => x.start_at.localeCompare(y.start_at))
-                .map((s) => s.services?.name)
-                .filter(Boolean)
-                .join(", ");
-              return (
-                <a
-                  key={r.id}
-                  href={`#lh-${r.id}`}
-                  className={`absolute z-10 overflow-hidden rounded-md border-l-4 px-1.5 py-1 text-[11px] leading-tight shadow-sm hover:z-30 hover:shadow-md ${BLOCK_STYLE[r.status] ?? BLOCK_STYLE.confirmed}`}
-                  style={{ top: top + 1, height: h, left: `calc(${(lane * 100) / lanes}% + 2px)`, width: `calc(${100 / lanes}% - 4px)` }}
-                  title={`${formatTime(r.start_at)} ${r.customers?.full_name ?? ""} – ${names}`}
-                >
-                  <span className="flex items-center gap-1 font-bold">
-                    {formatTime(r.start_at)}
-                    {skin && <SkinDot color={skin.overall} size="h-2 w-2" />}
-                  </span>
-                  <span className="block truncate font-semibold">{r.customers?.full_name ?? "—"}</span>
-                  {h > 50 && <span className="block truncate opacity-80">{names || "Chưa chọn dịch vụ"}</span>}
-                  {h > 70 && <span className="block truncate opacity-70">{STATUS_LABEL[r.status]}</span>}
-                </a>
-              );
-            })}
-            {rows.length === 0 && (
-              <p className="absolute inset-x-0 top-6 text-center text-sm text-ink/50">Chưa có lịch hẹn trong ngày này.</p>
-            )}
+
+              <div className="flex pt-2">
+                {/* trục giờ bên trái + số khách / suất */}
+                <div className="relative w-[60px] shrink-0" style={{ height }}>
+                  {hours.map((m) => (
+                    <span key={m} className="absolute -translate-y-1/2 text-[11px] font-semibold text-ink/55" style={{ top: (m - startMin) * PPM }}>
+                      {String(Math.floor(m / 60)).padStart(2, "0")}:00
+                    </span>
+                  ))}
+                  {halfHours.map((m) => {
+                    const s0 = dayZero + m * 60000;
+                    const n = intervals.filter((x) => x.s < s0 + 30 * 60000 && x.e > s0).length;
+                    return n > 0 ? (
+                      <span
+                        key={m}
+                        className={`absolute right-1.5 text-[10px] font-bold ${n >= cap ? "text-[#8A2323]" : "text-ink/35"}`}
+                        style={{ top: (m - startMin) * PPM + 15 * PPM - 6 }}
+                        title={`${n}/${cap} khách cùng lúc`}
+                      >
+                        {n}/{cap}
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+
+                {/* vùng lịch */}
+                <div className="relative flex-1 overflow-hidden rounded-2xl border border-beige-dark/50 bg-cream/40" style={{ height }}>
+                  {/* hàng 30 phút: bấm ô trống để tạo lịch, tô đỏ nhạt khi đã kín */}
+                  {halfHours.map((m) => {
+                    const s0 = dayZero + m * 60000;
+                    const n = intervals.filter((x) => x.s < s0 + 30 * 60000 && x.e > s0).length;
+                    const isFull = n >= cap;
+                    const hhmm = `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+                    const bookable = s0 + 30 * 60000 > Date.now() && (!isFull || manager);
+                    const cls = `absolute inset-x-0 block border-t ${m % 60 === 0 ? "border-beige-dark/70" : "border-dashed border-beige-dark/35"} ${isFull ? "bg-[#FCE4E4]/70" : ""} ${bookable ? "hover:bg-gold/10" : ""}`;
+                    const pos = { top: (m - startMin) * PPM, height: 30 * PPM };
+                    return bookable ? (
+                      <a key={m} href={`/quan-ly/tao-lich?cn=${branchId}&ngay=${date}&gio=${hhmm}`} title={`Tạo lịch lúc ${hhmm}`} className={cls} style={pos} />
+                    ) : (
+                      <div key={m} className={cls} style={pos} title={isFull ? `${hhmm}: đã đủ ${cap} khách` : undefined} />
+                    );
+                  })}
+
+                  {/* các cột KTV */}
+                  <div className="pointer-events-none absolute inset-0 flex">
+                    {columns.map((c, ci) => (
+                      <div key={c.id} className={`relative min-w-0 flex-1 ${ci > 0 ? "border-l border-beige-dark/40" : ""}`} style={{ minWidth: COL_MIN }}>
+                        {c.placed.map(({ item, lane }) => {
+                          const r = item.r;
+                          const top = ((item.s - dayZero) / 60000 - startMin) * PPM;
+                          const h = Math.max(((item.e - item.s) / 60000) * PPM - 3, 26);
+                          const skin = skinOfAppt.get(r.id);
+                          return (
+                            <a
+                              key={item.key}
+                              href={`#lh-${r.id}`}
+                              className={`pointer-events-auto absolute z-10 overflow-hidden rounded-xl border-l-[3px] px-2 py-1.5 text-[11px] leading-tight shadow-sm transition hover:z-20 hover:shadow-md ${BLOCK_STYLE[r.status] ?? BLOCK_STYLE.confirmed}`}
+                              style={{ top: top + 1.5, height: h, left: `calc(${(lane * 100) / c.lanes}% + 3px)`, width: `calc(${100 / c.lanes}% - 6px)` }}
+                              title={`${formatTime(new Date(item.s).toISOString())}–${formatTime(new Date(item.e).toISOString())} · ${r.customers?.full_name ?? ""} · ${item.title}`}
+                            >
+                              <span className="flex items-center gap-1 truncate font-semibold opacity-80">
+                                {formatTime(new Date(item.s).toISOString())} – {formatTime(new Date(item.e).toISOString())}
+                                {skin && <SkinDot color={skin.overall} size="h-2 w-2" />}
+                              </span>
+                              <span className="block truncate text-[12px] font-bold">{r.customers?.full_name ?? "—"}</span>
+                              {h > 48 && <span className="block truncate opacity-80">{item.title}</span>}
+                              {h > 68 && <span className="block truncate opacity-60">{STATUS_LABEL[r.status]}</span>}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+
+                  {nowMin !== null && nowMin >= startMin && nowMin <= dayEndMin && (
+                    <div className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-[#C94A4A]" style={{ top: (nowMin - startMin) * PPM }}>
+                      <span className="absolute -left-1 -top-1.5 h-3 w-3 rounded-full bg-[#C94A4A]" />
+                    </div>
+                  )}
+                  {rows.length === 0 && (
+                    <p className="pointer-events-none absolute inset-x-0 top-6 text-center text-sm text-ink/50">Chưa có lịch hẹn trong ngày này.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-ink/60">
+            {["pending", "confirmed", "in_progress", "completed"].map((st) => (
+              <span key={st} className={`rounded-md border-l-[3px] px-1.5 py-0.5 ${BLOCK_STYLE[st]}`}>{STATUS_LABEL[st]}</span>
+            ))}
+            <span>Bấm vào ô trống để tạo lịch giờ đó</span>
+            <Link href={link({ tt: filter === "active" ? "all" : "active" })} className="ml-auto text-xs font-semibold text-brown hover:underline">
+              {filter === "active" ? "Hiện cả lịch đã huỷ" : "Ẩn lịch đã huỷ"}
+            </Link>
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink/60">
-          {["pending", "confirmed", "in_progress", "completed"].map((s) => (
-            <span key={s} className={`rounded px-1.5 py-0.5 ${BLOCK_STYLE[s]} border-l-4`}>{STATUS_LABEL[s]}</span>
-          ))}
-          <span>Bấm vào ô trống để tạo lịch giờ đó</span>
-          <Link href={link({ tt: filter === "active" ? "all" : "active" })} className="ml-auto text-xs text-navy underline">
-            {filter === "active" ? "Hiện cả lịch đã huỷ" : "Ẩn lịch đã huỷ"}
-          </Link>
-        </div>
-        {profile?.role === "owner" && branch && (
-          <div className="mt-2 border-t border-beige pt-2">
-            <CapacityEditor branchId={branch.id} branchName={branch.name} current={cap} />
+        {/* ===== Lịch tháng ===== */}
+        <aside className="space-y-4">
+          <div className="card p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <Link href={link({ thang: shiftMonth(ym, -1) })} className="flex h-8 w-8 items-center justify-center rounded-full text-navy hover:bg-cream" aria-label="Tháng trước">‹</Link>
+              <div className="text-center">
+                <p className="font-display text-lg font-bold text-navy">{monthLabel(ym)}</p>
+                {ym !== monthOf(today) && (
+                  <Link href={link({ ngay: today, thang: null })} className="text-xs text-brown underline">Về hôm nay</Link>
+                )}
+              </div>
+              <Link href={link({ thang: shiftMonth(ym, 1) })} className="flex h-8 w-8 items-center justify-center rounded-full text-navy hover:bg-cream" aria-label="Tháng sau">›</Link>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-[10.5px] font-semibold text-ink/45">
+              {WEEKDAYS.map((w) => <div key={w} className={w === "CN" ? "text-[#8A2323]" : ""}>{w}</div>)}
+            </div>
+            <div className="mt-1 grid grid-cols-7 gap-1">
+              {grid.flat().map((g) => {
+                const list = byDay.get(g.date) ?? [];
+                const iv = toIntervals(list);
+                const full = list.length ? fullSlots(iv, g.date, cap) : 0;
+                const level = loadLevel(full, list.length);
+                const pend = list.filter((x) => x.status === "pending").length;
+                const selected = g.date === date;
+                const isToday = g.date === today;
+                return (
+                  <Link
+                    key={g.date}
+                    href={link({ ngay: g.date, thang: null })}
+                    title={list.length ? `${list.length} khách${full ? ` · ${full} suất kín` : ""}${pend ? ` · ${pend} chờ xác nhận` : ""}` : undefined}
+                    className={`relative flex aspect-square flex-col items-center justify-center rounded-xl text-xs transition ${
+                      selected ? "bg-navy font-bold text-white shadow" : `${LEVEL_STYLE[level]} hover:ring-1 hover:ring-gold`
+                    } ${g.inMonth ? "" : "opacity-35"}`}
+                  >
+                    <span className={isToday && !selected ? "font-bold text-brown underline decoration-gold decoration-2 underline-offset-2" : ""}>{Number(g.date.slice(8))}</span>
+                    {list.length > 0 && <span className={`text-[9.5px] leading-none ${selected ? "text-white/75" : "text-ink/50"}`}>{list.length}</span>}
+                    {pend > 0 && <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[#E0A526]" />}
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-[10.5px] text-ink/55">
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-[#E9EAF3]" /> Còn chỗ</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-[#F3ECE1]" /> Có giờ đã kín</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-[#FCE4E4]" /> Kín cả ngày</span>
+              <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-[#E0A526]" /> Chờ xác nhận</span>
+            </div>
           </div>
-        )}
+          {profile?.role === "owner" && branch && (
+            <div className="card p-4">
+              <CapacityEditor branchId={branch.id} branchName={branch.name} current={cap} />
+            </div>
+          )}
+        </aside>
       </div>
 
+      <h2 className="pt-2 text-navy">Chi tiết từng lịch hẹn</h2>
       {/* ===== Chi tiết từng lịch ===== */}
-      <div className="space-y-3">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
         {rows.map((r) => {
           const items = [...r.appointment_services].sort((x, y) => x.start_at.localeCompare(y.start_at));
           const total = items.reduce((a, s) => a + (s.price ?? 0), 0);

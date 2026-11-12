@@ -1,7 +1,7 @@
 import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { PRODUCT_COLUMNS, WAREHOUSE_LABEL, canManageStock, fetchStock, type Product, type Warehouse, type WarehouseType } from "@/lib/inventory";
+import { PRODUCT_COLUMNS, WAREHOUSE_LABEL, canEditProducts, canManageStock, fetchDefaultDiscountPct, fetchStock, type Product, type Warehouse, type WarehouseType } from "@/lib/inventory";
 import { KhoNav, pickBranch } from "./shared";
 import StockList from "./StockList";
 
@@ -15,9 +15,11 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const { data: branches } = await activeBranches();
   const { branchId, canSwitch } = pickBranch(profile, branches ?? [], sp.cn);
 
-  const [{ data: whs }, { data: products }] = await Promise.all([
+  const canEdit = canEditProducts(profile?.roles);
+  const [{ data: whs }, { data: products }, defaultPct] = await Promise.all([
     supabase.from("warehouses").select("id, branch_id, type, name").eq("branch_id", branchId),
     supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).order("name"),
+    canEdit ? fetchDefaultDiscountPct(supabase) : Promise.resolve(0),
   ]);
   const warehouses = (whs ?? []) as Warehouse[];
   const wh = warehouses.find((w) => w.type === type);
@@ -36,39 +38,54 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   );
   const link = (cn: string, kho: WarehouseType) => `/quan-ly/kho?cn=${cn}&kho=${kho}`;
 
+  const branchName = (branches ?? []).find((b) => b.id === branchId)?.name ?? "";
+
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-navy">Kho</h1>
-        <p className="text-sm text-ink/70">Mỗi chi nhánh có kho liệu trình (hàng KTV dùng) và kho bán lẻ (hàng bán cho khách).</p>
+    <div className="page-wide space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brown">Kho · {branchName}</p>
+          <h1 className="mt-1 text-navy">Tồn kho</h1>
+          <p className="mt-1 text-sm text-ink/60">Mỗi chi nhánh có kho liệu trình (hàng KTV dùng) và kho bán lẻ (hàng bán cho khách).</p>
+        </div>
+        {manage && (
+          <div className="flex flex-wrap gap-2">
+            <Link href="/quan-ly/kho/nhap-hang" className="btn-primary px-5 py-2.5">Nhập hàng</Link>
+            <Link href="/quan-ly/kho/chuyen-kho" className="btn-outline px-5 py-2.5">Chuyển kho</Link>
+            <Link href="/quan-ly/kho/kiem-kho" className="btn-outline px-5 py-2.5">Kiểm kho</Link>
+          </div>
+        )}
       </div>
       <KhoNav active="ton" role={profile!.role} pending={manage ? pending ?? 0 : 0} />
 
-      <div className="card space-y-3 p-4">
+      <div className="flex flex-wrap items-center gap-2">
         {canSwitch && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex rounded-full bg-surface p-1 ring-1 ring-beige-dark/70">
             {(branches ?? []).map((b) => (
               <Link
                 key={b.id}
                 href={link(b.id, type)}
-                className={`rounded-full px-3 py-1.5 text-sm font-semibold ${b.id === branchId ? "bg-navy text-white" : "bg-white text-navy ring-1 ring-beige-dark"}`}
+                className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${b.id === branchId ? "bg-navy text-white shadow" : "text-navy/70 hover:text-navy"}`}
               >
                 {b.name}
               </Link>
             ))}
           </div>
         )}
-        <div className="flex gap-2">
+        <div className="flex rounded-full bg-surface p-1 ring-1 ring-beige-dark/70">
           {(["treatment", "retail"] as const).map((t) => (
             <Link
               key={t}
               href={link(branchId, t)}
-              className={`flex-1 rounded-xl px-3 py-2 text-center text-sm font-semibold ${t === type ? "bg-beige text-navy ring-2 ring-navy/30" : "bg-cream text-navy/70"}`}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${t === type ? "bg-gold-soft text-navy ring-1 ring-gold/60" : "text-navy/70 hover:text-navy"}`}
             >
               {WAREHOUSE_LABEL[t]}
             </Link>
           ))}
         </div>
+        {manage && (pending ?? 0) > 0 && (
+          <Link href="/quan-ly/kho/xin-xuat" className="chip ml-auto bg-[#FFE8BA] py-1.5 text-[#7A5600]">{pending} phiếu xin xuất chờ duyệt →</Link>
+        )}
       </div>
 
       {type === "retail" && profile?.role !== "warehouse" && (
@@ -79,7 +96,17 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
       {!wh ? (
         <p className="card text-sm">Chi nhánh này chưa có {WAREHOUSE_LABEL[type].toLowerCase()}.</p>
       ) : (
-        <StockList warehouseId={wh.id} warehouseType={type} products={list} qty={qty} canManage={manage} />
+        <StockList
+          warehouseId={wh.id}
+          warehouseType={type}
+          warehouseName={`${WAREHOUSE_LABEL[type]} ${branchName}`}
+          products={list}
+          qty={qty}
+          canManage={manage}
+          canEdit={canEdit}
+          defaultPct={defaultPct}
+          showCost={profile?.role === "owner" || profile?.role === "manager"}
+        />
       )}
     </div>
   );

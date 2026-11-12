@@ -119,10 +119,12 @@ export default function NotificationBell({ userId, initialUnread }: { userId: st
 
   return (
     <>
-      <Link href="/quan-ly/thong-bao" className="relative shrink-0 rounded-full px-2 py-1.5 text-lg leading-none hover:bg-beige" aria-label={`Thông báo${unread ? ` (${unread} chưa đọc)` : ""}`}>
-        🔔
+      <Link href="/quan-ly/thong-bao" className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-navy ring-1 ring-beige-dark/70 hover:bg-beige" aria-label={`Thông báo${unread ? ` (${unread} chưa đọc)` : ""}`}>
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 003.4 0" />
+        </svg>
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-[#B3261E] px-1 text-center text-[11px] font-bold leading-[18px] text-white">
+          <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[#B3261E] px-1 text-center text-[11px] font-bold leading-[18px] text-white">
             {unread > 99 ? "99+" : unread}
           </span>
         )}
@@ -133,7 +135,7 @@ export default function NotificationBell({ userId, initialUnread }: { userId: st
             <button
               key={t.id}
               onClick={() => open(t)}
-              className="flex w-full items-start gap-3 rounded-2xl border border-gold/50 bg-white p-3 text-left shadow-lg"
+              className="flex w-full items-start gap-3 rounded-2xl border border-gold/50 bg-surface p-3 text-left shadow-lg"
             >
               <span className="text-xl">🔔</span>
               <span className="min-w-0 flex-1">

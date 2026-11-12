@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
 import NotificationBell from "@/components/NotificationBell";
+import HeaderGate from "@/components/HeaderGate";
 
 const link = "shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-navy hover:bg-beige";
 
@@ -14,7 +15,10 @@ export default async function Header() {
     unread = count ?? 0;
   }
 
+  // khu /quan-ly của chủ, quản lý, lễ tân, kho, marketing có thanh trên riêng (khung StaffShell) → ẩn thanh này
+  const ownShell = staff && profile?.role !== "technician";
   return (
+    <HeaderGate hideOnStaff={ownShell}>
     <header className="sticky top-0 z-20 border-b border-gold/40 bg-[#FBF8F2]/95 backdrop-blur print:hidden">
       <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
         <Link href={staff ? "/quan-ly" : "/"} className="shrink-0" aria-label="Moana Beauty – trang chủ">
@@ -58,5 +62,6 @@ export default async function Header() {
         </nav>
       </div>
     </header>
+    </HeaderGate>
   );
 }

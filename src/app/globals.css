@@ -1,14 +1,22 @@
 @import "tailwindcss";
 
+/* chế độ tối bật bằng nút trên thanh trên (class "dark" trên thẻ html), không theo máy */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Bảng màu bộ nhận diện Moana: Navy #2B2D64 · Navy nhạt #383866 · Be #DFD2B8 · Kem #EEE5D6 · Vàng đồng #A0845E · Xám #646464 */
 @theme {
   --color-navy: #2b2d64;
   --color-navy-dark: #1f2050;
+  --color-navy-soft: #383866;
   --color-beige: #eee5d6;
   --color-beige-dark: #dfd2b8;
   --color-cream: #f7f4ed;
   --color-brown: #a0845e;
   --color-ink: #282b38;
   --color-gold: #c9ad7f;
+  --color-gold-soft: #f4ecdd;
+  --color-surface: #ffffff;
+  --color-muted: #646464;
   --font-sans: var(--font-be-vietnam), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-cormorant), "Times New Roman", serif;
 }
@@ -71,12 +79,107 @@ body {
   @apply inline-flex items-center justify-center gap-2 rounded-full px-3 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 text-navy hover:bg-beige;
 }
 .input {
-  @apply w-full rounded-xl border border-beige-dark bg-white px-4 py-3 text-base outline-none focus:border-navy focus:ring-2 focus:ring-navy/15;
+  @apply w-full rounded-xl border border-beige-dark bg-surface px-4 py-3 text-base outline-none focus:border-navy focus:ring-2 focus:ring-navy/15;
 }
 .label {
   @apply mb-1.5 block text-sm font-medium text-ink;
 }
 .card {
-  @apply rounded-2xl border border-beige-dark/70 bg-white p-5 shadow-sm;
+  @apply rounded-3xl border border-beige-dark/60 bg-surface p-5 shadow-[0_1px_2px_rgba(43,45,100,0.04),0_8px_24px_-12px_rgba(43,45,100,0.10)];
+}
+/* ô số liệu bo góc (Tổng quan, Lịch hẹn, Kho) */
+.stat-tile {
+  @apply rounded-3xl border border-beige-dark/60 bg-surface p-4 shadow-[0_1px_2px_rgba(43,45,100,0.04),0_8px_24px_-12px_rgba(43,45,100,0.10)] sm:p-5;
+}
+/* nhãn tình trạng dạng viên thuốc */
+.chip {
+  @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold;
 }
 }
+
+/* ===================== KHU NHÂN VIÊN (khung mới) ===================== */
+/* Có khung nhân viên thì bỏ thanh trên + khung hẹp cũ của trang khách */
+body:has(.staff-shell) {
+  background: #faf8f3;
+}
+main:has(> .staff-shell) {
+  max-width: none;
+  padding: 0;
+}
+.staff-shell h1 {
+  font-size: 1.9rem;
+  line-height: 1.15;
+}
+.staff-shell h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2em;
+  letter-spacing: 0.01em;
+}
+/* trang rộng (Tổng quan, Lịch hẹn, Kho) được dùng hết bề ngang */
+.staff-content:has(.page-wide) {
+  max-width: 88rem;
+}
+/* thanh menu dưới đáy hiện tới màn hình < 1024px */
+@media (min-width: 640px) and (max-width: 1023.98px) {
+  body:has(.staff-bottom-nav) {
+    --bottom-nav-h: calc(3.75rem + env(safe-area-inset-bottom));
+  }
+}
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(201, 173, 127, 0.35) transparent;
+}
+
+/* ===================== CHẾ ĐỘ TỐI (chỉ khu nhân viên) ===================== */
+html.dark:has(.staff-shell) {
+  color-scheme: dark;
+  --color-cream: #17182e;
+  --color-beige: #262849;
+  --color-beige-dark: #35375e;
+  --color-ink: #ebe6dc;
+  --color-navy: #5558a8;
+  --color-navy-dark: #6669bd;
+  --color-navy-soft: #2b2d55;
+  --color-brown: #c9ad7f;
+  --color-gold-soft: #2c2a3c;
+  --color-surface: #1e2040;
+  --color-muted: #a7a8bd;
+}
+html.dark body:has(.staff-shell) {
+  background: #13142a;
+}
+html.dark .staff-shell .card,
+html.dark .staff-shell .stat-tile {
+  box-shadow: none;
+}
+html.dark .staff-shell :is(.bg-white, .bg-white\/95, .bg-white\/90, .bg-white\/80, .hover\:bg-white:hover) {
+  background-color: var(--color-surface);
+}
+html.dark .staff-shell :is(.text-navy, .hover\:text-navy:hover) {
+  color: #e3cfa4;
+}
+html.dark .staff-shell .text-navy\/70 { color: rgba(227, 207, 164, 0.75); }
+html.dark .staff-shell .text-navy\/60 { color: rgba(227, 207, 164, 0.65); }
+html.dark .staff-shell :is(.border-navy, .hover\:border-navy:hover) { border-color: #c9ad7f; }
+html.dark .staff-shell .btn-outline { border-color: #c9ad7f; color: #e3cfa4; }
+/* chữ màu đậm → sáng hơn để đọc được trên nền tối */
+html.dark .staff-shell :is(.text-\[\#8A2323\], .text-\[\#B3261E\], .text-\[\#8C1D18\]) { color: #f2a7a7; }
+html.dark .staff-shell :is(.text-\[\#22612A\], .text-\[\#1F5E3A\], .text-\[\#1D5224\]) { color: #9bd8a5; }
+html.dark .staff-shell :is(.text-\[\#7A5600\], .text-\[\#5C4100\]) { color: #ecc77d; }
+html.dark .staff-shell :is(.text-\[\#5E4B30\], .text-\[\#7A6242\], .text-\[\#6E5A3E\]) { color: #dcc6a0; }
+html.dark .staff-shell :is(.text-\[\#646464\], .text-\[\#666\], .text-\[\#555\], .text-\[\#999\]) { color: #a7a8bd; }
+html.dark .staff-shell :is(.text-\[\#4B2D7A\], .text-\[\#3A2163\]) { color: #c9b5f2; }
+html.dark .staff-shell :is(.text-\[\#A21C5E\], .text-\[\#8A2357\]) { color: #f2a8cc; }
+html.dark .staff-shell .text-\[\#0369A1\] { color: #8fcbf2; }
+/* nền màu nhạt → nền tối pha màu */
+html.dark .staff-shell :is(.bg-\[\#D6EDD8\], .bg-\[\#E4F2E9\], .bg-\[\#E3F3E5\]) { background-color: rgba(76, 170, 96, 0.18); }
+html.dark .staff-shell :is(.bg-\[\#FFE8BA\], .bg-\[\#FFF4DB\], .bg-\[\#FFF8E8\], .bg-\[\#FFF8E6\], .bg-\[\#FFF3D6\]) { background-color: rgba(224, 165, 38, 0.17); }
+html.dark .staff-shell :is(.bg-\[\#DCE3F5\], .bg-\[\#E9EAF3\], .bg-\[\#E6EBF8\]) { background-color: rgba(120, 128, 220, 0.2); }
+html.dark .staff-shell :is(.bg-\[\#F6D5D5\], .bg-\[\#FCE4E4\], .bg-\[\#FDECEA\], .bg-\[\#FBEAEA\]) { background-color: rgba(214, 80, 80, 0.2); }
+html.dark .staff-shell :is(.bg-\[\#E6DDF5\], .bg-\[\#EEE6FA\]) { background-color: rgba(150, 110, 220, 0.2); }
+html.dark .staff-shell :is(.bg-\[\#FDE2EF\], .bg-\[\#F9DDEB\]) { background-color: rgba(220, 90, 150, 0.2); }
+html.dark .staff-shell :is(.bg-\[\#ECECEC\], .bg-\[\#F1F1F1\]) { background-color: rgba(255, 255, 255, 0.08); }
+html.dark .staff-shell .bg-\[\#F3ECE1\] { background-color: rgba(201, 173, 127, 0.16); }
+html.dark .staff-shell :is(.border-\[\#E6DDCC\], .border-\[\#EFECE6\]) { border-color: #35375e; }
+html.dark .staff-shell img[src*="logo-moana.png"] { filter: brightness(0) invert(0.92) sepia(0.2); }

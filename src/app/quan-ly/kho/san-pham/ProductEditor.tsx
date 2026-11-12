@@ -8,6 +8,7 @@ import { formatVnd, normalizeText, vnError } from "@/lib/format";
 import { UNITS, cleanBarcode, productLabel, retailMinPrice, type Product } from "@/lib/inventory";
 import MoneyInput from "@/components/MoneyInput";
 import CameraScanner from "@/components/LazyCameraScanner";
+import Modal from "@/components/Modal";
 
 type Scope = "all" | "treatment" | "retail" | "nobarcode" | "inactive";
 
@@ -86,8 +87,8 @@ export default function ProductEditor({
           </button>
         </div>
         {canEdit && (
-          <button className="btn-outline w-full py-2" onClick={() => { setNewBarcode(""); setOpen(open === "new" ? null : "new"); }}>
-            {open === "new" ? "Đóng form thêm sản phẩm" : "+ Thêm sản phẩm mới"}
+          <button className="btn-outline w-full py-2" onClick={() => { setNewBarcode(""); setScanMsg(null); setOpen("new"); }}>
+            + Thêm sản phẩm mới
           </button>
         )}
         {scanMsg && <p className="rounded-lg bg-cream px-3 py-2 text-xs">{scanMsg}</p>}
@@ -106,7 +107,12 @@ export default function ProductEditor({
             </button>
           ))}
         </div>
-        {open === "new" && <ProductForm key={newBarcode} initialBarcode={newBarcode} cost={showCost ? null : undefined} defaultPct={defaultPct} onDone={() => setOpen(null)} />}
+        {open === "new" && (
+          <Modal title="Thêm sản phẩm mới" subtitle="Danh mục dùng chung cả 2 chi nhánh. Hàng vào kho qua phiếu Nhập hàng." onClose={() => setOpen(null)}>
+            {scanMsg && <p className="mb-2 rounded-lg bg-cream px-3 py-2 text-xs">{scanMsg}</p>}
+            <ProductForm key={newBarcode} initialBarcode={newBarcode} cost={showCost ? null : undefined} defaultPct={defaultPct} onDone={() => setOpen(null)} />
+          </Modal>
+        )}
       </div>
 
       <div className="card p-0">
