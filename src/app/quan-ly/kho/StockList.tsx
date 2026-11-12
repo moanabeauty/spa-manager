@@ -120,7 +120,7 @@ export default function StockList({
             <TileIconSvg name={icon} className="h-[18px] w-[18px]" />
           </span>
         </div>
-        <p className={`mt-1 font-display text-[1.9rem] font-bold leading-none sm:text-[2.15rem] ${highlight ? "text-[#7A5600]" : "text-navy"}`}>{value}</p>
+        <p className={`mt-2 text-[1.6rem] font-bold leading-none tracking-tight tabular-nums sm:text-[1.85rem] ${highlight ? "text-[#7A5600]" : "text-navy"}`}>{value}</p>
         <p className={`mt-3 text-xs ${highlight ? "font-semibold text-[#7A5600]" : "text-ink/55"}`}>{foot}</p>
       </button>
     );
@@ -157,7 +157,7 @@ export default function StockList({
               Lọc{filters ? ` (${filters})` : ""}
             </button>
             {showFilter && (
-              <div className="absolute right-0 top-full z-40 mt-2 w-72 space-y-3 rounded-2xl border border-beige-dark/70 bg-surface p-4 text-sm shadow-xl">
+              <div className="z-40 space-y-3 max-sm:fixed max-sm:inset-x-4 max-sm:top-24 sm:absolute sm:right-0 sm:top-full sm:mt-2 sm:w-72 rounded-2xl border border-beige-dark/70 bg-surface p-4 text-sm shadow-xl">
                 <label className="block">
                   <span className="label text-xs">Tình trạng</span>
                   <select className="input py-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}>

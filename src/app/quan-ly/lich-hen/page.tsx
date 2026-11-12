@@ -237,7 +237,7 @@ export default async function StaffAppointmentsPage({
       count: new Set(mine.filter((c) => !["cancelled", "no_show"].includes(c.r.status)).map((c) => c.r.id)).size,
     };
   });
-  const COL_MIN = 150;
+  const COL_MIN = 132;
 
   // ---- chỉ số trên cùng ----
   const prevDay = addDays(date, -1);
@@ -332,7 +332,7 @@ export default async function StaffAppointmentsPage({
                 <div className="w-[60px] shrink-0" />
                 {columns.map((c) => (
                   <div key={c.id} className="flex min-w-0 flex-1 items-center gap-2 px-2" style={{ minWidth: COL_MIN }}>
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-display text-sm font-bold ${c.id === "none" ? "bg-[#ECECEC] text-[#666]" : "bg-linear-to-br from-gold to-brown text-white"}`}>
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${c.id === "none" ? "bg-[#ECECEC] text-[#666]" : "bg-linear-to-br from-gold to-brown text-white"}`}>
                       {initialsOf(c.name)}
                     </span>
                     <span className="min-w-0 leading-tight">
@@ -422,7 +422,7 @@ export default async function StaffAppointmentsPage({
                     </div>
                   )}
                   {rows.length === 0 && (
-                    <p className="pointer-events-none absolute inset-x-0 top-6 text-center text-sm text-ink/50">Chưa có lịch hẹn trong ngày này.</p>
+                    <p className="pointer-events-none absolute left-4 top-6 text-sm text-ink/50">Chưa có lịch hẹn trong ngày này.</p>
                   )}
                 </div>
               </div>
@@ -446,7 +446,7 @@ export default async function StaffAppointmentsPage({
             <div className="mb-3 flex items-center justify-between gap-2">
               <Link href={link({ thang: shiftMonth(ym, -1) })} className="flex h-8 w-8 items-center justify-center rounded-full text-navy hover:bg-cream" aria-label="Tháng trước">‹</Link>
               <div className="text-center">
-                <p className="font-display text-lg font-bold text-navy">{monthLabel(ym)}</p>
+                <p className="font-semibold text-navy">{monthLabel(ym)}</p>
                 {ym !== monthOf(today) && (
                   <Link href={link({ ngay: today, thang: null })} className="text-xs text-brown underline">Về hôm nay</Link>
                 )}

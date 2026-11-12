@@ -123,7 +123,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       ];
   const hour = Number(nowVnHHMM().slice(0, 2));
   const hello = hour < 11 ? "Chào buổi sáng" : hour < 14 ? "Chào buổi trưa" : hour < 18 ? "Chào buổi chiều" : "Chào buổi tối";
-  const firstName = (profile!.full_name ?? "bạn").trim().split(/\s+/).pop();
+  const firstName = (profile!.full_name ?? "bạn").trim();
 
   return (
     <div className="page-wide space-y-6">
@@ -201,7 +201,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                 ["completed", "Hoàn thành"],
               ].map(([k, l]) => (
                 <div key={k} className="rounded-2xl bg-cream px-1 py-3">
-                  <p className="font-display text-2xl font-bold text-navy">{byStatus(k)}</p>
+                  <p className="text-xl font-bold tabular-nums text-navy">{byStatus(k)}</p>
                   <p className="mt-0.5 leading-tight text-ink/60">{l}</p>
                 </div>
               ))}
@@ -213,7 +213,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                 {upcoming.map((a) => (
                   <li key={a.id}>
                     <Link href={`/quan-ly/lich-hen#lh-${a.id}`} className="flex items-center gap-3 rounded-2xl border border-beige-dark/50 px-3 py-2.5 transition hover:border-gold hover:bg-cream/50">
-                      <span className="w-14 shrink-0 rounded-xl bg-gold-soft py-1.5 text-center font-display text-base font-bold text-navy">{formatTime(a.start_at)}</span>
+                      <span className="w-14 shrink-0 rounded-xl bg-gold-soft py-1.5 text-center text-sm font-bold tabular-nums text-navy">{formatTime(a.start_at)}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold">{a.customers?.full_name ?? "Khách"}</span>
                         <span className="block truncate text-xs text-ink/55">{a.appointment_services.map((s) => s.services?.name).filter(Boolean).join(", ") || "Hẹn tư vấn"}</span>

@@ -18,15 +18,16 @@
   --color-surface: #ffffff;
   --color-muted: #646464;
   --font-sans: var(--font-be-vietnam), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-cormorant), "Times New Roman", serif;
+  --font-display: var(--font-playfair), "Times New Roman", serif;
 }
 
 /* Tiêu đề trang: chữ có chân giống logo Moana */
 @layer base {
   h1 {
     font-family: var(--font-display);
-    font-weight: 700;
-    letter-spacing: 0.01em;
+    font-weight: 600;
+    letter-spacing: 0;
+    font-variant-numeric: lining-nums;
   }
 }
 
@@ -107,14 +108,29 @@ main:has(> .staff-shell) {
   padding: 0;
 }
 .staff-shell h1 {
-  font-size: 1.9rem;
-  line-height: 1.15;
+  font-size: 1.6rem;
+  line-height: 1.25;
+}
+@media (min-width: 640px) {
+  .staff-shell h1 { font-size: 1.85rem; }
 }
 .staff-shell h2 {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.2em;
-  letter-spacing: 0.01em;
+  font-weight: 600;
+  font-size: 1.12em;
+  font-variant-numeric: lining-nums;
+}
+/* chống tràn ngang trên điện thoại: ô chọn / ô nhập không được rộng hơn khung */
+.staff-shell :is(select, input, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+.staff-content {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+body:has(.staff-shell) {
+  overflow-x: clip;
 }
 /* trang rộng (Tổng quan, Lịch hẹn, Kho) được dùng hết bề ngang */
 .staff-content:has(.page-wide) {

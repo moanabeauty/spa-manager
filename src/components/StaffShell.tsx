@@ -187,7 +187,7 @@ function AvatarMenu({ fullName, roleLabel }: { fullName: string; roleLabel: stri
   return (
     <div ref={box} className="relative">
       <button onClick={() => setOpen(!open)} className="flex items-center gap-2.5 rounded-full p-0.5 pr-0.5 hover:bg-beige/60 sm:pr-3" aria-label="Tài khoản">
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-br from-gold to-brown font-display text-base font-bold text-white ring-2 ring-white dark:ring-[#1e2040]">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-br from-gold to-brown text-sm font-bold text-white ring-2 ring-white dark:ring-[#1e2040]">
           {initials(fullName)}
         </span>
         <span className="hidden text-left leading-tight sm:block">

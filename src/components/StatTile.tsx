@@ -79,7 +79,7 @@ export default function StatTile({
           <TileIconSvg name={icon} className="h-[18px] w-[18px]" />
         </span>
       </div>
-      <p className={`mt-1 font-display text-[1.9rem] font-bold leading-none tracking-tight sm:text-[2.15rem] ${t.value}`}>{value}</p>
+      <p className={`mt-2 text-[1.6rem] font-bold leading-none tracking-tight tabular-nums sm:text-[1.85rem] ${t.value}`}>{value}</p>
       {foot && <div className={`mt-3 ${tone === "navy" ? "[&_*]:!text-white/80" : ""}`}>{foot}</div>}
     </>
   );

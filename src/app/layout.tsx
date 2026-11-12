@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Be_Vietnam_Pro, Cormorant_Garamond } from "next/font/google";
+import { Be_Vietnam_Pro, Playfair_Display } from "next/font/google";
 import Header from "@/components/Header";
 import "./globals.css";
 
@@ -10,11 +10,11 @@ const font = Be_Vietnam_Pro({
   display: "swap",
 });
 
-// Chữ tiêu đề có chân, thanh mảnh – cùng tinh thần với logo Moana
-const display = Cormorant_Garamond({
+// Chữ tiêu đề có chân, sang trọng – Playfair Display hiển thị dấu tiếng Việt rõ ràng
+const display = Playfair_Display({
   subsets: ["vietnamese", "latin"],
   weight: ["500", "600", "700"],
-  variable: "--font-cormorant",
+  variable: "--font-playfair",
   display: "swap",
 });
 
