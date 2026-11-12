@@ -4,10 +4,10 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeText, vnError } from "@/lib/format";
-import { OPEN_LEVELS, cleanBarcode, isSingleUseUnit, openLevelLabel } from "@/lib/inventory";
+import { OPEN_LEVELS, cleanBarcode, isSingleUse, openLevelLabel } from "@/lib/inventory";
 import CameraScanner from "@/components/LazyCameraScanner";
 
-type P = { id: string; label: string; brand: string | null; unit: string; barcode: string | null; qty: number };
+type P = { id: string; label: string; brand: string | null; unit: string; volume?: number | null; barcode: string | null; qty: number };
 type Row = { full: string; opened: number[] };
 
 /** Kiểm kho đầu kỳ: chai nguyên (số nguyên) + chai đang dở (mức còn 3/4 · 2/3 · 1/2 · 1/3 · 1/4 · Gần hết) */
@@ -83,7 +83,7 @@ export default function OpeningForm({ warehouseId, treatment, products, isOwner 
         <ul className="divide-y divide-beige">
           {list.map((p) => {
             const r = row(p.id);
-            const canOpen = treatment && !isSingleUseUnit(p.unit);
+            const canOpen = treatment && !isSingleUse(p.unit, p.volume);
             return (
               <li key={p.id} className="space-y-2 px-4 py-3 text-sm">
                 <div className="flex items-center justify-between gap-3">

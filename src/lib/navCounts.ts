@@ -24,7 +24,7 @@ export const loadNavCounts = cache(async (role: string, branchId: string | null)
   let discQ = supabase.from("discount_requests").select("id", head).eq("status", "pending");
   if (!O) discQ = discQ.eq("kind", "debt");
 
-  const [disc, vouchers, promos, care, stock, counts, receipts, att, ot, leaves, chg, early, fix, mk] = await Promise.all([
+  const [disc, vouchers, promos, care, stock, counts, receipts, att, ot, leaves, chg, early, fix, mk, cfm] = await Promise.all([
     M ? discQ : zero,
     M ? supabase.from("cashbook_entries").select("id", head).eq("source", "counter").eq("status", "pending") : zero,
     !L ? supabase.from("promotion_registrations").select("id", head).eq("status", "pending") : zero,
@@ -39,6 +39,7 @@ export const loadNavCounts = cache(async (role: string, branchId: string | null)
     M ? supabase.from("staff_attendance").select("staff_id", head).eq("in_status", "pending") : zero,
     M ? supabase.from("attendance_fix_requests").select("id", head).eq("status", "pending") : zero,
     O || MK ? supabase.from("marketing_posts").select("id", head).eq("status", O ? "review" : "revise") : zero,
+    O ? supabase.from("usage_stock_confirms").select("id", head).eq("status", "pending") : zero,
   ]);
   return {
     discounts: disc.count ?? 0,
@@ -50,7 +51,7 @@ export const loadNavCounts = cache(async (role: string, branchId: string | null)
     receipts: receipts.count ?? 0,
     attendance: (att.count ?? 0) + (ot.count ?? 0),
     leaves: leaves.count ?? 0,
-    ktv: (chg.count ?? 0) + (early.count ?? 0) + (fix.count ?? 0),
+    ktv: (chg.count ?? 0) + (early.count ?? 0) + (fix.count ?? 0) + (cfm.count ?? 0),
     marketing: mk.count ?? 0,
   };
 });

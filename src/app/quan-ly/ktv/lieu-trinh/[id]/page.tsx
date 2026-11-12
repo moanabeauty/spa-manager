@@ -3,7 +3,8 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import type { ServiceGuide } from "@/components/ServiceGuideSections";
 import { loadCustomerPhotos, photosRequired } from "@/lib/photos";
-import ProcedureRunner, { type Change, type Step } from "./ProcedureRunner";
+import ProcedureRunner, { type Change, type Step, type Usage } from "./ProcedureRunner";
+import { volumeUnit } from "@/lib/inventory";
 
 export const metadata = { title: "Quy trình liệu trình – Moana Beauty" };
 
@@ -43,7 +44,7 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       </div>
     );
   }
-  const [{ data: steps }, { data: changes }, { data: guide }, photoSessions, needPhotos] = await Promise.all([
+  const [{ data: steps }, { data: changes }, { data: guide }, photoSessions, needPhotos, { data: used }] = await Promise.all([
     supabase
       .from("service_procedure_steps")
       .select("step_no, title, products, instructions, note")
@@ -61,7 +62,20 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       .maybeSingle(),
     loadCustomerPhotos(supabase, row.appointments?.customer_id ?? "", row.appointment_id),
     photosRequired(supabase, row.services?.id ? [row.services.id] : []),
+    supabase.from("treatment_usages").select("qty, product_id, products(name, capacity, unit)").eq("appointment_service_id", id),
   ]);
+  // gộp lượng đã trừ theo sản phẩm
+  const usageMap = new Map<string, Usage>();
+  ((used ?? []) as unknown as { qty: number; product_id: string; products: { name: string; capacity: string | null; unit: string } | null }[]).forEach((u) => {
+    const cur = usageMap.get(u.product_id);
+    if (cur) cur.qty += Number(u.qty);
+    else
+      usageMap.set(u.product_id, {
+        label: [u.products?.name, u.products?.capacity].filter(Boolean).join(" · "),
+        unit: volumeUnit(u.products?.capacity, u.products?.unit),
+        qty: Number(u.qty),
+      });
+  });
   const planned = Math.round((new Date(row.end_at).getTime() - new Date(row.start_at).getTime()) / 60000);
 
   return (
@@ -83,6 +97,7 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       photos={photoSessions[0]?.photos ?? []}
       photosRequired={needPhotos}
       photoSkipReason={row.appointments?.photo_skip_reason ?? null}
+      usages={[...usageMap.values()]}
       photosEditable={profile.role === "owner" || profile.role === "manager" || (row.technician_id === profile.id && row.appointments?.status !== "completed")}
     />
   );

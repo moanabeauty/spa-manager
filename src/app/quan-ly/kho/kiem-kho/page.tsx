@@ -97,7 +97,7 @@ export default async function StockCountPage({ searchParams }: { searchParams: P
       )}
 
       {wh && opening ? (
-        <OpeningForm key={wh.id + "-dk"} warehouseId={wh.id} treatment={type === "treatment"} isOwner={isOwner} products={list.map((p) => ({ id: p.id, label: productLabel(p), brand: p.brand, unit: p.unit, barcode: p.barcode, qty: qty[p.id] ?? 0 }))} />
+        <OpeningForm key={wh.id + "-dk"} warehouseId={wh.id} treatment={type === "treatment"} isOwner={isOwner} products={list.map((p) => ({ id: p.id, label: productLabel(p), brand: p.brand, unit: p.unit, volume: p.volume, barcode: p.barcode, qty: qty[p.id] ?? 0 }))} />
       ) : wh ? (
         <CountForm key={wh.id} warehouseId={wh.id} products={list.map((p) => ({ id: p.id, label: productLabel(p), brand: p.brand, unit: p.unit, barcode: p.barcode, qty: qty[p.id] ?? 0 }))} />
       ) : (

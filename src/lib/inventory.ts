@@ -130,9 +130,26 @@ export function openLevelLabel(pct: number): string {
   return hit ? hit.label : `${Math.round(pct)}%`;
 }
 
-/** Hàng dùng 1 lần: xuất ra là hết, không thành "chai đang mở" — giống hàm is_single_use_unit */
-export function isSingleUseUnit(unit: string | null | undefined): boolean {
+/** Hàng dùng 1 lần: xuất ra là hết, không thành "chai đang mở" — giống hàm is_single_use_product.
+ *  Có dung tích thì theo dung tích (≤ 1 là dùng 1 lần, vd 1 miếng / 1 bộ); chưa có dung tích thì theo đơn vị. */
+export function isSingleUse(unit: string | null | undefined, volume?: number | string | null): boolean {
+  if (volume != null && volume !== "") return Number(volume) <= 1;
   return ["cái", "miếng", "gói", "ống", "túi"].includes((unit ?? "").toLowerCase());
+}
+
+/** Đơn vị dung tích — giống hàm volume_unit: "500ml" → ml, "Hũ 120g" → g, "Hộp 50 cái" → cái */
+export function volumeUnit(capacity: string | null | undefined, unit?: string | null): string {
+  const c = (capacity ?? "").toLowerCase();
+  if (c.includes("ml")) return "ml";
+  if (/\d\s*(g|gr|gram)\b/.test(c)) return "g";
+  if (c.includes("shot")) return "shot";
+  for (const u of ["miếng", "cái", "ống", "lọ"]) if (c.includes(u)) return u;
+  return unit ?? "";
+}
+
+/** 0.5 → "0,5"; 246 → "246" */
+export function fmtQty(n: number | string | null | undefined): string {
+  return Number(n ?? 0).toLocaleString("vi-VN", { maximumFractionDigits: 3 });
 }
 
 export type OpenedItem = { id: string; product_id: string; remaining_pct: number; source: "opening" | "request"; opened_at: string };

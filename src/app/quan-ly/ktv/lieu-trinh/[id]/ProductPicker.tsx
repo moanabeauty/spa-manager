@@ -19,7 +19,7 @@ export function productLabel(p: P) {
  * Ô "Đổi sang sản phẩm": gõ tên / nhãn hàng / mã → hiện danh sách sản phẩm trong kho để chọn,
  * hoặc bấm 📷 quét mã vạch trên vỏ hộp. Vẫn gõ tay được nếu sản phẩm chưa có trong hệ thống.
  */
-export default function ProductPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export default function ProductPicker({ value, onChange }: { value: string; onChange: (v: string, productId?: string | null) => void }) {
   const [hits, setHits] = useState<P[] | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -65,7 +65,7 @@ export default function ProductPicker({ value, onChange }: { value: string; onCh
 
   function pick(p: P) {
     picked.current = true;
-    onChange(productLabel(p));
+    onChange(productLabel(p), p.id);
     setOpen(false);
     setMsg(null);
   }
@@ -93,7 +93,7 @@ export default function ProductPicker({ value, onChange }: { value: string; onCh
         value={value}
         autoFocus
         onChange={(e) => {
-          onChange(e.target.value);
+          onChange(e.target.value, null);
           setOpen(true);
           setMsg(null);
         }}

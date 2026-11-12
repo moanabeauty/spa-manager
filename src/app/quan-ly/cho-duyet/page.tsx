@@ -7,6 +7,7 @@ import { ReviewButtons } from "../theo-doi-ktv/Actions";
 import { VoucherReview } from "../phieu-thu-chi/VoucherForm";
 import { CountReview } from "../kho/kiem-kho/CountForm";
 import RequestCard, { type StockRequest } from "../kho/xin-xuat/RequestCard";
+import StockConfirmReview from "./StockConfirmReview";
 
 export const metadata = { title: "Việc chờ duyệt – Moana Beauty" };
 
@@ -34,7 +35,7 @@ export default async function ApprovalsPage() {
     .order("created_at");
   if (!O) discQ = discQ.eq("kind", "debt");
 
-  const [discR, vouR, attR, otR, earlyR, fixR, leaveR, chgR, reqR, branchR, countR, recR, mkR, staffR, cfgR] = await Promise.all([
+  const [discR, vouR, attR, otR, earlyR, fixR, leaveR, chgR, reqR, branchR, countR, recR, mkR, staffR, cfgR, cfmR] = await Promise.all([
     discQ,
     supabase
       .from("cashbook_entries")
@@ -91,6 +92,13 @@ export default async function ApprovalsPage() {
     O ? supabase.from("marketing_posts").select("id, title, publish_date, due_date, channels").eq("status", "review").order("publish_date") : none,
     supabase.from("profiles").select("id, full_name"),
     payrollSettings(),
+    O
+      ? supabase
+          .from("usage_stock_confirms")
+          .select("id, note, created_at, warehouses(name), products(name, capacity), requester:profiles!usage_stock_confirms_requested_by_fkey(full_name), appointment_services(services(name_en, name), appointments(customers(full_name)))")
+          .eq("status", "pending")
+          .order("created_at")
+      : none,
   ]);
 
   const disc = (discR.data ?? []) as unknown as {
@@ -130,7 +138,13 @@ export default async function ApprovalsPage() {
   const bname = new Map(((branchR.data ?? []) as { id: string; name: string }[]).map((b) => [b.id, b.name]));
   const pname = new Map(((staffR.data ?? []) as { id: string; full_name: string | null }[]).map((p) => [p.id, p.full_name ?? "?"]));
 
+  const confirms = (cfmR.data ?? []) as unknown as {
+    id: string; note: string | null; created_at: string; warehouses: { name: string } | null; products: { name: string; capacity: string | null } | null; requester: Named;
+    appointment_services: { services: { name_en: string | null; name: string } | null; appointments: { customers: { full_name: string } | null } | null } | null;
+  }[];
+
   const total =
+    confirms.length +
     disc.length + vouchers.length + att.length + ot.length + early.length + fixes.length + leaves.length + changes.length + stockReqs.length + counts.length + receipts.length + posts.length;
 
   const jump = [
@@ -139,6 +153,7 @@ export default async function ApprovalsPage() {
     { id: "cham-cong", label: "Chấm công & tăng ca", n: att.length + ot.length },
     { id: "ktv", label: "Vào sớm · quên chấm công · đổi sản phẩm", n: early.length + fixes.length + changes.length },
     { id: "nghi-phep", label: "Nghỉ phép", n: leaves.length },
+    { id: "con-hang", label: "Xác nhận còn hàng", n: confirms.length },
     { id: "xin-xuat", label: "Xin xuất kho", n: stockReqs.length },
     { id: "kiem-kho", label: "Kiểm kho lệch", n: counts.length },
     { id: "nhap-hang", label: "Phiếu nhập", n: receipts.length },
@@ -286,6 +301,24 @@ export default async function ApprovalsPage() {
               </p>
               {l.reason && <p className="text-xs">{l.reason}</p>}
               <ReviewButtons fn="review_leave" args={{ p_id: l.id }} />
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {confirms.length > 0 && (
+        <Section id="con-hang" title="Xác nhận còn hàng (KTV chưa hoàn thành được buổi)" more="/quan-ly/kho/chai-dang-mo">
+          <p className="text-xs text-ink/60">Máy báo chi nhánh không còn đủ trong chai đang mở. Nếu thực tế vẫn còn chai, chọn mức còn để KTV hoàn thành buổi.</p>
+          {confirms.map((c) => (
+            <div key={c.id} className={item}>
+              <p>
+                <b>{c.requester?.full_name ?? "KTV"}</b> · {c.products ? [c.products.name, c.products.capacity].filter(Boolean).join(" · ") : "?"} · {c.warehouses?.name}
+              </p>
+              <p className="text-xs">
+                Khách {c.appointment_services?.appointments?.customers?.full_name} · {c.appointment_services?.services?.name_en || c.appointment_services?.services?.name} · {when(c.created_at)}
+                {c.note ? ` · ${c.note}` : ""}
+              </p>
+              <StockConfirmReview id={c.id} />
             </div>
           ))}
         </Section>

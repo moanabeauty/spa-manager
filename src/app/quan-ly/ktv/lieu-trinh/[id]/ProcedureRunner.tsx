@@ -7,11 +7,14 @@ import { createClient } from "@/lib/supabase/client";
 import { formatTime, vnError } from "@/lib/format";
 import { elapsed } from "@/lib/ktv";
 import ProductPicker from "./ProductPicker";
+import UsagePanel from "./UsagePanel";
+import { fmtQty } from "@/lib/inventory";
 import ServiceGuideSections, { type ServiceGuide } from "@/components/ServiceGuideSections";
 import SessionPhotos from "@/components/SessionPhotos";
 import type { Photo } from "@/lib/photos";
 
 export type Step = { step_no: number; title: string; products: string[]; instructions: string | null; note: string | null };
+export type Usage = { label: string; unit: string; qty: number };
 export type Change = { id: string; step_no: number; from_product: string | null; to_product: string; reason: string; status: string; review_note: string | null };
 
 export default function ProcedureRunner(props: {
@@ -33,6 +36,7 @@ export default function ProcedureRunner(props: {
   photosRequired: boolean;
   photoSkipReason: string | null;
   photosEditable: boolean;
+  usages: Usage[];
 }) {
   const { apsId, steps, changes, startedAt, doneAt, stepsDone, plannedMinutes } = props;
   const router = useRouter();
@@ -42,6 +46,8 @@ export default function ProcedureRunner(props: {
   const [open, setOpen] = useState<Record<number, boolean>>({});
   const [ask, setAsk] = useState<{ step: number; from: string } | null>(null);
   const [to, setTo] = useState("");
+  const [toId, setToId] = useState<string | null>(null);
+  const [finishing, setFinishing] = useState(false);
   const [reason, setReason] = useState("");
 
   // đồng hồ chạy + cập nhật duyệt đổi sản phẩm
@@ -62,13 +68,19 @@ export default function ProcedureRunner(props: {
   const pct = startedAt ? Math.min(100, Math.round((spentMin / plannedMinutes) * 100)) : 0;
   const stepAt = new Map(props.stepLog.map((l) => [l.step, l.at]));
 
-  async function act(action: "start" | "step" | "finish" | "undo") {
-    if (action === "finish" && total > 0 && stepsDone < total && !confirm(`Còn ${total - stepsDone} bước chưa bấm xong. Vẫn hoàn thành buổi?`)) return;
+  async function act(action: "start" | "step" | "finish" | "undo", choices?: Record<string, string>) {
+    if (action === "finish" && !choices) {
+      // xem trước sản phẩm sẽ trừ rồi mới hoàn thành
+      if (total > 0 && stepsDone < total && !confirm(`Còn ${total - stepsDone} bước chưa bấm xong. Vẫn hoàn thành buổi?`)) return;
+      setError(null);
+      return setFinishing(true);
+    }
     setBusy(true);
     setError(null);
-    const { error: e } = await createClient().rpc("ktv_progress", { p_aps: apsId, p_action: action });
+    const { error: e } = await createClient().rpc("ktv_progress", { p_aps: apsId, p_action: action, p_choices: choices ?? null });
     setBusy(false);
     if (e) return setError(vnError(e.message));
+    if (action === "finish") setFinishing(false);
     router.refresh();
   }
 
@@ -83,11 +95,13 @@ export default function ProcedureRunner(props: {
       p_from: ask.from,
       p_to: to.trim(),
       p_reason: reason.trim(),
+      p_to_product: toId,
     });
     setBusy(false);
     if (e) return setError(vnError(e.message));
     setAsk(null);
     setTo("");
+    setToId(null);
     setReason("");
     router.refresh();
   }
@@ -208,7 +222,7 @@ export default function ProcedureRunner(props: {
               </select>
             )}
             <input className="input py-2 text-sm" placeholder="Sản phẩm gốc (nếu có)" value={ask.from} onChange={(e) => setAsk({ ...ask, from: e.target.value })} />
-            <ProductPicker value={to} onChange={setTo} />
+            <ProductPicker value={to} onChange={(v, id) => { setTo(v); setToId(id ?? null); }} />
             <input className="input py-2 text-sm" placeholder="Lý do (vd da khách đang đỏ)" value={reason} onChange={(e) => setReason(e.target.value)} />
             <div className="flex gap-2">
               <button className="btn-ghost flex-1" onClick={() => setAsk(null)}>Huỷ</button>
@@ -217,6 +231,26 @@ export default function ProcedureRunner(props: {
           </div>
         )}
       </div>
+
+      {finishing && !doneAt && (
+        <div className="px-4 pt-4">
+          <UsagePanel apsId={apsId} busy={busy} onCancel={() => setFinishing(false)} onConfirm={(c) => act("finish", c)} />
+        </div>
+      )}
+
+      {doneAt && props.usages.length > 0 && (
+        <div className="px-4 pt-4">
+          <div className="space-y-1 rounded-[14px] bg-white p-3.5 text-xs">
+            <p className="text-sm font-bold">Đã trừ sản phẩm</p>
+            {props.usages.map((u) => (
+              <p key={u.label} className="flex justify-between gap-2">
+                <span>{u.label}</span>
+                <b className="shrink-0">−{fmtQty(u.qty)} {u.unit}</b>
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!props.closed && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E6DDCC] bg-white px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
