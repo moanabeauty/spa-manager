@@ -16,7 +16,7 @@ export type PendingReceipt = {
   warehouse: string;
   creator: string;
   extra_costs: { label: string; amount: number }[];
-  items: { item_id: string; product_id: string; quantity: number; expiry_date: string | null }[];
+  items: { item_id: string; product_id: string; quantity: number; expiry_date: string | null; pack_size?: number | null }[];
 };
 
 /** Chủ spa: nhập giá niêm yết NCC / chiết khấu / giá nhập cho phiếu do kho lập, sửa phiếu rồi duyệt hoặc không duyệt */
@@ -57,7 +57,8 @@ type Line = {
   key: string;
   item_id: string | null;
   product_id: string;
-  quantity: number;
+  quantity: number; // dòng nhập theo hộp: số HỘP; giá niêm yết / giá nhập cũng theo hộp
+  pack: number | null; // số ống / hộp (dòng kho nhập theo hộp)
   expiry_date: string | null;
   list: number; // 0 = chưa có giá niêm yết
   pct: number | null;
@@ -93,9 +94,10 @@ function ReceiptCard({
       key: i.item_id,
       item_id: i.item_id,
       product_id: i.product_id,
-      quantity: i.quantity,
+      quantity: i.pack_size ? i.quantity / i.pack_size : i.quantity,
+      pack: i.pack_size ?? null,
       expiry_date: i.expiry_date,
-      list: defaultList(i.product_id),
+      list: defaultList(i.product_id) * (i.pack_size ?? 1),
       pct: null,
       pctText: "",
       price: 0,
@@ -156,7 +158,7 @@ function ReceiptCard({
   function addProduct(p: Product) {
     setLines((ls) => [
       ...ls,
-      { key: `new-${Date.now()}`, item_id: null, product_id: p.id, quantity: 1, expiry_date: null, list: defaultList(p.id), pct: null, pctText: "", price: 0 },
+      { key: `new-${Date.now()}`, item_id: null, product_id: p.id, quantity: 1, pack: null, expiry_date: null, list: defaultList(p.id), pct: null, pctText: "", price: 0 },
     ]);
     setSearch("");
     setAdding(false);
@@ -176,11 +178,11 @@ function ReceiptCard({
       p_items: lines.map((l) => ({
         item_id: l.item_id,
         product_id: l.product_id,
-        quantity: l.quantity,
+        quantity: l.quantity * (l.pack ?? 1),
         expiry_date: l.expiry_date,
-        list_price: l.list > 0 ? l.list : null,
+        list_price: l.list > 0 ? Math.round(l.list / (l.pack ?? 1)) : null,
         discount_pct: l.pct,
-        unit_cost: l.price || 0,
+        unit_cost: Math.round((l.price || 0) / (l.pack ?? 1)),
       })),
       p_extra_costs: extras.filter((x) => x.amount > 0).map((x) => ({ label: x.label, amount: x.amount })),
       p_supplier: supplier.trim() || null,
@@ -246,7 +248,7 @@ function ReceiptCard({
                   {!l.item_id && <span className="ml-1 rounded-full bg-[#D6EDD8] px-2 py-0.5 text-[11px] text-[#22612A]">chủ thêm</span>}
                 </p>
                 <p className="text-xs text-ink/55">
-                  {[p?.brand, l.expiry_date ? `HSD ${new Date(l.expiry_date).toLocaleDateString("vi-VN")}` : "chưa ghi HSD", last ? `giá vốn lần trước ${formatVnd(Number(last))}` : null]
+                  {[p?.brand, l.expiry_date ? `HSD ${new Date(l.expiry_date).toLocaleDateString("vi-VN")}` : "chưa ghi HSD", last ? `giá vốn lần trước ${formatVnd(Number(last) * (l.pack ?? 1))}${l.pack ? "/hộp" : ""}` : null]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
@@ -262,7 +264,7 @@ function ReceiptCard({
             </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
               <label className="space-y-1">
-                <span className="block text-ink/60">Số lượng ({p?.unit ?? ""})</span>
+                <span className="block text-ink/60">{l.pack ? `Số hộp (${l.pack} ${p?.unit ?? ""}/hộp)` : `Số lượng (${p?.unit ?? ""})`}</span>
                 <input
                   inputMode="numeric"
                   className="w-full rounded-lg border border-beige-dark bg-white px-2 py-1.5 text-right text-sm"
@@ -271,7 +273,7 @@ function ReceiptCard({
                 />
               </label>
               <label className="space-y-1">
-                <span className="block text-ink/60">Giá niêm yết NCC</span>
+                <span className="block text-ink/60">Giá niêm yết NCC{l.pack ? " / hộp" : ""}</span>
                 <MoneyInput value={l.list} onChange={(n) => setList(l.key, n)} className="w-full" placeholder="trống" ariaLabel="Giá niêm yết NCC" />
               </label>
               <label className="space-y-1">
@@ -286,11 +288,12 @@ function ReceiptCard({
                 />
               </label>
               <label className="space-y-1">
-                <span className="block text-ink/60">Giá nhập</span>
+                <span className="block text-ink/60">Giá nhập{l.pack ? " / hộp" : ""}</span>
                 <MoneyInput value={l.price} onChange={(n) => setPrice(l.key, n)} className="w-full" ariaLabel="Giá nhập" />
               </label>
             </div>
             <p className="text-right text-xs">
+              {l.pack ? <span className="mr-2 text-ink/55">= {l.quantity * l.pack} {p?.unit} · {formatVnd(Math.round((l.price || 0) / l.pack))}/{p?.unit}</span> : null}
               Thành tiền: <b className="text-navy">{formatVnd(l.quantity * (l.price || 0))}</b>
             </p>
           </div>

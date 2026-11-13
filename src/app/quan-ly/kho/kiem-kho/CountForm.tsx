@@ -6,12 +6,12 @@ import { createClient } from "@/lib/supabase/client";
 import { normalizeText, vnError } from "@/lib/format";
 import { cleanBarcode } from "@/lib/inventory";
 import CameraScanner from "@/components/LazyCameraScanner";
+import { initPack } from "@/components/PackQty";
+import PackCell, { cellTotal, cellUsed, savePackChanges, useCells, type CountP } from "./PackCell";
 
-type P = { id: string; label: string; brand: string | null; unit: string; barcode: string | null; qty: number };
-
-export default function CountForm({ warehouseId, products }: { warehouseId: string; products: P[] }) {
+export default function CountForm({ warehouseId, products }: { warehouseId: string; products: CountP[] }) {
   const router = useRouter();
-  const [counted, setCounted] = useState<Record<string, string>>({});
+  const { cells, setCells, setCell } = useCells();
   const [query, setQuery] = useState("");
   const [onlyEntered, setOnlyEntered] = useState(false);
   const [note, setNote] = useState("");
@@ -19,14 +19,16 @@ export default function CountForm({ warehouseId, products }: { warehouseId: stri
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const entered = Object.entries(counted).filter(([, v]) => v !== "" && Number.isInteger(Number(v)) && Number(v) >= 0);
-  const diffs = entered.filter(([id, v]) => Number(v) !== (products.find((p) => p.id === id)?.qty ?? 0));
+  const used = Object.entries(cells).filter(([, c]) => cellUsed(c));
+  const bad = used.filter(([, c]) => cellTotal(c) === null);
+  const entered = used.filter(([, c]) => cellTotal(c) !== null).map(([id, c]) => [id, cellTotal(c) as number] as const);
+  const diffs = entered.filter(([id, v]) => v !== (products.find((p) => p.id === id)?.qty ?? 0));
   const rows = useMemo(() => {
     const q = normalizeText(query.trim());
     return products
       .filter((p) => !q || normalizeText(`${p.brand ?? ""} ${p.label} ${p.barcode ?? ""}`).includes(q))
-      .filter((p) => !onlyEntered || counted[p.id] !== undefined);
-  }, [products, query, onlyEntered, counted]);
+      .filter((p) => !onlyEntered || cells[p.id] !== undefined);
+  }, [products, query, onlyEntered, cells]);
 
   function onScan(raw: string) {
     const c = cleanBarcode(raw);
@@ -34,21 +36,29 @@ export default function CountForm({ warehouseId, products }: { warehouseId: stri
     setScan(false);
     if (!p) return setMsg({ ok: false, text: `Không thấy sản phẩm có mã vạch ${c} trong kho này.` });
     setQuery(p.label);
-    setCounted((x) => ({ ...x, [p.id]: String(Number(x[p.id] || 0) + 1) }));
+    const cur = cells[p.id];
+    const pe = cur?.pe ?? initPack(p);
+    const inc = (s: string) => String(Number(s || 0) + 1);
+    setCell(p.id, { pe: cur?.open && pe.mode === "box" ? { ...pe, boxes: inc(pe.boxes) } : { ...pe, loose: inc(pe.loose) }, open: !!cur?.open });
     setMsg({ ok: true, text: `+1 ${p.label}` });
   }
 
   async function submit() {
     setBusy(true);
     setMsg(null);
+    const perr = await savePackChanges(products, cells);
+    if (perr) {
+      setBusy(false);
+      return setMsg({ ok: false, text: perr });
+    }
     const { error } = await createClient().rpc("submit_stock_count", {
       p_warehouse_id: warehouseId,
-      p_items: entered.map(([product_id, v]) => ({ product_id, counted: Number(v) })),
+      p_items: entered.map(([product_id, v]) => ({ product_id, counted: v })),
       p_note: note,
     });
     setBusy(false);
     if (error) return setMsg({ ok: false, text: vnError(error.message) });
-    setCounted({});
+    setCells({});
     setNote("");
     setMsg({ ok: true, text: diffs.length ? "Đã gửi phiếu kiểm kho. Phần lệch số sẽ cập nhật sau khi chủ spa duyệt." : "Đã lưu phiếu kiểm kho, số liệu khớp." });
     router.refresh();
@@ -65,33 +75,28 @@ export default function CountForm({ warehouseId, products }: { warehouseId: stri
         <label className="flex items-center gap-2 text-xs">
           <input type="checkbox" checked={onlyEntered} onChange={(e) => setOnlyEntered(e.target.checked)} /> Chỉ hiện sản phẩm đã nhập số
         </label>
-        <p className="text-xs text-ink/60">Quét mã vạch: mỗi lần quét +1 cho sản phẩm đó. Ô bỏ trống = không kiểm sản phẩm đó.</p>
+        <p className="text-xs text-ink/60">Quét mã vạch: mỗi lần quét +1 cho sản phẩm đó. Bấm <b>Hộp/ống</b> để đếm theo hộp (số hộp × số ống/hộp) hoặc sửa số ml mỗi ống. Ô bỏ trống = không kiểm sản phẩm đó.</p>
       </div>
 
       <div className="card p-0">
         <ul className="divide-y divide-beige">
           {rows.map((p) => {
-            const v = counted[p.id] ?? "";
-            const d = v === "" ? 0 : Number(v) - p.qty;
+            const c = cells[p.id];
+            const t = cellTotal(c);
+            const d = t === null ? 0 : t - p.qty;
             return (
-              <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
-                <span className="min-w-0">
-                  <span className="font-medium">{p.label}</span>
-                  <span className="block text-xs text-ink/55">{p.brand ?? ""} · trên máy {p.qty} {p.unit}</span>
-                </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  {v !== "" && d !== 0 && <b className={d > 0 ? "text-[#22612A]" : "text-[#8A2323]"}>{d > 0 ? "+" : ""}{d}</b>}
-                  {v !== "" && d === 0 && <span className="text-[#22612A]">✓</span>}
-                  <input
-                    type="number"
-                    min={0}
-                    inputMode="numeric"
-                    className="w-20 rounded-lg border border-beige-dark px-2 py-1.5 text-right"
-                    placeholder="đếm"
-                    value={v}
-                    onChange={(e) => setCounted((x) => ({ ...x, [p.id]: e.target.value }))}
-                  />
-                </span>
+              <li key={p.id} className="space-y-2 px-4 py-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="font-medium">{p.label}</span>
+                    <span className="block text-xs text-ink/55">
+                      {p.brand ?? ""} · trên máy {p.qty} {p.unit}
+                      {t !== null && cellUsed(c) && (d !== 0 ? <b className={`ml-1 ${d > 0 ? "text-[#22612A]" : "text-[#8A2323]"}`}>{d > 0 ? "+" : ""}{d}</b> : <span className="ml-1 text-[#22612A]">✓</span>)}
+                    </span>
+                  </span>
+                  {!c?.open && <PackCell p={p} cell={c} onChange={(x) => setCell(p.id, x)} />}
+                </div>
+                {c?.open && <PackCell p={p} cell={c} onChange={(x) => setCell(p.id, x)} />}
               </li>
             );
           })}
@@ -103,11 +108,12 @@ export default function CountForm({ warehouseId, products }: { warehouseId: stri
         <p>
           Đã đếm <b>{entered.length}</b> sản phẩm · lệch <b className={diffs.length ? "text-[#8A2323]" : ""}>{diffs.length}</b>
         </p>
+        {bad.length > 0 && <p className="text-xs text-[#8A2323]">Còn {bad.length} sản phẩm nhập chưa đủ (số hộp / số ống mỗi hộp).</p>}
         {diffs.length > 0 && (
           <input className={`input py-2 ${note.trim() ? "" : "border-[#E0A526]"}`} placeholder="Lý do lệch (bắt buộc): hàng hỏng, vỡ, đếm sai…" value={note} onChange={(e) => setNote(e.target.value)} />
         )}
         {msg && <p className={msg.ok ? "text-[#22612A]" : "text-[#8A2323]"}>{msg.text}</p>}
-        <button className="btn-primary w-full" disabled={busy || entered.length === 0 || (diffs.length > 0 && !note.trim())} onClick={submit}>
+        <button className="btn-primary w-full" disabled={busy || entered.length === 0 || bad.length > 0 || (diffs.length > 0 && !note.trim())} onClick={submit}>
           {busy ? "Đang lưu…" : "Lưu phiếu kiểm kho"}
         </button>
       </div>

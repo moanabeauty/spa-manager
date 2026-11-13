@@ -26,7 +26,7 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
       let q = supabase
         .from("stock_receipts")
         .select(
-          "id, code, supplier, note, created_at, approved_at, rejected_at, reject_reason, status, warehouses(name), profiles!stock_receipts_created_by_fkey(full_name), stock_receipt_items(id, product_id, quantity, expiry_date)",
+          "id, code, supplier, note, created_at, approved_at, rejected_at, reject_reason, status, warehouses(name), profiles!stock_receipts_created_by_fkey(full_name), stock_receipt_items(id, product_id, quantity, expiry_date, pack_size)",
         )
         .order("created_at", { ascending: false })
         .limit(30);
@@ -36,7 +36,7 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
     isOwner
       ? supabase
           .from("stock_receipts")
-          .select("id, code, supplier, note, created_at, warehouses(name), profiles!stock_receipts_created_by_fkey(full_name), stock_receipt_items(id, product_id, quantity, expiry_date)")
+          .select("id, code, supplier, note, created_at, warehouses(name), profiles!stock_receipts_created_by_fkey(full_name), stock_receipt_items(id, product_id, quantity, expiry_date, pack_size)")
           .eq("status", "pending")
           .order("created_at")
       : Promise.resolve({ data: [] }),
@@ -64,7 +64,7 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
   type PendingRow = {
     id: string; code: string; supplier: string | null; note: string | null; created_at: string;
     warehouses: { name: string } | null; profiles: { full_name: string | null } | null;
-    stock_receipt_items: { id: string; product_id: string; quantity: number; expiry_date: string | null }[];
+    stock_receipt_items: { id: string; product_id: string; quantity: number; expiry_date: string | null; pack_size: number | null }[];
   };
   const pendingRows = (pendingData ?? []) as unknown as PendingRow[];
   const { data: extraData } = pendingRows.length
@@ -80,7 +80,7 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
     warehouse: r.warehouses?.name ?? "",
     creator: r.profiles?.full_name ?? "?",
     extra_costs: extraMap.get(r.id) ?? [],
-    items: r.stock_receipt_items.map((m) => ({ item_id: m.id, product_id: m.product_id, quantity: Number(m.quantity), expiry_date: m.expiry_date })),
+    items: r.stock_receipt_items.map((m) => ({ item_id: m.id, product_id: m.product_id, quantity: Number(m.quantity), expiry_date: m.expiry_date, pack_size: m.pack_size })),
   }));
   const costMap = Object.fromEntries(((costs ?? []) as { product_id: string; cost_price: number | null }[]).map((c) => [c.product_id, c.cost_price]));
 

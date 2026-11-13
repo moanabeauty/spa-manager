@@ -31,11 +31,11 @@ export const REQUEST_STATUS_STYLE: Record<string, string> = {
   cancelled: "bg-[#ECECEC] text-[#666]",
 };
 
-export const UNITS = ["chai", "hộp", "lọ", "ống", "tuýp", "hũ", "túi", "gói", "miếng", "set", "bộ", "cái"];
+export const UNITS = ["chai", "hộp", "lọ", "ống", "tuýp", "hũ", "túi", "gói", "miếng", "cặp", "set", "bộ", "cái"];
 
 /** Cột sản phẩm mọi nhân viên đọc được (không có giá nhập) */
 export const PRODUCT_COLUMNS =
-  "id, name, brand, capacity, volume, unit, barcode, category, used_in, retail_price, for_treatment, for_retail, max_staff_discount_pct, min_stock, note, is_active, sku, expiry_date, deleted_at";
+  "id, name, brand, capacity, volume, unit, barcode, category, used_in, retail_price, for_treatment, for_retail, max_staff_discount_pct, min_stock, note, is_active, sku, expiry_date, deleted_at, pack_size";
 
 export type Product = {
   id: string;
@@ -57,6 +57,7 @@ export type Product = {
   sku: string | null;
   expiry_date: string | null;
   deleted_at?: string | null; // đã xoá mã: ẩn khỏi mọi danh sách, chỉ giữ cho lịch sử
+  pack_size?: number | null; // số đơn vị lẻ (ống / lọ…) trong 1 hộp
 };
 
 export type Warehouse = { id: string; branch_id: string; type: WarehouseType; name: string };
@@ -127,7 +128,7 @@ export const OPEN_LEVELS: { pct: number; label: string }[] = [
 export function openLevelLabel(pct: number): string {
   if (pct >= 100) return "Nguyên chai";
   const hit = OPEN_LEVELS.find((l) => Math.abs(l.pct - pct) < 0.5);
-  return hit ? hit.label : `${Math.round(pct)}%`;
+  return hit ? hit.label : `${Math.round(pct)}%`; // gõ tay số thập phân: hiện %
 }
 
 /** Hàng dùng 1 lần: xuất ra là hết, không thành "chai đang mở" — giống hàm is_single_use_product.
@@ -170,4 +171,15 @@ export async function fetchOpened(supabase: Db, warehouseId: string): Promise<Ma
     out.set(o.product_id, l);
   });
   return out;
+}
+
+/** Đơn vị đếm từng cái (không có dung tích) — khớp hàm _convert_product_pack */
+export const COUNT_UNITS = ["cái", "miếng", "gói", "túi", "cặp", "set", "bộ"];
+
+/** "0,5" / "0.5" → 0.5; rỗng hoặc sai → null */
+export function parseDec(s: string | null | undefined): number | null {
+  const t = (s ?? "").trim().replace(",", ".");
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
 }

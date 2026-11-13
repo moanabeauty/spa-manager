@@ -10,12 +10,14 @@ import {
   WAREHOUSE_LABEL,
   cleanBarcode,
   productLabel,
+  volumeUnit,
   type Product,
   type Warehouse,
   type WarehouseType,
 } from "@/lib/inventory";
 import MoneyInput from "@/components/MoneyInput";
 import CameraScanner from "@/components/LazyCameraScanner";
+import PackQty, { initPack, packChange, packError, packTotal, type PackEntry } from "@/components/PackQty";
 
 export type RecentReceipt = {
   id: string;
@@ -29,14 +31,14 @@ export type RecentReceipt = {
   status: "pending" | "approved" | "rejected";
   warehouses: { name: string } | null;
   profiles: { full_name: string | null } | null;
-  stock_receipt_items: { id: string; product_id: string; quantity: number; expiry_date: string | null }[];
+  stock_receipt_items: { id: string; product_id: string; quantity: number; expiry_date: string | null; pack_size?: number | null }[];
   extra_costs?: { label: string; amount: number }[];
 };
 
 const vnDate = (iso: string) => new Date(iso).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
 const vnDay = (d: string) => d.split("-").reverse().join("/");
 
-type Line = { productId: string; qty: number; exp: string };
+type Line = { productId: string; exp: string; pe: PackEntry };
 type Extra = { key: number; label: string; amount: number };
 
 const EXTRA_PRESETS = ["Tiền ship", "Chi phí khác"];
@@ -88,15 +90,21 @@ export default function ReceiveForm({
     scanRef.current?.focus();
   }, []);
 
-  function addProduct(p: Product, qty = 1) {
+  function addProduct(p: Product) {
+    const inc = (s: string) => String((Number(s) || 0) + 1);
     setLines((ls) => {
       const i = ls.findIndex((l) => l.productId === p.id);
-      if (i >= 0) return ls.map((l, k) => (k === i ? { ...l, qty: l.qty + qty } : l));
-      return [{ productId: p.id, qty, exp: "" }, ...ls];
+      if (i >= 0)
+        return ls.map((l, k) =>
+          k === i ? { ...l, pe: l.pe.mode === "box" ? { ...l.pe, boxes: inc(l.pe.boxes) } : { ...l.pe, loose: inc(l.pe.loose) } } : l,
+        );
+      const pe = initPack(p);
+      return [{ productId: p.id, exp: "", pe: pe.mode === "box" ? { ...pe, boxes: "1" } : { ...pe, loose: "1" } }, ...ls];
     });
-    setFlash(`+${qty} ${productLabel(p)}`);
+    setFlash(`+1 ${p.pack_size ? "hộp" : p.unit} ${productLabel(p)}`);
     setDone(null);
   }
+  const setPe = (id: string, pe: PackEntry) => setLines((ls) => ls.map((x) => (x.productId === id ? { ...x, pe } : x)));
 
   function handleCode(raw: string) {
     const c = cleanBarcode(raw);
@@ -122,7 +130,7 @@ export default function ReceiveForm({
       .slice(0, 8);
   }, [search, products]);
 
-  const totalQty = lines.reduce((a, l) => a + l.qty, 0);
+  const totalQty = lines.reduce((a, l) => a + (packTotal(l.pe, false) ?? 0), 0);
   const extraTotal = extras.reduce((a, x) => a + (x.amount || 0), 0);
   const minExp = useMemo(() => {
     const d = new Date(Date.now() + 7 * 3600 * 1000 + 86400 * 1000); // ngày mai (giờ VN)
@@ -133,14 +141,43 @@ export default function ReceiveForm({
   async function save() {
     if (!type) return setError("Hãy tick chọn nhập vào Kho liệu trình hay Kho bán lẻ.");
     if (!wh || lines.length === 0) return;
+    for (const l of lines) {
+      const p = byId.get(l.productId);
+      const err = packError(l.pe, p);
+      const n = packTotal(l.pe, false);
+      if (err || !n) return setError(`${p ? productLabel(p) : "Sản phẩm"}: ${err ?? "nhập số lượng lớn hơn 0"}`);
+    }
     if (noExp > 0 && !window.confirm(`Còn ${noExp} sản phẩm chưa nhập hạn sử dụng. Vẫn lưu phiếu?`)) return;
     setSaving(true);
     setError(null);
+    // lưu quy cách mới (đơn vị lẻ, ml / ống, số ống / hộp) vào sản phẩm trước
+    const changed: string[] = [];
+    for (const l of lines) {
+      const p = byId.get(l.productId);
+      const ch = p ? packChange(p, l.pe) : null;
+      if (!p || !ch) continue;
+      const { error } = await supabase.rpc("set_product_pack", { p_id: p.id, ...ch });
+      if (error) {
+        setSaving(false);
+        return setError(`${productLabel(p)}: ${vnError(error.message)}`);
+      }
+      changed.push(p.id);
+    }
+    if (changed.length) {
+      const { data: fresh } = await supabase.from("products").select(PRODUCT_COLUMNS).in("id", changed);
+      const m = new Map(((fresh ?? []) as Product[]).map((x) => [x.id, x]));
+      setProducts((ps) => ps.map((x) => m.get(x.id) ?? x));
+    }
     const { data, error } = await supabase.rpc("receive_stock", {
       p_warehouse_id: wh.id,
       p_supplier: supplier,
       p_note: note,
-      p_items: lines.map((l) => ({ product_id: l.productId, quantity: l.qty, expiry_date: l.exp || null })),
+      p_items: lines.map((l) => ({
+        product_id: l.productId,
+        quantity: packTotal(l.pe, false),
+        pack_size: l.pe.mode === "box" ? Number(l.pe.pack) : null,
+        expiry_date: l.exp || null,
+      })),
       p_extra_costs: extras.filter((x) => x.amount > 0).map((x) => ({ label: x.label, amount: x.amount })),
     });
     setSaving(false);
@@ -264,27 +301,8 @@ export default function ReceiveForm({
                   ✕
                 </button>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-                <span className="flex items-center gap-1">
-                  <button className="h-8 w-8 rounded-lg bg-cream text-base font-bold" onClick={() => setLines((ls) => ls.map((x) => (x.productId === l.productId ? { ...x, qty: Math.max(1, x.qty - 1) } : x)))}>
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    min={1}
-                    inputMode="numeric"
-                    className="w-16 rounded-lg border border-beige-dark px-2 py-1.5 text-center text-sm"
-                    value={l.qty}
-                    onChange={(e) => {
-                      const n = Math.max(1, Math.floor(Number(e.target.value) || 1));
-                      setLines((ls) => ls.map((x) => (x.productId === l.productId ? { ...x, qty: n } : x)));
-                    }}
-                  />
-                  <button className="h-8 w-8 rounded-lg bg-cream text-base font-bold" onClick={() => setLines((ls) => ls.map((x) => (x.productId === l.productId ? { ...x, qty: x.qty + 1 } : x)))}>
-                    +
-                  </button>
-                  <span className="ml-1">{p.unit}</span>
-                </span>
+              <div className="mt-2 space-y-2 text-xs">
+                <PackQty value={l.pe} onChange={(pe) => setPe(l.productId, pe)} product={p} volUnit={volumeUnit(p.capacity, p.unit) === "g" ? "g" : "ml"} />
                 <label className="flex items-center gap-1">
                   Hạn sử dụng
                   <input
@@ -423,7 +441,10 @@ export default function ReceiveForm({
                             return (
                               <tr key={it.id}>
                                 <td className="px-2 py-1">{p ? productLabel(p) : "(sản phẩm đã xoá)"}</td>
-                                <td className="px-2 py-1 text-right">{it.quantity}{p ? ` ${p.unit}` : ""}</td>
+                                <td className="px-2 py-1 text-right">
+                                  {it.quantity}{p ? ` ${p.unit}` : ""}
+                                  {it.pack_size ? <span className="block text-ink/55">{it.quantity / it.pack_size} hộp × {it.pack_size}</span> : null}
+                                </td>
                                 <td className={`px-2 py-1 text-right ${it.expiry_date ? "" : "text-[#7A5600]"}`}>{it.expiry_date ? vnDay(it.expiry_date) : "chưa nhập"}</td>
                               </tr>
                             );
