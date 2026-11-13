@@ -29,8 +29,8 @@ as $function$
     when coalesce(p_volume, 1) <= 1 then
       case when p_pack is not null then 'Hộp ' || p_pack || ' ' || p_unit else '1 ' || p_unit end
     when p_pack is not null then
-      'Hộp ' || p_pack || ' ' || p_unit || ' x ' || rtrim(to_char(p_volume, 'FM999999990.###'), '.') || coalesce(nullif(p_vu, ''), 'ml')
-    else initcap(p_unit) || ' ' || rtrim(to_char(p_volume, 'FM999999990.###'), '.') || coalesce(nullif(p_vu, ''), 'ml')
+      'Hộp ' || p_pack || ' ' || p_unit || ' x ' || trim_scale(p_volume)::text || coalesce(nullif(p_vu, ''), 'ml')
+    else initcap(p_unit) || ' ' || trim_scale(p_volume)::text || coalesce(nullif(p_vu, ''), 'ml')
   end
 $function$;
 
@@ -258,3 +258,4 @@ begin
   end loop;
   return v_id;
 end $function$;
+-- (đã sửa: dùng trim_scale để 2.5 không bị làm tròn thành 3)
