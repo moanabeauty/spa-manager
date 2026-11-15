@@ -115,7 +115,7 @@ export default async function LiabilitiesPage({ searchParams }: { searchParams: 
         <div className="card p-3">
           <p className="text-xs text-ink/60">Giá trị combo còn nợ</p>
           <p className="mt-1 text-lg font-bold text-navy">{formatVnd(pkgOwed)}</p>
-          <p className="text-[11px] text-ink/50">giá mua − buổi đã dùng × giá lẻ</p>
+          <p className="text-[11px] text-ink/50">giá gói × phần buổi chưa làm (theo giá lẻ)</p>
         </div>
         <div className="card p-3">
           <p className="text-xs text-ink/60">Số dư thẻ của khách</p>
@@ -171,8 +171,8 @@ export default async function LiabilitiesPage({ searchParams }: { searchParams: 
 
       <p className="text-xs text-ink/60">
         Ví dụ thẻ: khách nạp 10.000.000đ được 13.000.000đ (tặng 3tr), còn số dư 6.500.000đ thì spa thực nợ 6.500.000 × 10/13 =
-        5.000.000đ. Gói combo: giá trị còn nợ = giá khách trả cho gói − số buổi đã làm × giá lẻ / buổi (giống cách tính khi huỷ gói hoàn
-        tiền). Gói không giới hạn buổi (vd Glow Infinite) ghi "∞" đến khi hết hạn.
+        5.000.000đ. Gói combo: giá trị còn nợ = giá khách trả cho gói × (giá lẻ các buổi chưa làm / tổng giá lẻ cả gói). Khi huỷ gói, tiền hoàn
+        vẫn tính theo cách cũ: giá gói − buổi đã làm × giá lẻ. Gói không giới hạn buổi (vd Glow Infinite) ghi "∞" đến khi hết hạn.
       </p>
     </div>
   );
