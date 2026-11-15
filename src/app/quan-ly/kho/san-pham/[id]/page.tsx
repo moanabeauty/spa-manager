@@ -34,6 +34,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     const { data: costs } = await supabase.rpc("product_costs");
     cost = ((costs ?? []) as { product_id: string; cost_price: number | null }[]).find((c) => c.product_id === id)?.cost_price ?? null;
   }
+  // giá nhập trung bình (bình quân các lô còn trong kho) – chỉ Chủ
+  let avg: { avg_cost: number | null; stock_qty: number } | null = null;
+  if (profile?.role === "owner") {
+    const { data: a } = await supabase.rpc("product_avg_costs", { p_ids: [id] });
+    avg = ((a ?? []) as { avg_cost: number | null; stock_qty: number }[])[0] ?? null;
+  }
   const warehouses = (whs ?? []) as Warehouse[];
   const qty = new Map(((levels ?? []) as { warehouse_id: string; quantity: number }[]).map((l) => [l.warehouse_id, Number(l.quantity)]));
   const whName = (wid: string) => warehouses.find((w) => w.id === wid)?.name ?? "";
@@ -60,7 +66,17 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     ...(p.retail_price != null && p.for_retail
       ? [["Bán thấp nhất (NV)", formatVnd(retailMinPrice(Number(p.retail_price), p.max_staff_discount_pct, pct))] as [string, React.ReactNode]]
       : []),
-    ...(canEdit ? [["Giá nhập", cost != null ? formatVnd(cost) : "—"] as [string, React.ReactNode]] : []),
+    ...(canEdit ? [[avg ? "Giá nhập lần cuối" : "Giá nhập", cost != null ? formatVnd(cost) : "—"] as [string, React.ReactNode]] : []),
+    ...(avg
+      ? [["Giá nhập trung bình", (
+          <span key="avg">
+            <b className="text-[#8A2323]">{avg.avg_cost != null ? formatVnd(Number(avg.avg_cost)) : "—"}</b>
+            <span className="block text-[11px] text-ink/50">
+              {Number(avg.stock_qty) > 0 ? `bình quân ${Number(avg.stock_qty)} ${p.unit} còn trong kho` : "kho hết hàng · theo lần nhập cuối"}
+            </span>
+          </span>
+        )] as [string, React.ReactNode]]
+      : []),
     ["Báo sắp hết khi còn ≤", String(p.min_stock)],
     ["Trạng thái", p.is_active ? "Đang lưu hành" : "Ngừng lưu hành"],
     ...(p.note ? [["Ghi chú", p.note] as [string, React.ReactNode]] : []),

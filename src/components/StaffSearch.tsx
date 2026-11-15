@@ -16,6 +16,7 @@ type Hit = {
   brand?: string | null;
   list_price?: number | null;
   min_price?: number | null;
+  avg_cost?: number | null;
 };
 const KIND: Record<Hit["kind"], { label: string; href: (id: string) => string }> = {
   customer: { label: "Khách hàng", href: (id) => `/quan-ly/khach-hang?id=${id}` },
@@ -67,9 +68,19 @@ export default function StaffSearch() {
     setBusy(true);
     let alive = true; // gõ tiếp thì bỏ kết quả cũ về muộn (tránh hiện sai kết quả)
     const id = setTimeout(async () => {
-      const { data } = await createClient().rpc("staff_search_v3", { p_q: t });
+      const sb = createClient();
+      const { data } = await sb.rpc("staff_search_v3", { p_q: t });
       if (!alive) return;
-      setHits((data ?? []) as Hit[]);
+      let list = (data ?? []) as Hit[];
+      // giá nhập trung bình: chỉ tài khoản Chủ nhận được số (người khác hàm trả về rỗng)
+      const ids = list.filter((h) => h.kind === "product").map((h) => h.id);
+      if (ids.length) {
+        const { data: costs } = await sb.rpc("product_avg_costs", { p_ids: ids });
+        if (!alive) return;
+        const m = new Map(((costs ?? []) as { product_id: string; avg_cost: number | null }[]).map((c) => [c.product_id, c.avg_cost]));
+        if (m.size) list = list.map((h) => (m.has(h.id) ? { ...h, avg_cost: m.get(h.id) } : h));
+      }
+      setHits(list);
       setBusy(false);
     }, 250);
     return () => {
@@ -171,7 +182,7 @@ export default function StaffSearch() {
   );
 }
 
-/** Dòng gợi ý sản phẩm: Dung tích · Nhãn hàng, rồi Giá niêm yết · Giá bán thấp nhất của KTV (chỉ hàng bán lẻ) */
+/** Dòng gợi ý sản phẩm: Dung tích · Nhãn hàng, rồi Giá niêm yết · Giá bán thấp nhất của KTV (chỉ hàng bán lẻ) · Giá nhập TB (chỉ Chủ) */
 function ProductLine({ h }: { h: Hit }) {
   const info = [h.capacity, h.brand].filter(Boolean).join(" · ");
   const hasPrice = h.list_price != null;
@@ -191,6 +202,11 @@ function ProductLine({ h }: { h: Hit }) {
         </span>
       ) : (
         h.subtitle && <span className="block text-xs italic text-ink/50">{h.subtitle}</span>
+      )}
+      {h.avg_cost !== undefined && (
+        <span className="mt-0.5 block text-xs">
+          Giá nhập TB: <b className="text-[#8A2323]">{h.avg_cost != null ? formatVnd(Number(h.avg_cost)) : "chưa có"}</b>
+        </span>
       )}
     </>
   );
