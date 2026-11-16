@@ -8,6 +8,7 @@ import { VoucherReview } from "../phieu-thu-chi/VoucherForm";
 import { CountReview } from "../kho/kiem-kho/CountForm";
 import RequestCard, { type StockRequest } from "../kho/xin-xuat/RequestCard";
 import StockConfirmReview from "./StockConfirmReview";
+import PackageReview from "./PackageReview";
 
 export const metadata = { title: "Việc chờ duyệt – Moana Beauty" };
 
@@ -35,7 +36,7 @@ export default async function ApprovalsPage() {
     .order("created_at");
   if (!O) discQ = discQ.eq("kind", "debt");
 
-  const [discR, vouR, attR, otR, earlyR, fixR, leaveR, chgR, reqR, branchR, countR, recR, mkR, staffR, cfgR, cfmR] = await Promise.all([
+  const [discR, vouR, attR, otR, earlyR, fixR, leaveR, chgR, reqR, branchR, countR, recR, mkR, staffR, cfgR, cfmR, pkgR, pkgCostR] = await Promise.all([
     discQ,
     supabase
       .from("cashbook_entries")
@@ -99,6 +100,14 @@ export default async function ApprovalsPage() {
           .eq("status", "pending")
           .order("created_at")
       : none,
+    O
+      ? supabase
+          .from("packages")
+          .select("id, name, price, category, approval_reason, submitted_at, submitter:profiles!packages_submitted_by_fkey(full_name), package_items(label, quantity, sort_order)")
+          .eq("approval_status", "pending")
+          .order("submitted_at")
+      : none,
+    O ? supabase.rpc("pending_package_costs") : none,
   ]);
 
   const disc = (discR.data ?? []) as unknown as {
@@ -143,7 +152,16 @@ export default async function ApprovalsPage() {
     appointment_services: { services: { name_en: string | null; name: string } | null; appointments: { customers: { full_name: string } | null } | null } | null;
   }[];
 
+  const pkgs = (pkgR.data ?? []) as unknown as {
+    id: string; name: string; price: number; category: string | null; approval_reason: string | null; submitted_at: string | null;
+    submitter: Named; package_items: { label: string; quantity: number | null; sort_order: number }[];
+  }[];
+  const pkgCost = new Map(
+    ((pkgCostR.data ?? []) as { package_id: string; cost: number; missing: number; unlimited: boolean; retail: number }[]).map((c) => [c.package_id, c]),
+  );
+
   const total =
+    pkgs.length +
     confirms.length +
     disc.length + vouchers.length + att.length + ot.length + early.length + fixes.length + leaves.length + changes.length + stockReqs.length + counts.length + receipts.length + posts.length;
 
@@ -158,6 +176,7 @@ export default async function ApprovalsPage() {
     { id: "kiem-kho", label: "Kiểm kho lệch", n: counts.length },
     { id: "nhap-hang", label: "Phiếu nhập", n: receipts.length },
     { id: "marketing", label: "Bài Marketing", n: posts.length },
+    { id: "combo", label: "Combo mới", n: pkgs.length },
   ].filter((j) => j.n > 0);
 
   const item = "rounded-xl border border-[#F0DFB4] bg-[#FFF8E8] px-3 py-2.5 text-sm";
@@ -387,6 +406,50 @@ export default async function ApprovalsPage() {
             </Link>
           ))}
           <p className="text-xs text-ink/55">Phiếu nhập cần điền giá mua nên mở ở trang Nhập hàng để duyệt.</p>
+        </Section>
+      )}
+
+      {pkgs.length > 0 && (
+        <Section id="combo" title="Combo chờ duyệt (cost cao hơn giá bán…)" more="/quan-ly/goi-combo">
+          {pkgs.map((p) => {
+            const c = pkgCost.get(p.id);
+            const loss = c ? Number(c.cost) > Number(p.price) : false;
+            return (
+              <div key={p.id} className={item}>
+                <div className="flex flex-wrap justify-between gap-2">
+                  <p className="font-semibold text-navy">
+                    {p.name}
+                    {p.category ? <span className="font-normal text-ink/60"> · {p.category}</span> : null}
+                  </p>
+                  <span className="text-xs text-ink/60">
+                    {p.submitter?.full_name ?? "?"}
+                    {p.submitted_at ? ` · ${when(p.submitted_at)}` : ""}
+                  </span>
+                </div>
+                <p className="text-xs text-ink/70">
+                  {[...p.package_items]
+                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .map((i) => `${i.label} ${i.quantity === null ? "(không giới hạn)" : `×${i.quantity}`}`)
+                    .join(" · ")}
+                </p>
+                <p className="mt-1 text-sm">
+                  Giá bán <b className="text-navy">{formatVnd(Number(p.price))}</b>
+                  {c && Number(c.retail) > 0 && <> · giá lẻ {formatVnd(Number(c.retail))}</>}
+                  {c && (
+                    <>
+                      {" "}· cost <b className={loss ? "text-[#8A2323]" : ""}>{formatVnd(Number(c.cost))}</b>
+                      {loss && <b className="text-[#8A2323]"> (lỗ {formatVnd(Number(c.cost) - Number(p.price))})</b>}
+                    </>
+                  )}
+                </p>
+                <p className="text-xs">
+                  Lý do: {p.approval_reason}
+                  {c && c.missing > 0 ? ` · ${c.missing} sản phẩm chưa có giá nhập` : ""}
+                </p>
+                <PackageReview id={p.id} />
+              </div>
+            );
+          })}
         </Section>
       )}
 

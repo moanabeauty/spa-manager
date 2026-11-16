@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatVnd, normalizeText, vnError } from "@/lib/format";
@@ -16,6 +16,9 @@ export type Pkg = {
   category: string | null;
   sort_order: number;
   menu_tier: "public" | "private";
+  approval_status: "approved" | "pending" | "rejected";
+  approval_reason: string | null;
+  review_note: string | null;
   package_items: {
     id: string;
     label: string;
@@ -26,7 +29,8 @@ export type Pkg = {
     package_item_services: { service_id: string }[];
   }[];
 };
-type Svc = { id: string; name: string; name_en: string | null; price: number | null };
+type Svc = { id: string; name: string; name_en: string | null; price: number | null; category_id: string | null };
+type Cat = { id: string; name: string };
 type Part = { key: number; label: string; note: string; unlimited: boolean; quantity: number; unit_price: number; service_ids: string[] };
 type Draft = {
   id: string | null;
@@ -77,15 +81,75 @@ function ServicePicker({ services, onPick, exclude }: { services: Svc[]; onPick:
   );
 }
 
-export default function PackageEditor({ packages, services }: { packages: Pkg[]; services: Svc[] }) {
+function GroupPicker({ categories, services, onPick }: { categories: Cat[]; services: Svc[]; onPick: (ids: string[], minPrice: number) => void }) {
+  const [cat, setCat] = useState("");
+  const [maxPrice, setMaxPrice] = useState(0);
+  const inGroup = services.filter((s) => s.category_id === cat && (!maxPrice || Number(s.price ?? 0) <= maxPrice));
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+      <select className="rounded-lg border border-beige-dark bg-white px-2 py-1.5" value={cat} onChange={(e) => setCat(e.target.value)}>
+        <option value="">+ Chọn cả nhóm liệu trình…</option>
+        {categories
+          .filter((c) => services.some((s) => s.category_id === c.id))
+          .map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name} ({services.filter((s) => s.category_id === c.id).length})
+            </option>
+          ))}
+      </select>
+      {cat && (
+        <>
+          <label className="flex items-center gap-1">
+            giá lẻ tối đa
+            <MoneyInput value={maxPrice} onChange={setMaxPrice} className="w-24" ariaLabel="Giá lẻ tối đa trong nhóm" />
+          </label>
+          <button
+            type="button"
+            className="btn-ghost px-2 py-1 text-xs"
+            disabled={inGroup.length === 0}
+            onClick={() => {
+              onPick(inGroup.map((s) => s.id), Math.min(...inGroup.map((s) => Number(s.price ?? 0))));
+              setCat("");
+              setMaxPrice(0);
+            }}
+          >
+            Thêm {inGroup.length} liệu trình
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function PackageEditor({ packages, services, categories, isOwner }: { packages: Pkg[]; services: Svc[]; categories: Cat[]; isOwner: boolean }) {
   const router = useRouter();
   const byId = useMemo(() => new Map(services.map((s) => [s.id, s])), [services]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  // Chỉ chủ: cost từng liệu trình (máy chủ trả rỗng với tài khoản khác)
+  const [svcCost, setSvcCost] = useState<Map<string, { cost: number; missing: number }>>(new Map());
+  const draftIds = draft ? Array.from(new Set(draft.parts.flatMap((p) => p.service_ids))).sort().join(",") : "";
+  useEffect(() => {
+    if (!isOwner || !draftIds) return;
+    const ids = draftIds.split(",").filter((id) => !svcCost.has(id));
+    if (ids.length === 0) return;
+    createClient()
+      .rpc("service_costs", { p_ids: ids })
+      .then(({ data }) => {
+        if (!data) return;
+        setSvcCost((m) => {
+          const n = new Map(m);
+          for (const r of data as { service_id: string; cost: number; missing: number }[]) n.set(r.service_id, { cost: Number(r.cost), missing: r.missing });
+          return n;
+        });
+      });
+  }, [isOwner, draftIds, svcCost]);
 
   function edit(p: Pkg) {
     setError(null);
+    setNotice(null);
     setDraft({
       id: p.id,
       name: p.name,
@@ -93,7 +157,7 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
       price: Number(p.price),
       validity: p.validity_days ? String(p.validity_days) : "",
       category: p.category ?? "",
-      is_active: p.is_active,
+      is_active: p.approval_status === "approved" ? p.is_active : true,
       menu_tier: p.menu_tier,
       parts: [...p.package_items]
         .sort((a, b) => a.sort_order - b.sort_order)
@@ -117,8 +181,13 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
 
   async function save() {
     if (!draft) return;
+    if (isOwner && costInfo.ready && costInfo.cost > draft.price && draft.price > 0) {
+      if (!window.confirm(`Cost liệu trình (${formatVnd(costInfo.cost)}) đang CAO HƠN giá bán (${formatVnd(draft.price)}). Vẫn lưu combo này?`)) return;
+    }
+    if (draft.price <= 0) return setError("Vui lòng nhập giá bán combo");
     setSaving(true);
     setError(null);
+    setNotice(null);
     const supabase = createClient();
     const { data: savedId, error } = await supabase.rpc("save_package", {
       p_id: draft.id,
@@ -140,17 +209,30 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
       setSaving(false);
       return setError(vnError(error.message));
     }
-    const { error: tierError } = await supabase
-      .from("packages")
-      .update({ menu_tier: draft.menu_tier })
-      .eq("id", (savedId as string) ?? draft.id);
+    const pid = (savedId as string) ?? draft.id;
+    const { error: tierError } = await supabase.from("packages").update({ menu_tier: draft.menu_tier }).eq("id", pid);
+    const { data: st } = await supabase.from("packages").select("approval_status, approval_reason").eq("id", pid).maybeSingle();
     setSaving(false);
     if (tierError) return setError(vnError(tierError.message));
     setDraft(null);
+    if (st?.approval_status === "pending") {
+      setNotice(`⚠ Combo “${draft.name}” chưa được bán: ${st.approval_reason ?? "cần chủ kiểm tra"}. Đã gửi chủ spa duyệt.`);
+    }
     router.refresh();
   }
 
   const retail = draft ? draft.parts.reduce((a, p) => a + (p.unlimited ? 0 : p.unit_price * p.quantity), 0) : 0;
+  const partCost = (p: Part) => (p.service_ids.length ? Math.max(...p.service_ids.map((id) => svcCost.get(id)?.cost ?? 0)) : 0);
+  const costInfo = useMemo(() => {
+    if (!draft || !isOwner) return { ready: false, cost: 0, missing: 0, unlimited: false };
+    const ids = draft.parts.flatMap((p) => p.service_ids);
+    return {
+      ready: ids.length > 0 && ids.every((id) => svcCost.has(id)),
+      cost: draft.parts.reduce((a, p) => a + (p.unlimited ? 0 : p.quantity * partCost(p)), 0),
+      missing: ids.reduce((a, id) => a + (svcCost.get(id)?.missing ?? 0), 0),
+      unlimited: draft.parts.some((p) => p.unlimited),
+    };
+  }, [draft, isOwner, svcCost]);
 
   return (
     <div className="space-y-4">
@@ -160,11 +242,13 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
           <p className="text-sm text-ink/70">{packages.filter((p) => p.is_active).length} gói đang bán. Bấm vào gói để sửa.</p>
         </div>
         {!draft && (
-          <button className="btn-primary" onClick={() => { setError(null); setDraft({ id: null, name: "", description: "", price: 0, validity: "", category: "", is_active: true, menu_tier: "private", parts: [newPart()] }); }}>
+          <button className="btn-primary" onClick={() => { setError(null); setNotice(null); setDraft({ id: null, name: "", description: "", price: 0, validity: "", category: "", is_active: true, menu_tier: "private", parts: [newPart()] }); }}>
             + Tạo gói
           </button>
         )}
       </div>
+
+      {notice && <p className="card border-[#E8B4B4] bg-[#FDECEC] text-sm font-medium text-[#8A2323]">{notice}</p>}
 
       {draft && (
         <div className="card space-y-3">
@@ -175,7 +259,7 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="label">Giá combo</span>
+              <span className="label">Giá bán combo</span>
               <MoneyInput value={draft.price} onChange={(n) => setDraft({ ...draft, price: n })} className="w-full py-2.5 text-base" ariaLabel="Giá gói" />
             </label>
             <label className="block">
@@ -251,6 +335,22 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
                   ))}
                 </div>
                 {p.service_ids.length > 1 && <p className="mt-1 text-xs text-ink/60">KTV chọn 1 trong các dịch vụ trên cho mỗi buổi, trừ chung vào số buổi của phần này.</p>}
+                {isOwner && p.service_ids.length > 0 && svcCost.size > 0 && (
+                  <p className="mt-1 text-[11px] text-[#7A5A12]">
+                    🔒 Cost {p.service_ids.length > 1 ? "cao nhất " : ""}{formatVnd(partCost(p))} / buổi
+                    {!p.unlimited && ` · ${formatVnd(partCost(p) * p.quantity)} cho ${p.quantity} buổi`}
+                  </p>
+                )}
+                <GroupPicker
+                  categories={categories}
+                  services={services}
+                  onPick={(ids, minPrice) =>
+                    setPart(p.key, {
+                      service_ids: Array.from(new Set([...p.service_ids, ...ids])),
+                      unit_price: p.unit_price || minPrice,
+                    })
+                  }
+                />
                 <ServicePicker
                   services={services}
                   exclude={p.service_ids}
@@ -267,10 +367,36 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
               + Thêm liệu trình
             </button>
             {retail > 0 && (
-              <p className="text-xs text-ink/60">
-                Tổng giá lẻ: {formatVnd(retail)}
-                {draft.price > 0 && draft.price < retail && ` · giảm ${Math.round((1 - draft.price / retail) * 100)}%`}
-              </p>
+              <div className="rounded-xl bg-cream px-3 py-2 text-sm">
+                <p className="flex justify-between">
+                  <span>Tổng giá lẻ các buổi</span> <b>{formatVnd(retail)}</b>
+                </p>
+                <p className="flex justify-between">
+                  <span>Giá bán combo</span>
+                  <b className="text-navy">
+                    {draft.price > 0 ? formatVnd(draft.price) : "chưa nhập"}
+                    {draft.price > 0 && draft.price < retail && ` (giảm ${Math.round((1 - draft.price / retail) * 100)}%)`}
+                  </b>
+                </p>
+                {isOwner && costInfo.ready && (
+                  <>
+                    <p className={`flex justify-between ${draft.price > 0 && costInfo.cost > draft.price ? "font-semibold text-[#8A2323]" : "text-[#7A5A12]"}`}>
+                      <span>🔒 Cost liệu trình (chỉ chủ thấy)</span>
+                      <b>
+                        {formatVnd(costInfo.cost)}
+                        {draft.price > 0 && ` · ${Math.round((costInfo.cost / draft.price) * 100)}% giá bán`}
+                      </b>
+                    </p>
+                    {draft.price > 0 && costInfo.cost > draft.price && <p className="text-xs font-semibold text-[#8A2323]">⚠ Cost cao hơn giá bán – combo đang lỗ.</p>}
+                    {(costInfo.missing > 0 || costInfo.unlimited) && (
+                      <p className="text-xs text-ink/60">
+                        {costInfo.missing > 0 && `${costInfo.missing} sản phẩm chưa có giá nhập (chưa tính). `}
+                        {costInfo.unlimited && "Phần không giới hạn buổi chưa tính vào cost."}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </div>
 
@@ -289,6 +415,7 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
             </button>
           </div>
           <p className="text-xs text-ink/50">
+            {!isOwner && "Hệ thống tự kiểm tra chi phí liệu trình: nếu giá bán thấp hơn chi phí, combo sẽ chưa được bán và chuyển chủ spa duyệt. "}
             Giá lẻ / buổi dùng để tính tiền hoàn khi khách huỷ gói (giá gói − số buổi đã dùng × giá lẻ). Sửa gói không ảnh hưởng gói khách đã mua.
           </p>
           {error && <p className="text-sm text-[#8A2323]">{error}</p>}
@@ -306,6 +433,8 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
             <div className="flex justify-between gap-3">
               <p className="font-semibold">
                 {p.name} {!p.is_active && <span className="text-xs font-normal text-ink/60">(ngừng bán)</span>}
+                {p.approval_status === "pending" && <span className="ml-1.5 rounded-full bg-[#FFE7C2] px-2 text-[10px] font-semibold text-[#8A4B0C]">⏳ Chờ chủ duyệt</span>}
+                {p.approval_status === "rejected" && <span className="ml-1.5 rounded-full bg-[#FDECEC] px-2 text-[10px] font-semibold text-[#8A2323]">✕ Chủ từ chối</span>}
                 <span className={`ml-1.5 rounded-full px-2 text-[10px] font-normal ${p.menu_tier === "public" ? "bg-[#D6EDD8] text-[#22612A]" : "bg-[#DCE3F5] text-navy"}`}>
                   {p.menu_tier === "public" ? "👁 Public" : "🔒 Private"}
                 </span>
@@ -320,6 +449,8 @@ export default function PackageEditor({ packages, services }: { packages: Pkg[];
                 .join(" · ")}
               {p.validity_days ? ` · hạn ${p.validity_days} ngày` : ""}
             </p>
+            {p.approval_status === "pending" && p.approval_reason && <p className="mt-1 text-xs text-[#8A4B0C]">Lý do chờ duyệt: {p.approval_reason}</p>}
+            {p.approval_status === "rejected" && <p className="mt-1 text-xs text-[#8A2323]">Chủ từ chối{p.review_note ? `: ${p.review_note}` : ""} – sửa lại rồi lưu để gửi duyệt lại.</p>}
           </button>
         ))}
       </div>
