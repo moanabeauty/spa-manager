@@ -109,7 +109,8 @@ export default function ReceiveForm({
   function handleCode(raw: string) {
     const c = cleanBarcode(raw);
     if (!c) return;
-    const p = byBarcode.get(c);
+    // mã vạch, hoặc mã sản phẩm (SKU) gõ tay
+    const p = byBarcode.get(c) ?? products.find((x) => !x.deleted_at && x.sku && x.sku.toLowerCase() === c.toLowerCase());
     if (p) {
       addProduct(p);
       setUnknown(null);
@@ -126,7 +127,7 @@ export default function ReceiveForm({
     if (!q) return [];
     return products
       .filter((p) => !p.deleted_at)
-      .filter((p) => normalizeText(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""}`).includes(q))
+      .filter((p) => normalizeText(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""} ${p.sku ?? ""} ${p.barcode ?? ""}`).includes(q))
       .slice(0, 8);
   }, [search, products]);
 
@@ -255,7 +256,7 @@ export default function ReceiveForm({
         <div>
           <input
             className="input py-2 text-sm"
-            placeholder="Hoặc tìm sản phẩm theo tên (hàng không có mã vạch)…"
+            placeholder="Hoặc tìm theo tên / mã sản phẩm / mã vạch…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
