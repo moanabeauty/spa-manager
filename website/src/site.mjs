@@ -60,14 +60,14 @@ export const BRANDS = [
 // Nhóm liệu trình trên trang chủ: khớp theo tên nhóm trong app (service_categories).
 // Nhóm chỉ hiện khi có ít nhất 1 liệu trình Public.
 export const GROUPS = [
-  { slug: 'cham-soc-da-co-ban', match: 'Essential Treatment', title: 'Chăm sóc da cơ bản', tags: 'Làm sạch sâu / Cấp ẩm / Làm dịu', image: 'co-ban' },
-  { slug: 'biologique-recherche', match: 'Biologique Recherche', title: 'Biologique Recherche', tags: 'Cấp ẩm / Phục hồi / Nâng cơ', image: 'biologique' },
-  { slug: 'peel', match: 'Chemical Peel', title: 'Peel căng bóng', tags: 'Căng bóng / Đều màu da', image: 'peel' },
-  { slug: 'phi-kim', match: 'MTS', title: 'Phi kim MTS', tags: 'Lỗ chân lông / Đều màu / Căng bóng', image: 'phi-kim' },
-  { slug: 'vung-mat', match: 'Eyezone', title: 'Chăm sóc vùng mắt', tags: 'Thư giãn / Săn chắc / Trẻ hoá', image: 'vung-mat' },
-  { slug: 'body', match: 'Body', title: 'Chăm sóc body', tags: 'Sáng da / Mụn lưng / Sau nắng', image: 'body' },
-  { slug: 'toc-da-dau', match: 'Hair & Scalp', title: 'Tóc & da đầu', tags: 'Gội đầu / Detox da đầu / Tóc rụng', image: 'thu-gian' },
-  { slug: 'triet-long', match: 'Triệt lông', title: 'Triệt lông', tags: 'Mặt / Nách / Tay chân / Toàn thân', image: 'hoa-thu-gian' },
+  { slug: 'cham-soc-da-co-ban', intro: 'Các liệu trình nền tảng giúp làm sạch, cấp ẩm và làm dịu da — phù hợp để duy trì làn da khoẻ theo định kỳ.', match: 'Essential Treatment', title: 'Chăm sóc da cơ bản', tags: 'Làm sạch sâu / Cấp ẩm / Làm dịu', image: 'co-ban' },
+  { slug: 'biologique-recherche', intro: 'Liệu trình cùng sản phẩm Biologique Recherche (Pháp), được Moana lựa chọn theo tình trạng da của bạn ở từng buổi.', match: 'Biologique Recherche', title: 'Biologique Recherche', tags: 'Cấp ẩm / Phục hồi / Nâng cơ', image: 'biologique' },
+  { slug: 'peel', intro: 'Peel căng bóng với hai lựa chọn có bong và không bong — Moana tư vấn theo tình trạng da và lịch sinh hoạt của bạn.', match: 'Chemical Peel', title: 'Peel căng bóng', tags: 'Căng bóng / Đều màu da', image: 'peel' },
+  { slug: 'phi-kim', intro: 'Các liệu trình phi kim hướng tới từng nhu cầu riêng: cấp ẩm, sáng da, lỗ chân lông hay phục hồi da yếu.', match: 'MTS', title: 'Phi kim MTS', tags: 'Lỗ chân lông / Đều màu / Căng bóng', image: 'phi-kim' },
+  { slug: 'vung-mat', intro: 'Chăm sóc riêng cho vùng da mỏng quanh mắt, kết hợp thư giãn.', match: 'Eyezone', title: 'Chăm sóc vùng mắt', tags: 'Thư giãn / Săn chắc / Trẻ hoá', image: 'vung-mat' },
+  { slug: 'body', intro: 'Chăm sóc da body theo nhu cầu: sáng da, mụn lưng, phục hồi sau nắng.', match: 'Body', title: 'Chăm sóc body', tags: 'Sáng da / Mụn lưng / Sau nắng', image: 'body' },
+  { slug: 'toc-da-dau', intro: 'Gội đầu thư giãn và chăm sóc da đầu cùng sản phẩm Oway.', match: 'Hair & Scalp', title: 'Tóc & da đầu', tags: 'Gội đầu / Detox da đầu / Tóc rụng', image: 'thu-gian' },
+  { slug: 'triet-long', intro: 'Triệt lông theo từng vùng, từ mặt đến toàn thân.', match: 'Triệt lông', title: 'Triệt lông', tags: 'Mặt / Nách / Tay chân / Toàn thân', image: 'hoa-thu-gian' },
 ];
 
 // Liệu trình nổi bật trên trang chủ: khớp theo tên tiếng Anh (name_en) trong app.
@@ -80,3 +80,36 @@ export const FEATURED = [
 
 // 4 sản phẩm BR giới thiệu trên trang chủ (theo mã SP). Thiếu mã nào thì lấy sản phẩm khác cùng danh sách web.
 export const HOME_PRODUCTS = ['LOP5150', 'MAVIV100', 'FLVIPO230', 'CRGM50'];
+
+// Tên hiển thị riêng trên website cho vài liệu trình (theo guideline: hạn chế HIFU, không hứa kết quả).
+// Khoá = tên tiếng Anh (name_en) trong app. Khi đã đổi tên trong app thì có thể xoá dòng tương ứng ở đây.
+export const WEB_NAMES = {
+  'EYE LIFT': 'Săn chắc vùng mắt',
+  'EYE FIRM': 'Trẻ hoá vùng mắt (RF)',
+};
+
+// Nhóm sản phẩm trên trang Sản phẩm (khớp cột category trong app), theo thứ tự hiển thị.
+export const PRODUCT_CATS = [
+  { key: 'SỮA RỬA MẶT', label: 'Sữa rửa mặt', area: 'Mặt' },
+  { key: 'TẨY TRANG', label: 'Tẩy trang', area: 'Mặt' },
+  { key: 'LOTION', label: 'Lotion', area: 'Mặt' },
+  { key: 'TONER', label: 'Toner', area: 'Mặt' },
+  { key: 'SERUM', label: 'Serum', area: 'Mặt' },
+  { key: 'KEM DƯỠNG', label: 'Kem dưỡng', area: 'Mặt' },
+  { key: 'KEM MẮT', label: 'Kem mắt', area: 'Mặt' },
+  { key: 'MẶT NẠ', label: 'Mặt nạ', area: 'Mặt' },
+  { key: 'KEM CHỐNG NẮNG', label: 'Kem chống nắng', area: 'Mặt' },
+  { key: 'DƯỠNG MÔI', label: 'Dưỡng môi', area: 'Mặt' },
+  { key: 'CHĂM SÓC CƠ THỂ', label: 'Cơ thể', area: 'Cơ thể' },
+  { key: 'CHĂM SÓC TÓC', label: 'Tóc', area: 'Tóc' },
+];
+
+// Ảnh minh hoạ cho combo theo nhóm combo (khớp đầu tên nhóm trong app).
+export const COMBO_IMAGES = [
+  { match: 'Chăm sóc da cơ bản', image: 'co-ban' },
+  { match: 'Mụn', image: 'phi-kim' },
+  { match: 'Sáng da', image: 'peel' },
+  { match: 'Tóc', image: 'thu-gian' },
+  { match: 'Triệt lông', image: 'hoa-thu-gian' },
+  { match: 'Biologique', image: 'biologique' },
+];

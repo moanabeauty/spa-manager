@@ -28,7 +28,7 @@ export async function loadData() {
       rpc('web_packages'),
       rpc('web_products'),
       call('promotions?select=id,name,description,kind,start_date,end_date,terms,sort_order&is_active=eq.true&show_online=eq.true&order=sort_order.asc.nullslast').catch(() => []),
-      call('posts?select=id,kind,title,slug,summary,cover_url,published_at&is_published=eq.true&order=published_at.desc.nullslast&limit=6').catch(() => []),
+      call('posts?select=id,kind,title,slug,summary,body,cover_url,published_at&is_published=eq.true&order=published_at.desc.nullslast&limit=200').catch(() => []),
     ]);
     return {
       services, packages, products,

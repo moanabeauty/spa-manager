@@ -1,13 +1,10 @@
 import { SITE, BRANCHES, BRANDS, GROUPS, FEATURED, HOME_PRODUCTS } from '../site.mjs';
 import { esc, page, zaloIcon } from '../layout.mjs';
+import { niceName, prodSlug, svcSlug } from '../util.mjs';
 
 const img = (name, alt, { cls = '', eager = false, sizes = '100vw' } = {}) =>
   `<img class="${cls}" src="/images/${name}.webp" alt="${esc(alt)}" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" sizes="${sizes}">`;
 
-// Viết hoa chữ cái đầu mỗi từ cho tên sản phẩm BR (dữ liệu trong app có chỗ viết hoa hết).
-const niceName = (s) =>
-  String(s).toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase())
-    .replace(/\b(Vip|Msr|Pigm|Ac|Rl|Vg|P50\w?|O2)\b/gi, (m) => m.toUpperCase());
 
 export function renderHome(data, buildId) {
   const services = data.services || [];
@@ -21,7 +18,7 @@ export function renderHome(data, buildId) {
     const list = services.filter((s) => (s.name_en || '').toUpperCase() === f.nameEn);
     if (!list.length) return null;
     const sub = list.length > 1 ? list.map((s) => s.name.replace(/^Peel căng bóng\s*(tức thì)?\s*–\s*/i, '')).join(' / ') : list[0].name;
-    return { ...f, sub };
+    return { ...f, sub, href: list.length > 1 ? `/lieu-trinh#${f.slug}` : `/lieu-trinh/${svcSlug(list[0])}` };
   }).filter(Boolean);
 
   const products = (data.products || []);
@@ -95,7 +92,7 @@ ${featured.length ? `
     <div class="featured-img">${img('noi-bat', 'Thao tác chăm sóc da mặt cùng sản phẩm Biologique Recherche', { sizes: '(min-width: 1000px) 50vw, 100vw' })}</div>
     <div class="featured-grid">
       ${featured.map((f) => `
-      <a class="tile" href="/lieu-trinh#${f.slug}">
+      <a class="tile" href="${f.href}">
         <span class="label">${esc(f.group)}</span>
         <span class="tile-title">${esc(f.nameEn)}</span>
         <span class="tile-sub">${esc(f.sub)}</span>
@@ -137,7 +134,7 @@ ${featured.length ? `
   <ul class="brands" aria-label="Các hãng dược mỹ phẩm Moana đang dùng">${BRANDS.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>
   <div class="grid-products">
     ${picked.map((p) => `
-    <a class="product" href="/san-pham">
+    <a class="product" href="/san-pham/${prodSlug(p)}">
       <span class="product-img">${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(niceName(p.name))}" loading="lazy">` : `<span class="product-ph" aria-hidden="true">BR</span>`}</span>
       <span class="product-body">
         <span class="label">Biologique Recherche</span>
