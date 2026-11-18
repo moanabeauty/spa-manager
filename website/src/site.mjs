@@ -60,14 +60,14 @@ export const BRANDS = [
 // Nhóm liệu trình trên trang chủ: khớp theo tên nhóm trong app (service_categories).
 // Nhóm chỉ hiện khi có ít nhất 1 liệu trình Public.
 export const GROUPS = [
-  { slug: 'cham-soc-da-co-ban', intro: 'Các liệu trình nền tảng giúp làm sạch, cấp ẩm và làm dịu da — phù hợp để duy trì làn da khoẻ theo định kỳ.', match: 'Essential Treatment', title: 'Chăm sóc da cơ bản', tags: 'Làm sạch sâu / Cấp ẩm / Làm dịu', image: 'co-ban' },
-  { slug: 'biologique-recherche', intro: 'Liệu trình cùng sản phẩm Biologique Recherche (Pháp), được Moana lựa chọn theo tình trạng da của bạn ở từng buổi.', match: 'Biologique Recherche', title: 'Biologique Recherche', tags: 'Cấp ẩm / Phục hồi / Nâng cơ', image: 'biologique' },
-  { slug: 'peel', intro: 'Peel căng bóng với hai lựa chọn có bong và không bong — Moana tư vấn theo tình trạng da và lịch sinh hoạt của bạn.', match: 'Chemical Peel', title: 'Peel căng bóng', tags: 'Căng bóng / Đều màu da', image: 'peel' },
-  { slug: 'phi-kim', intro: 'Các liệu trình phi kim hướng tới từng nhu cầu riêng: cấp ẩm, sáng da, lỗ chân lông hay phục hồi da yếu.', match: 'MTS', title: 'Phi kim MTS', tags: 'Lỗ chân lông / Đều màu / Căng bóng', image: 'phi-kim' },
-  { slug: 'vung-mat', intro: 'Chăm sóc riêng cho vùng da mỏng quanh mắt, kết hợp thư giãn.', match: 'Eyezone', title: 'Chăm sóc vùng mắt', tags: 'Thư giãn / Săn chắc / Trẻ hoá', image: 'vung-mat' },
-  { slug: 'body', intro: 'Chăm sóc da body theo nhu cầu: sáng da, mụn lưng, phục hồi sau nắng.', match: 'Body', title: 'Chăm sóc body', tags: 'Sáng da / Mụn lưng / Sau nắng', image: 'body' },
-  { slug: 'toc-da-dau', intro: 'Gội đầu thư giãn và chăm sóc da đầu cùng sản phẩm Oway.', match: 'Hair & Scalp', title: 'Tóc & da đầu', tags: 'Gội đầu / Detox da đầu / Tóc rụng', image: 'thu-gian' },
-  { slug: 'triet-long', intro: 'Triệt lông theo từng vùng, từ mặt đến toàn thân.', match: 'Triệt lông', title: 'Triệt lông', tags: 'Mặt / Nách / Tay chân / Toàn thân', image: 'hoa-thu-gian' },
+  { slug: 'cham-soc-da-co-ban', intro: 'Các liệu trình nền tảng giúp làm sạch, cấp ẩm và làm dịu da — phù hợp để duy trì làn da khoẻ theo định kỳ.', match: 'Essential Treatment', title: 'Chăm sóc da cơ bản', tags: 'Làm sạch sâu / Cấp ẩm / Làm dịu', image: 'nhom-co-ban' },
+  { slug: 'biologique-recherche', intro: 'Liệu trình cùng sản phẩm Biologique Recherche (Pháp), được Moana lựa chọn theo tình trạng da của bạn ở từng buổi.', match: 'Biologique Recherche', title: 'Biologique Recherche', tags: 'Cấp ẩm / Phục hồi / Nâng cơ', image: 'nhom-biologique' },
+  { slug: 'peel', intro: 'Peel căng bóng với hai lựa chọn có bong và không bong — Moana tư vấn theo tình trạng da và lịch sinh hoạt của bạn.', match: 'Chemical Peel', title: 'Peel căng bóng', tags: 'Căng bóng / Đều màu da', image: 'nhom-peel' },
+  { slug: 'phi-kim', intro: 'Các liệu trình phi kim hướng tới từng nhu cầu riêng: cấp ẩm, sáng da, lỗ chân lông hay phục hồi da yếu.', match: 'MTS', title: 'Phi kim MTS', tags: 'Lỗ chân lông / Đều màu / Căng bóng', image: 'nhom-phi-kim' },
+  { slug: 'vung-mat', intro: 'Chăm sóc riêng cho vùng da mỏng quanh mắt, kết hợp thư giãn.', match: 'Eyezone', title: 'Chăm sóc vùng mắt', tags: 'Thư giãn / Săn chắc / Trẻ hoá', image: 'nhom-vung-mat' },
+  { slug: 'body', intro: 'Chăm sóc da body theo nhu cầu: sáng da, mụn lưng, phục hồi sau nắng.', match: 'Body', title: 'Chăm sóc body', tags: 'Sáng da / Mụn lưng / Sau nắng', image: 'nhom-body' },
+  { slug: 'toc-da-dau', intro: 'Gội đầu thư giãn và chăm sóc da đầu cùng sản phẩm Oway.', match: 'Hair & Scalp', title: 'Tóc & da đầu', tags: 'Gội đầu / Detox da đầu / Tóc rụng', image: 'nhom-toc' },
+  { slug: 'triet-long', intro: 'Triệt lông theo từng vùng, từ mặt đến toàn thân.', match: 'Triệt lông', title: 'Triệt lông', tags: 'Mặt / Nách / Tay chân / Toàn thân', image: 'nhom-triet-long' },
 ];
 
 // Liệu trình nổi bật trên trang chủ: khớp theo tên tiếng Anh (name_en) trong app.
@@ -106,10 +106,10 @@ export const PRODUCT_CATS = [
 
 // Ảnh minh hoạ cho các gói Promotion theo nhóm gói (khớp đầu tên nhóm trong app).
 export const COMBO_IMAGES = [
-  { match: 'Chăm sóc da cơ bản', image: 'co-ban' },
-  { match: 'Mụn', image: 'phi-kim' },
-  { match: 'Sáng da', image: 'peel' },
-  { match: 'Tóc', image: 'thu-gian' },
-  { match: 'Triệt lông', image: 'hoa-thu-gian' },
-  { match: 'Biologique', image: 'biologique' },
+  { match: 'Chăm sóc da cơ bản', image: 'nhom-co-ban' },
+  { match: 'Mụn', image: 'nhom-phi-kim' },
+  { match: 'Sáng da', image: 'nhom-peel' },
+  { match: 'Tóc', image: 'nhom-toc' },
+  { match: 'Triệt lông', image: 'nhom-triet-long' },
+  { match: 'Biologique', image: 'nhom-biologique' },
 ];
