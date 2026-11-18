@@ -5,10 +5,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { vnError } from "@/lib/format";
-import { POST_KIND, postDate, slugify, type Post, type PostKind } from "@/lib/posts";
+import { POST_KIND, postDate, slugify, videoEmbed, type Post, type PostKind } from "@/lib/posts";
 
-type Draft = { id?: string; kind: PostKind; title: string; slug: string; summary: string; body: string; cover_url: string; is_published: boolean };
-const empty = (): Draft => ({ kind: "new_treatment", title: "", slug: "", summary: "", body: "", cover_url: "", is_published: false });
+type Draft = { id?: string; kind: PostKind; title: string; slug: string; summary: string; body: string; cover_url: string; video_url: string; is_published: boolean };
+const empty = (): Draft => ({ kind: "new_treatment", title: "", slug: "", summary: "", body: "", cover_url: "", video_url: "", is_published: false });
 
 export default function PostEditor({ posts }: { posts: Post[] }) {
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -46,7 +46,7 @@ export default function PostEditor({ posts }: { posts: Post[] }) {
             <button
               className="btn-ghost shrink-0 py-1.5"
               onClick={() =>
-                setDraft({ id: p.id, kind: p.kind, title: p.title, slug: p.slug, summary: p.summary ?? "", body: p.body, cover_url: p.cover_url ?? "", is_published: p.is_published })
+                setDraft({ id: p.id, kind: p.kind, title: p.title, slug: p.slug, summary: p.summary ?? "", body: p.body, cover_url: p.cover_url ?? "", video_url: p.video_url ?? "", is_published: p.is_published })
               }
             >
               Sửa
@@ -88,6 +88,7 @@ function Form({ initial, onDone }: { initial: Draft; onDone: () => void }) {
       summary: d.summary.trim() || null,
       body: d.body,
       cover_url: d.cover_url || null,
+      video_url: d.video_url.trim() || null,
       is_published: publish ?? d.is_published,
     };
     const supabase = createClient();
@@ -144,6 +145,17 @@ function Form({ initial, onDone }: { initial: Draft; onDone: () => void }) {
           <span className="text-xs text-ink/50">JPG / PNG / WEBP, tối đa 5MB</span>
         </div>
       </div>
+      <label className="block">
+        <span className="label">Link video (không bắt buộc)</span>
+        <input className="input" value={d.video_url} onChange={(e) => set({ video_url: e.target.value })} placeholder="https://www.tiktok.com/@moanabeautyspa/video/… hoặc link YouTube" />
+        <span className="mt-1 block text-xs text-ink/55">
+          {d.video_url.trim() && !/^https?:\/\//i.test(d.video_url.trim())
+            ? "Link cần bắt đầu bằng https://"
+            : d.video_url.trim() && !videoEmbed(d.video_url)
+              ? "Chưa nhận ra link này: bài sẽ hiện nút “Xem video” thay vì phát ngay. Với TikTok, mở video trên máy tính rồi chép link dạng tiktok.com/@…/video/…"
+              : "Video TikTok hoặc YouTube sẽ phát ngay trong bài, ở mục Beauty Vlog trên website."}
+        </span>
+      </label>
       <label className="block">
         <span className="label">Nội dung</span>
         <textarea className="input font-normal" rows={14} value={d.body} onChange={(e) => set({ body: e.target.value })} />

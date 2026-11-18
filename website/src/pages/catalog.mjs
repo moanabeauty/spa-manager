@@ -1,9 +1,9 @@
-// Trang Liệu trình, Combo, Bảng giá (+ trang chi tiết).
-// Giá liệu trình & combo CHỈ hiện ở trang Bảng giá (quy ước đã chốt).
+// Trang Liệu trình, Promotion (ưu đãi theo tháng + các gói/combo), Bảng giá (+ trang chi tiết).
+// Giá liệu trình & gói CHỈ hiện ở trang Bảng giá (quy ước đã chốt). Trên web, "combo" trong app được gọi là Promotion.
 import { SITE, GROUPS, COMBO_IMAGES } from '../site.mjs';
 import { esc, page } from '../layout.mjs';
 import { banner, crumbs, ctaBand, zaloButtons } from '../parts.mjs';
-import { slugify, img, money, webText, svcName, titleEn, svcSlug, pkgSlug } from '../util.mjs';
+import { slugify, img, money, webText, svcName, titleEn, svcSlug, pkgSlug, paragraphs, fmtDate } from '../util.mjs';
 
 // ---------- Chuẩn bị dữ liệu ----------
 export function prepare(data) {
@@ -46,12 +46,12 @@ export function prepare(data) {
 
   const pkgGroups = [];
   for (const p of packages) {
-    const key = p.category || 'Combo khác';
+    const key = p.category || 'Gói khác';
     let g = pkgGroups.find((x) => x.title === key);
     if (!g) pkgGroups.push((g = { title: key, slug: pkgSlug({ name: key }), items: [] }));
     g.items.push(p);
   }
-  return { services, groups, packages, pkgGroups };
+  return { services, groups, packages, pkgGroups, promotions: data.promotions || [] };
 }
 
 const duration = (s) => (s.duration_minutes ? `${s.duration_minutes} phút` : '');
@@ -79,8 +79,8 @@ const svcRow = (s) => `
       </a>`;
 
 const comboCard = (p) => `
-    <a class="combo" href="/combo/${p.slug}">
-      <span class="label">${esc(webText(p.category || 'Combo'))}</span>
+    <a class="combo" href="/promotion/${p.slug}">
+      <span class="label">${esc(webText(p.category || 'Promotion'))}</span>
       <span class="card-title">${esc(p.name)}</span>
       ${p.desc ? `<span class="combo-desc">${esc(p.desc)}</span>` : ''}
       <ul class="combo-items">${p.items.map((i) => `<li>${itemLine(i)}</li>`).join('')}</ul>
@@ -109,7 +109,7 @@ ${ctx.groups.map((g, i) => `
 <div class="wrap center section-s">
   <div class="btn-row center">
     <a class="btn btn-outline" href="/bang-gia">Xem bảng giá</a>
-    <a class="btn btn-outline" href="/combo">Xem các combo</a>
+    <a class="btn btn-outline" href="/promotion">Xem Promotion</a>
   </div>
 </div>
 ${ctaBand()}`;
@@ -155,7 +155,7 @@ function renderService(s, ctx, buildId) {
 
 ${s.packages.length ? `
 <section class="wrap section">
-  <h2 class="h2 center">Combo có ${esc(s.en)}</h2>
+  <h2 class="h2 center">Promotion có ${esc(s.en)}</h2>
   <div class="grid-combos">${s.packages.map(comboCard).join('')}
   </div>
 </section>` : ''}
@@ -173,73 +173,105 @@ ${ctaBand()}`;
   });
 }
 
-// ---------- /combo ----------
+// ---------- /promotion ----------
+const promoDates = (p) => {
+  if (p.start_date && p.end_date) return `Từ ${fmtDate(p.start_date)} đến ${fmtDate(p.end_date)}`;
+  if (p.end_date) return `Áp dụng đến ${fmtDate(p.end_date)}`;
+  if (p.start_date) return `Áp dụng từ ${fmtDate(p.start_date)}`;
+  return '';
+};
+
 function renderCombosIndex(ctx, buildId) {
-  const body = `${banner('Combo', 'Combo là các gói nhiều buổi, kết hợp một hoặc nhiều liệu trình theo một mục tiêu chăm sóc. Moana tư vấn để bạn chọn combo phù hợp với làn da và lịch của mình.')}
-${chips(ctx.pkgGroups)}
-${ctx.pkgGroups.map((g, i) => `
-<section class="wrap group${i ? '' : ' group-first'}" id="${g.slug}">
+  const promos = ctx.promotions;
+  const body = `${banner('Promotion', 'Ưu đãi theo tháng và các gói chăm sóc nhiều buổi của Moana. Moana tư vấn để bạn chọn lựa chọn phù hợp với làn da và lịch của mình.')}
+<nav class="chips wrap" aria-label="Chọn nhóm">
+  <a href="#uu-dai">Ưu đãi tháng này</a>
+  ${ctx.pkgGroups.map((g) => `<a href="#${g.slug}">${esc(webText(g.title))}</a>`).join('\n  ')}
+</nav>
+
+<section class="wrap group group-first" id="uu-dai">
+  <h2 class="h2">Ưu đãi tháng này</h2>
+  ${promos.length ? `
+  <div class="grid-promos">
+    ${promos.map((p) => `
+    <article class="promo">
+      <p class="label">Ưu đãi</p>
+      <h3 class="card-title">${esc(webText(p.name))}</h3>
+      ${promoDates(p) ? `<p class="muted small">${esc(promoDates(p))}</p>` : ''}
+      ${p.description ? paragraphs(webText(p.description)) : ''}
+      ${p.terms ? `<details class="terms"><summary>Điều kiện áp dụng</summary>${paragraphs(webText(p.terms))}</details>` : ''}
+      <div class="btn-row">${zaloButtons('btn btn-outline btn-sm')}</div>
+    </article>`).join('')}
+  </div>` : `
+  <div class="promo promo-empty">
+    <p>Moana cập nhật ưu đãi theo tháng và các dịp đặc biệt trong năm. Nhắn Zalo để nhận thông tin ưu đãi mới nhất từ cơ sở gần bạn.</p>
+    <div class="btn-row">${zaloButtons('btn btn-outline btn-sm')}</div>
+  </div>`}
+</section>
+
+${ctx.pkgGroups.map((g) => `
+<section class="wrap group" id="${g.slug}">
   <h2 class="h2">${esc(webText(g.title))}</h2>
   <div class="grid-combos">${g.items.map(comboCard).join('')}
   </div>
 </section>`).join('')}
 <div class="wrap center section-s">
-  <a class="btn btn-outline" href="/bang-gia#combo">Xem giá các combo</a>
+  <a class="btn btn-outline" href="/bang-gia#promotion">Xem giá các gói</a>
 </div>
-${ctaBand('Chưa biết chọn combo nào?', 'Nhắn Moana để được tư vấn combo theo tình trạng da và tần suất bạn có thể đến spa.')}`;
+${ctaBand('Chưa biết chọn gói nào?', 'Nhắn Moana để được tư vấn theo tình trạng da và tần suất bạn có thể đến spa.')}`;
   return page({
-    path: '/combo', title: 'Combo', body, buildId,
-    description: 'Các combo chăm sóc da nhiều buổi tại Moana Beauty: chăm sóc da cơ bản, mụn – lỗ chân lông, sáng da, Biologique Recherche, tóc – da đầu, triệt lông.',
+    path: '/promotion', title: 'Promotion — Ưu đãi & gói chăm sóc', body, buildId,
+    description: 'Promotion tại Moana Beauty: ưu đãi theo tháng và các gói chăm sóc da nhiều buổi — chăm sóc da cơ bản, mụn – lỗ chân lông, sáng da, Biologique Recherche, tóc – da đầu, triệt lông.',
   });
 }
 
-// ---------- /combo/<slug> ----------
+// ---------- /promotion/<slug> ----------
 function renderCombo(p, ctx, buildId) {
   const same = ctx.packages.filter((x) => x !== p && x.category === p.category);
-  const body = `${crumbs([{ href: '/combo', label: 'Combo' }, { label: p.name }])}
+  const body = `${crumbs([{ href: '/promotion', label: 'Promotion' }, { label: p.name }])}
 <section class="wrap detail">
   <div class="detail-img">${img(p.image, p.name, { eager: true, sizes: '(min-width: 900px) 50vw, 100vw' })}</div>
   <div class="detail-text">
-    <p class="label">${esc(webText(p.category || 'Combo'))}</p>
+    <p class="label">${esc(webText(p.category || 'Promotion'))}</p>
     <h1 class="detail-title">${esc(p.name)}</h1>
     ${p.desc ? `<p class="detail-sub">${esc(p.desc)}</p>` : ''}
-    <h2 class="h3">Combo gồm</h2>
+    <h2 class="h3">Gói gồm</h2>
     <ul class="combo-items big">${p.items.map((i) => `<li>${itemLine(i)}</li>`).join('')}</ul>
     ${validity(p) ? `<p class="muted">${esc(validity(p))}</p>` : ''}
     <div class="btn-row mt-s">
       <a class="btn btn-solid" href="${SITE.bookingUrl}">Đặt lịch</a>
       ${zaloButtons()}
     </div>
-    <p class="mt-s"><a class="link" href="/bang-gia#${p.slug}">Xem giá combo tại Bảng giá</a></p>
+    <p class="mt-s"><a class="link" href="/bang-gia#${p.slug}">Xem giá tại Bảng giá</a></p>
   </div>
 </section>
 
 ${p.services.length ? `
 <section class="wrap section">
-  <h2 class="h2 center">Liệu trình trong combo</h2>
+  <h2 class="h2 center">Liệu trình trong gói</h2>
   <div class="rows">${p.services.map(svcRow).join('')}
   </div>
 </section>` : ''}
 
 ${same.length ? `
 <section class="wrap section${p.services.length ? ' pt-0' : ''}">
-  <h2 class="h2 center">Combo cùng nhóm</h2>
+  <h2 class="h2 center">Promotion cùng nhóm</h2>
   <div class="grid-combos">${same.slice(0, 6).map(comboCard).join('')}
   </div>
 </section>` : ''}
 ${ctaBand()}`;
   return page({
-    path: `/combo/${p.slug}`, title: `Combo ${p.name}`, body, buildId,
-    description: `Combo ${p.name} tại Moana Beauty${p.desc ? ` — ${p.desc}` : ''}. Gồm: ${p.items.map((i) => `${i.quantity ? `${i.quantity} ` : ''}${i.label}`).join(', ')}.`.slice(0, 300),
+    path: `/promotion/${p.slug}`, title: `${p.name} — Promotion`, body, buildId,
+    description: `${p.name} — Promotion tại Moana Beauty${p.desc ? `: ${p.desc}` : ''}. Gồm: ${p.items.map((i) => `${i.quantity ? `${i.quantity} ` : ''}${i.label}`).join(', ')}.`.slice(0, 300),
   });
 }
 
 // ---------- /bang-gia ----------
 function renderPrices(ctx, buildId) {
-  const body = `${banner('Bảng giá', 'Giá niêm yết các liệu trình và combo tại Moana Beauty, áp dụng cho cả hai cơ sở.')}
+  const body = `${banner('Bảng giá', 'Giá niêm yết các liệu trình và gói Promotion tại Moana Beauty, áp dụng cho cả hai cơ sở.')}
 <nav class="chips wrap" aria-label="Chọn bảng giá">
   <a href="#lieu-trinh">Liệu trình</a>
-  <a href="#combo">Combo</a>
+  <a href="#promotion">Promotion</a>
 </nav>
 
 <section class="wrap group group-first" id="lieu-trinh">
@@ -266,20 +298,20 @@ function renderPrices(ctx, buildId) {
   </div>`).join('')}
 </section>
 
-<section class="wrap group" id="combo">
-  <h2 class="h2">Combo</h2>
+<section class="wrap group" id="promotion">
+  <h2 class="h2">Promotion</h2>
   ${ctx.pkgGroups.map((g) => `
   <div class="price-group">
     <h3 class="price-h">${esc(webText(g.title))}</h3>
-    <div class="price-table combo-table" role="table" aria-label="Giá combo ${esc(g.title)}">
+    <div class="price-table combo-table" role="table" aria-label="Giá Promotion ${esc(g.title)}">
       <div class="price-row price-head" role="row">
-        <span role="columnheader">Combo</span>
+        <span role="columnheader">Gói</span>
         <span role="columnheader">Bao gồm</span>
         <span role="columnheader">Giá</span>
       </div>
       ${g.items.map((p) => `
       <div class="price-row" role="row" id="${p.slug}">
-        <span role="cell" class="price-name"><a href="/combo/${p.slug}">${esc(p.name)}</a>${p.desc ? `<small>${esc(p.desc)}</small>` : ''}</span>
+        <span role="cell" class="price-name"><a href="/promotion/${p.slug}">${esc(p.name)}</a>${p.desc ? `<small>${esc(p.desc)}</small>` : ''}</span>
         <span role="cell" class="price-inc">${p.items.map((i) => `<span>${itemLine(i)}</span>`).join('')}${validity(p) ? `<small>${esc(validity(p))}</small>` : ''}</span>
         <span role="cell" class="price-val" data-label="Giá">${money(p.price)}</span>
       </div>`).join('')}
@@ -290,7 +322,7 @@ function renderPrices(ctx, buildId) {
 ${ctaBand()}`;
   return page({
     path: '/bang-gia', title: 'Bảng giá', body, buildId,
-    description: 'Bảng giá liệu trình và combo tại Moana Beauty — spa chăm sóc da tại 67 Lưu Quang Vũ (Cầu Giấy) và 109 Nguyễn Sơn (Long Biên), Hà Nội.',
+    description: 'Bảng giá liệu trình và Promotion tại Moana Beauty — spa chăm sóc da tại 67 Lưu Quang Vũ (Cầu Giấy) và 109 Nguyễn Sơn (Long Biên), Hà Nội.',
   });
 }
 
@@ -299,8 +331,8 @@ export function catalogPages(data, buildId) {
   const out = [
     { path: '/lieu-trinh', html: renderServicesIndex(ctx, buildId) },
     ...ctx.services.map((s) => ({ path: `/lieu-trinh/${s.slug}`, html: renderService(s, ctx, buildId) })),
-    { path: '/combo', html: renderCombosIndex(ctx, buildId) },
-    ...ctx.packages.map((p) => ({ path: `/combo/${p.slug}`, html: renderCombo(p, ctx, buildId) })),
+    { path: '/promotion', html: renderCombosIndex(ctx, buildId) },
+    ...ctx.packages.map((p) => ({ path: `/promotion/${p.slug}`, html: renderCombo(p, ctx, buildId) })),
     { path: '/bang-gia', html: renderPrices(ctx, buildId) },
   ];
   return { pages: out, ctx };

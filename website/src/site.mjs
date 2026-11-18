@@ -42,13 +42,13 @@ export const BRANCHES = [
 
 export const NAV_LEFT = [
   { href: '/lieu-trinh', label: 'Liệu trình' },
-  { href: '/combo', label: 'Combo' },
+  { href: '/promotion', label: 'Promotion' },
   { href: '/bang-gia', label: 'Bảng giá' },
   { href: '/san-pham', label: 'Sản phẩm' },
 ];
 export const NAV_RIGHT = [
   { href: '/ve-moana', label: 'Về Moana' },
-  { href: '/tin-tuc', label: 'Ưu đãi' },
+  { href: '/beauty-vlog', label: 'Beauty Vlog' },
   { href: '/lien-he', label: 'Liên hệ' },
 ];
 
@@ -104,7 +104,7 @@ export const PRODUCT_CATS = [
   { key: 'CHĂM SÓC TÓC', label: 'Tóc', area: 'Tóc' },
 ];
 
-// Ảnh minh hoạ cho combo theo nhóm combo (khớp đầu tên nhóm trong app).
+// Ảnh minh hoạ cho các gói Promotion theo nhóm gói (khớp đầu tên nhóm trong app).
 export const COMBO_IMAGES = [
   { match: 'Chăm sóc da cơ bản', image: 'co-ban' },
   { match: 'Mụn', image: 'phi-kim' },

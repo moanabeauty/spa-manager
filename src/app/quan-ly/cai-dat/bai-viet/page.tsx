@@ -12,7 +12,7 @@ export default async function PostsAdminPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-navy">Bài viết web khách</h1>
-        <p className="text-sm text-ink/70">Viết bài giới thiệu liệu trình mới và chia sẻ kiến thức chăm da. Bài đã đăng hiện ở trang khách.</p>
+        <p className="text-sm text-ink/70">Viết bài giới thiệu liệu trình mới và chia sẻ kiến thức chăm da. Bài đã đăng hiện ở trang khách và ở mục Beauty Vlog trên website moanabeauty.vn (sau khi website được cập nhật).</p>
       </div>
       <PostEditor posts={(data ?? []) as Post[]} />
     </div>

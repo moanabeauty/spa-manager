@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { POST_COLUMNS, POST_KIND, PostBody, postDate, type Post } from "@/lib/posts";
+import { POST_COLUMNS, POST_KIND, PostBody, PostVideo, postDate, type Post } from "@/lib/posts";
 
 export default async function PostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -23,6 +23,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
         // eslint-disable-next-line @next/next/no-img-element
         <img src={p.cover_url} alt="" className="w-full rounded-2xl object-cover" />
       )}
+      <PostVideo url={p.video_url} />
       <PostBody body={p.body} />
       <div className="card flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm">Bạn muốn được tư vấn và trải nghiệm tại Moana?</p>

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { loadData } from './src/data.mjs';
 import { SITE } from './src/site.mjs';
 import { renderHome } from './src/pages/home.mjs';
-import { renderAbout, newsPages, renderPrivacy, renderContact, render404 } from './src/pages/other.mjs';
+import { renderAbout, vlogPages, renderPrivacy, renderContact, render404 } from './src/pages/other.mjs';
 import { catalogPages } from './src/pages/catalog.mjs';
 import { productPages } from './src/pages/products.mjs';
 
@@ -34,7 +34,7 @@ const pages = [
   ...catalogPages(data, buildId).pages,
   ...productPages(data, buildId),
   { path: '/ve-moana', html: renderAbout(buildId) },
-  ...newsPages(data, buildId),
+  ...vlogPages(data, buildId),
   { path: '/lien-he', html: renderContact(buildId) },
   { path: '/chinh-sach-bao-mat', html: renderPrivacy(buildId) },
 ];

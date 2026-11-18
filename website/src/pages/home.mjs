@@ -26,8 +26,8 @@ export function renderHome(data, buildId) {
   for (const p of products) { if (picked.length >= 4) break; if (!picked.includes(p)) picked.push(p); }
 
   const news = [
-    ...(data.promotions || []).map((p) => ({ label: 'Ưu đãi', title: p.name, text: p.description, href: '/tin-tuc' })),
-    ...(data.posts || []).map((p) => ({ label: p.kind === 'promotion' ? 'Ưu đãi' : 'Tin tức', title: p.title, text: p.summary, href: `/tin-tuc/${p.slug}`, cover: p.cover_url })),
+    ...(data.promotions || []).map((p) => ({ label: 'Ưu đãi', title: p.name, text: p.description, href: '/promotion#uu-dai' })),
+    ...(data.posts || []).map((p) => ({ label: p.kind === 'new_treatment' ? 'Liệu trình mới' : 'Beauty Vlog', title: p.title, text: p.summary, href: `/beauty-vlog/${p.slug}`, cover: p.cover_url })),
   ].slice(0, 3);
 
   const body = `
@@ -60,8 +60,8 @@ export function renderHome(data, buildId) {
   <article class="entry">
     <div class="entry-img">${img('hoa-thu-gian', 'Hoa tươi trong không gian Moana', { sizes: '(min-width: 900px) 33vw, 100vw' })}</div>
     <h2 class="h3">Ưu đãi của Moana</h2>
-    <p>Chương trình theo tháng và các dịp đặc biệt trong năm.</p>
-    <a class="btn btn-outline" href="/tin-tuc">Xem ưu đãi</a>
+    <p>Ưu đãi theo tháng và các gói chăm sóc nhiều buổi.</p>
+    <a class="btn btn-outline" href="/promotion">Xem Promotion</a>
   </article>
 </section>
 
@@ -102,7 +102,7 @@ ${featured.length ? `
   </div>
   <div class="btn-row center mt">
     <a class="btn btn-outline" href="/lieu-trinh">Xem tất cả liệu trình</a>
-    <a class="btn btn-outline" href="/combo">Xem các combo</a>
+    <a class="btn btn-outline" href="/promotion">Xem Promotion</a>
   </div>
 </section>` : ''}
 
@@ -151,7 +151,7 @@ ${featured.length ? `
 
 <section class="news" id="uu-dai">
   <div class="wrap section">
-    <h2 class="h2 center">Ưu đãi &amp; Tin tức</h2>
+    <h2 class="h2 center">Ưu đãi &amp; Beauty Vlog</h2>
     ${news.length ? `
     <div class="grid-news">
       ${news.map((n) => `

@@ -57,11 +57,11 @@ function footer() {
     <div>
       <p class="footer-h">Khám phá</p>
       <a href="/lieu-trinh">Liệu trình</a>
-      <a href="/combo">Combo</a>
+      <a href="/promotion">Promotion</a>
       <a href="/bang-gia">Bảng giá</a>
       <a href="/san-pham">Sản phẩm</a>
       <a href="/ve-moana">Về Moana</a>
-      <a href="/tin-tuc">Ưu đãi &amp; Tin tức</a>
+      <a href="/beauty-vlog">Beauty Vlog</a>
     </div>
     <div>
       <p class="footer-h">Liên hệ</p>

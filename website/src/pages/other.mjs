@@ -1,8 +1,8 @@
-// Trang Về Moana, Ưu đãi & Tin tức (+ bài viết), Chính sách bảo mật, Liên hệ, 404.
+// Trang Về Moana, Beauty Vlog (+ bài viết), Chính sách bảo mật, Liên hệ, 404.
 import { SITE, BRANCHES, BRANDS } from '../site.mjs';
 import { esc, page, zaloIcon } from '../layout.mjs';
 import { banner, crumbs, ctaBand, zaloButtons } from '../parts.mjs';
-import { img, paragraphs, fmtDate, webText } from '../util.mjs';
+import { img, fmtDate, webText, postBody, videoBlock, videoEmbed } from '../util.mjs';
 
 const contactBlock = (tag = 'h2') => `
   <div class="branches">
@@ -77,78 +77,63 @@ ${ctaBand('Đặt lịch chăm sóc cùng Moana', 'Moana mở cửa 9:00 – 18:
   });
 }
 
-// ---------- /tin-tuc + /tin-tuc/<slug> ----------
-const promoDates = (p) => {
-  if (p.start_date && p.end_date) return `Từ ${fmtDate(p.start_date)} đến ${fmtDate(p.end_date)}`;
-  if (p.end_date) return `Áp dụng đến ${fmtDate(p.end_date)}`;
-  if (p.start_date) return `Áp dụng từ ${fmtDate(p.start_date)}`;
+// ---------- /beauty-vlog + /beauty-vlog/<slug> ----------
+// Bài viết soạn trong app (Cài đặt › Bài viết web khách), có thể gắn video TikTok / YouTube.
+const KIND = { skincare: 'Góc chăm da', new_treatment: 'Liệu trình mới' };
+const kindLabel = (n) => KIND[n.kind] || 'Beauty Vlog';
+const VLOG_INTRO = 'Moana chia sẻ kinh nghiệm chăm sóc da, thói quen làm đẹp hằng ngày và những điều nên biết trước khi bắt đầu một liệu trình.';
+
+const vlogThumb = (n) => {
+  if (n.cover_url) return `<span class="news-img"><img src="${esc(n.cover_url)}" alt="" loading="lazy" decoding="async"></span>`;
+  const v = videoEmbed(n.video_url);
+  if (v?.id) return `<span class="news-img"><img src="https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" alt="" loading="lazy" decoding="async"></span>`;
   return '';
 };
-
-export function newsPages(data, buildId) {
-  const promos = data.promotions || [];
-  const posts = (data.posts || []).filter((p) => p.slug);
-  const empty = !promos.length && !posts.length;
-
-  const body = `${banner('Ưu đãi & Tin tức', 'Chương trình ưu đãi theo tháng, các dịp đặc biệt trong năm và tin tức từ Moana.')}
-${promos.length ? `
-<section class="wrap section pt-0" id="uu-dai">
-  <h2 class="h2 center">Ưu đãi đang áp dụng</h2>
-  <div class="grid-promos">
-    ${promos.map((p) => `
-    <article class="promo">
-      <p class="label">Ưu đãi</p>
-      <h3 class="card-title">${esc(webText(p.name))}</h3>
-      ${promoDates(p) ? `<p class="muted small">${esc(promoDates(p))}</p>` : ''}
-      ${p.description ? paragraphs(webText(p.description)) : ''}
-      ${p.terms ? `<details class="terms"><summary>Điều kiện áp dụng</summary>${paragraphs(webText(p.terms))}</details>` : ''}
-      <div class="btn-row">${zaloButtons('btn btn-outline btn-sm')}</div>
-    </article>`).join('')}
-  </div>
-</section>` : ''}
-${posts.length ? `
-<section class="news">
-  <div class="wrap section">
-    <h2 class="h2 center">Tin tức</h2>
-    <div class="grid-news">
-      ${posts.map((n) => `
-      <a class="news-card" href="/tin-tuc/${esc(n.slug)}">
-        ${n.cover_url ? `<span class="news-img"><img src="${esc(n.cover_url)}" alt="" loading="lazy"></span>` : ''}
+const vlogCard = (n) => `
+      <a class="news-card" href="/beauty-vlog/${esc(n.slug)}">
+        ${vlogThumb(n)}
         <span class="card-body">
-          <span class="label">${n.kind === 'promotion' ? 'Ưu đãi' : 'Tin tức'}${n.published_at ? ` · ${fmtDate(n.published_at)}` : ''}</span>
+          <span class="label">${esc(kindLabel(n))}${n.video_url ? ' · Video' : ''}${n.published_at ? ` · ${fmtDate(n.published_at)}` : ''}</span>
           <span class="card-title">${esc(n.title)}</span>
           ${n.summary ? `<span class="news-text">${esc(n.summary)}</span>` : ''}
         </span>
-      </a>`).join('')}
-    </div>
+      </a>`;
+
+export function vlogPages(data, buildId) {
+  const posts = (data.posts || []).filter((p) => p.slug);
+  const body = `${banner('Beauty Vlog', VLOG_INTRO)}
+${posts.length ? `
+<section class="wrap section pt-0">
+  <div class="grid-news grid-vlog">${posts.map(vlogCard).join('')}
   </div>
-</section>` : ''}
-${empty ? `
+</section>
+${ctaBand()}` : `
 <section class="wrap section pt-0">
   <div class="news-empty">
-    <p>Moana cập nhật ưu đãi theo tháng và các dịp đặc biệt trong năm. Nhắn Zalo để nhận thông tin mới nhất từ cơ sở gần bạn.</p>
+    <p>Những bài chia sẻ đầu tiên sẽ sớm có mặt tại đây. Trong lúc chờ, bạn có thể theo dõi Moana trên TikTok và Instagram.</p>
     <div class="btn-row center">
-      ${zaloButtons()}
+      <a class="btn btn-outline" href="${SITE.tiktok}" rel="noopener">TikTok Moana</a>
+      <a class="btn btn-outline" href="${SITE.instagram}" rel="noopener">Instagram Moana</a>
     </div>
   </div>
-</section>` : ctaBand()}`;
+</section>`}`;
 
   const out = [{
-    path: '/tin-tuc', html: page({
-      path: '/tin-tuc', title: 'Ưu đãi & Tin tức', body, buildId,
-      description: 'Ưu đãi theo tháng, các dịp đặc biệt và tin tức từ Moana Beauty — spa chăm sóc da tại Cầu Giấy và Long Biên, Hà Nội.',
+    path: '/beauty-vlog', html: page({
+      path: '/beauty-vlog', title: 'Beauty Vlog', body, buildId,
+      description: 'Beauty Vlog của Moana Beauty: chia sẻ kinh nghiệm chăm sóc da, làm đẹp và những điều nên biết trước khi bắt đầu liệu trình.',
     }),
   }];
 
   for (const n of posts) {
     const others = posts.filter((x) => x !== n).slice(0, 3);
-    const pbody = `${crumbs([{ href: '/tin-tuc', label: 'Ưu đãi & Tin tức' }, { label: n.title }])}
+    const pbody = `${crumbs([{ href: '/beauty-vlog', label: 'Beauty Vlog' }, { label: n.title }])}
 <article class="wrap article">
-  <p class="label">${n.kind === 'promotion' ? 'Ưu đãi' : 'Tin tức'}${n.published_at ? ` · ${fmtDate(n.published_at)}` : ''}</p>
+  <p class="label">${esc(kindLabel(n))}${n.published_at ? ` · ${fmtDate(n.published_at)}` : ''}</p>
   <h1 class="detail-title">${esc(n.title)}</h1>
   ${n.summary ? `<p class="lead">${esc(n.summary)}</p>` : ''}
-  ${n.cover_url ? `<img class="article-cover" src="${esc(n.cover_url)}" alt="" fetchpriority="high">` : ''}
-  <div class="prose">${paragraphs(webText(n.body))}</div>
+  ${n.video_url ? videoBlock(n.video_url, n.title) : (n.cover_url ? `<img class="article-cover" src="${esc(n.cover_url)}" alt="" fetchpriority="high">` : '')}
+  <div class="prose post-body">${postBody(webText(n.body))}</div>
   <div class="btn-row mt">
     <a class="btn btn-solid" href="${SITE.bookingUrl}">Đặt lịch</a>
     ${zaloButtons()}
@@ -157,14 +142,13 @@ ${empty ? `
 ${others.length ? `
 <section class="wrap section pt-0">
   <h2 class="h2 center">Bài khác</h2>
-  <div class="grid-news">${others.map((x) => `
-    <a class="news-card" href="/tin-tuc/${esc(x.slug)}"><span class="card-body"><span class="card-title">${esc(x.title)}</span>${x.summary ? `<span class="news-text">${esc(x.summary)}</span>` : ''}</span></a>`).join('')}
+  <div class="grid-news">${others.map(vlogCard).join('')}
   </div>
 </section>` : ''}`;
     out.push({
-      path: `/tin-tuc/${n.slug}`, html: page({
-        path: `/tin-tuc/${n.slug}`, title: n.title, body: pbody, buildId,
-        description: n.summary || `${n.title} — Moana Beauty`,
+      path: `/beauty-vlog/${n.slug}`, html: page({
+        path: `/beauty-vlog/${n.slug}`, title: n.title, body: pbody, buildId,
+        description: n.summary || `${n.title} — Beauty Vlog của Moana Beauty`,
       }),
     });
   }

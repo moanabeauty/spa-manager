@@ -48,3 +48,43 @@ export const fmtDate = (d) => {
   const [y, m, day] = String(d).slice(0, 10).split('-');
   return `${day}/${m}/${y}`;
 };
+
+// Nội dung bài viết soạn trong app: dòng trống tách đoạn; "## " = tiêu đề nhỏ; "- " = gạch đầu dòng; **chữ đậm**
+export function postBody(text) {
+  const inline = (t) => esc(t).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  const out = [];
+  for (const block of String(text || '').replace(/\r/g, '').split(/\n{2,}/)) {
+    let para = [], list = [];
+    const flushP = () => { if (para.length) out.push(`<p>${para.map(inline).join('<br>')}</p>`); para = []; };
+    const flushL = () => { if (list.length) out.push(`<ul>${list.map((l) => `<li>${inline(l)}</li>`).join('')}</ul>`); list = []; };
+    for (const raw of block.split('\n')) {
+      const l = raw.trim();
+      if (!l) continue;
+      if (l.startsWith('## ')) { flushP(); flushL(); out.push(`<h2>${inline(l.slice(3))}</h2>`); }
+      else if (l.startsWith('- ')) { flushP(); list.push(l.slice(2)); }
+      else { flushL(); para.push(l); }
+    }
+    flushP(); flushL();
+  }
+  return out.join('\n');
+}
+
+// Link video TikTok / YouTube -> khung nhúng (giống app). null nếu không nhận ra.
+export function videoEmbed(url) {
+  const u = String(url || '').trim();
+  if (!u) return null;
+  let m = u.match(/tiktok\.com\/@[^/]+\/video\/(\d+)/i);
+  if (m) return { src: `https://www.tiktok.com/player/v1/${m[1]}`, vertical: true, site: 'TikTok' };
+  m = u.match(/youtube\.com\/shorts\/([\w-]{6,})/i);
+  if (m) return { src: `https://www.youtube-nocookie.com/embed/${m[1]}`, vertical: true, site: 'YouTube', id: m[1] };
+  m = u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|live\/)|youtu\.be\/)([\w-]{6,})/i);
+  if (m) return { src: `https://www.youtube-nocookie.com/embed/${m[1]}`, vertical: false, site: 'YouTube', id: m[1] };
+  return null;
+}
+
+export function videoBlock(url, title = 'Video') {
+  if (!url) return '';
+  const v = videoEmbed(url);
+  if (!v) return `<p><a class="btn btn-outline" href="${esc(url)}" rel="noopener">Xem video</a></p>`;
+  return `<div class="video${v.vertical ? ' video-v' : ''}"><iframe src="${v.src}" title="${esc(title)}" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
+}

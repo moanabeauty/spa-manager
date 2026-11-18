@@ -10,8 +10,9 @@ export const POST_KIND: Record<PostKind, { label: string; path: string; intro: s
 export type Post = {
   id: string; kind: PostKind; title: string; slug: string; summary: string | null; body: string; cover_url: string | null;
   service_id: string | null; is_published: boolean; published_at: string | null; updated_at: string;
+  video_url: string | null;
 };
-export const POST_COLUMNS = "id, kind, title, slug, summary, body, cover_url, service_id, is_published, published_at, updated_at";
+export const POST_COLUMNS = "id, kind, title, slug, summary, body, cover_url, video_url, service_id, is_published, published_at, updated_at";
 
 /** "Trị mụn an toàn mùa hè" -> "tri-mun-an-toan-mua-he" */
 export function slugify(s: string): string {
@@ -74,5 +75,34 @@ export function PostCard({ p }: { p: Pick<Post, "slug" | "title" | "summary" | "
         {p.summary && <p className="mt-1 line-clamp-3 text-sm text-ink/70">{p.summary}</p>}
       </div>
     </Link>
+  );
+}
+
+/** Link video TikTok / YouTube -> địa chỉ khung nhúng (null nếu không nhận ra) */
+export function videoEmbed(url: string | null | undefined): { src: string; vertical: boolean } | null {
+  if (!url) return null;
+  const u = url.trim();
+  let m = u.match(/tiktok\.com\/@[^/]+\/video\/(\d+)/i);
+  if (m) return { src: `https://www.tiktok.com/player/v1/${m[1]}`, vertical: true };
+  m = u.match(/youtube\.com\/shorts\/([\w-]{6,})/i);
+  if (m) return { src: `https://www.youtube-nocookie.com/embed/${m[1]}`, vertical: true };
+  m = u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|live\/)|youtu\.be\/)([\w-]{6,})/i);
+  if (m) return { src: `https://www.youtube-nocookie.com/embed/${m[1]}`, vertical: false };
+  return null;
+}
+
+export function PostVideo({ url }: { url: string | null }) {
+  if (!url) return null;
+  const v = videoEmbed(url);
+  if (!v)
+    return (
+      <a href={url} target="_blank" rel="noopener" className="btn-outline inline-flex">
+        Xem video
+      </a>
+    );
+  return (
+    <div className={`overflow-hidden rounded-2xl bg-black ${v.vertical ? "mx-auto aspect-[9/16] max-w-[340px]" : "aspect-video w-full"}`}>
+      <iframe src={v.src} title="Video" className="h-full w-full" allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen loading="lazy" />
+    </div>
   );
 }
