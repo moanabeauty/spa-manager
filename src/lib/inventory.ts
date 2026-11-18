@@ -35,7 +35,7 @@ export const UNITS = ["chai", "hộp", "lọ", "ống", "tuýp", "hũ", "túi", 
 
 /** Cột sản phẩm mọi nhân viên đọc được (không có giá nhập) */
 export const PRODUCT_COLUMNS =
-  "id, name, brand, capacity, volume, unit, barcode, category, used_in, retail_price, for_treatment, for_retail, max_staff_discount_pct, min_stock, note, is_active, sku, expiry_date, deleted_at, pack_size";
+  "id, name, brand, capacity, volume, unit, barcode, category, used_in, retail_price, for_treatment, for_retail, max_staff_discount_pct, min_stock, note, is_active, sku, expiry_date, deleted_at, pack_size, show_on_web, image_url, web_description";
 
 export type Product = {
   id: string;
@@ -58,6 +58,9 @@ export type Product = {
   expiry_date: string | null;
   deleted_at?: string | null; // đã xoá mã: ẩn khỏi mọi danh sách, chỉ giữ cho lịch sử
   pack_size?: number | null; // số đơn vị lẻ (ống / lọ…) trong 1 hộp
+  show_on_web?: boolean; // hiện trên website moanabeauty.vn (trang Sản phẩm)
+  image_url?: string | null; // ảnh sản phẩm (kho ảnh product-images)
+  web_description?: string | null; // mô tả ngắn hiện trên website
 };
 
 export type Warehouse = { id: string; branch_id: string; type: WarehouseType; name: string };

@@ -10,7 +10,7 @@ import MoneyInput from "@/components/MoneyInput";
 import CameraScanner from "@/components/LazyCameraScanner";
 import Modal from "@/components/Modal";
 
-type Scope = "all" | "treatment" | "retail" | "nobarcode" | "inactive";
+type Scope = "all" | "treatment" | "retail" | "web" | "nobarcode" | "inactive";
 
 export default function ProductEditor({
   products,
@@ -64,11 +64,12 @@ export default function ProductEditor({
             (scope === "all" ||
               (scope === "treatment" && p.for_treatment) ||
               (scope === "retail" && p.for_retail) ||
+              (scope === "web" && p.show_on_web) ||
               (scope === "nobarcode" && !p.barcode)),
       )
       .filter((p) => {
         if (!q) return true;
-        const hay = normalizeText(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""} ${p.category ?? ""} ${p.barcode ?? ""}`);
+        const hay = normalizeText(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""} ${p.category ?? ""} ${p.barcode ?? ""} ${p.sku ?? ""}`);
         // bỏ qua dấu chấm / khoảng trắng / gạch: gõ "lait sr 250" vẫn ra "LAIT S.R. · 250 ML"
         const strip = (x: string) => x.replace(/[^a-z0-9]/g, "");
         return hay.includes(q) || (strip(q).length >= 2 && strip(hay).includes(strip(q)));
@@ -81,7 +82,7 @@ export default function ProductEditor({
 
       <div className="card space-y-3 p-4">
         <div className="flex gap-2">
-          <input className="input flex-1 py-2" placeholder="Tìm tên, nhãn hàng hoặc mã vạch…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className="input flex-1 py-2" placeholder="Tìm tên, nhãn hàng, mã SP hoặc mã vạch…" value={query} onChange={(e) => setQuery(e.target.value)} />
           <button className="btn-primary shrink-0 py-2" onClick={() => { setScanMsg(null); setScanning(true); }}>
             📷 Quét mã vạch
           </button>
@@ -98,6 +99,7 @@ export default function ProductEditor({
               ["all", "Tất cả"],
               ["treatment", "Hàng liệu trình"],
               ["retail", "Hàng bán lẻ"],
+              ["web", "Trên website"],
               ["nobarcode", "Chưa có mã vạch"],
               ["inactive", "Ngừng lưu hành"],
             ] as const
@@ -121,10 +123,13 @@ export default function ProductEditor({
           {rows.map((p) => (
             <li key={p.id} className="px-4 py-2.5 text-sm">
               <Link href={`/quan-ly/kho/san-pham/${p.id}`} className="flex w-full items-start justify-between gap-3 text-left hover:text-navy">
-                <span className="min-w-0">
+                <span className="flex min-w-0 items-start gap-2">
+                  {p.image_url && <img src={p.image_url} alt="" className="h-10 w-10 shrink-0 rounded-md bg-cream object-contain" />}
+                  <span className="min-w-0">
                   <span className="font-medium">{productLabel(p)}</span>
                   <span className="block text-xs text-ink/55">
-                    {[p.brand ?? "(chưa có nhãn hàng)", p.category, p.barcode ?? "chưa có mã vạch"].filter(Boolean).join(" · ")}
+                    {[p.brand ?? "(chưa có nhãn hàng)", p.category, p.sku, p.barcode ?? "chưa có mã vạch"].filter(Boolean).join(" · ")}
+                  </span>
                   </span>
                 </span>
                 <span className="shrink-0 text-right text-xs">
@@ -132,6 +137,7 @@ export default function ProductEditor({
                   <span className="text-ink/50">
                     {[p.for_treatment && "liệu trình", p.for_retail && "bán lẻ"].filter(Boolean).join(" + ") || "—"}
                   </span>
+                  {p.show_on_web && <span className="block font-semibold text-navy">🌐 web</span>}
                 </span>
               </Link>
             </li>
@@ -218,7 +224,12 @@ export function ProductForm({
     is_active: product?.is_active ?? true,
     note: product?.note ?? "",
     expiry_date: product?.expiry_date ?? "",
+    sku: product?.sku ?? "",
+    show_on_web: product?.show_on_web ?? false,
+    image_url: product?.image_url ?? "",
+    web_description: product?.web_description ?? "",
   });
+  const [upBusy, setUpBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -264,6 +275,10 @@ export function ProductForm({
       is_active: f.is_active,
       note: f.note || null,
       expiry_date: f.expiry_date || null,
+      sku: f.sku.trim().toUpperCase() || null,
+      show_on_web: f.show_on_web,
+      image_url: f.image_url || null,
+      web_description: f.web_description.trim() || null,
     };
     const supabase = createClient();
     const { error } = product
@@ -273,6 +288,25 @@ export function ProductForm({
     if (error) return setError(vnError(error.message));
     onDone();
     router.refresh();
+  }
+
+  // Ảnh sản phẩm cho website: thu nhỏ còn tối đa 1200px (nền trắng, JPEG) rồi tải lên kho ảnh công khai
+  async function uploadImage(file: File) {
+    setUpBusy(true);
+    setError(null);
+    try {
+      const blob = await shrinkImage(file, 1200);
+      const base = (f.sku || f.name || "san-pham").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const path = `${base}-${Date.now()}.jpg`;
+      const supabase = createClient();
+      const { error } = await supabase.storage.from("product-images").upload(path, blob, { contentType: "image/jpeg", upsert: false });
+      if (error) throw error;
+      set({ image_url: supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl });
+    } catch (e) {
+      setError(vnError((e as Error).message ?? "Không tải được ảnh"));
+    } finally {
+      setUpBusy(false);
+    }
   }
 
   // Tạo mới: không tạo dòng thứ 2, chỉ bật cả 2 loại cho sản phẩm có sẵn (ô nào còn trống thì lấy từ form)
@@ -311,6 +345,7 @@ export function ProductForm({
           />
         )}
       </div>
+      <label>Mã sản phẩm<input className={`${input} font-mono uppercase`} value={f.sku} onChange={(e) => set({ sku: e.target.value })} placeholder="vd LADER150" /></label>
       <label>Nhãn hàng{product ? "" : " *"}<input className={input} value={f.brand} onChange={(e) => set({ brand: e.target.value })} /></label>
       <label>Tên sản phẩm *<input className={input} value={f.name} onChange={(e) => set({ name: e.target.value })} /></label>
       <label>Dung tích / quy cách{product ? "" : " *"}<input className={input} value={f.capacity} onChange={(e) => set({ capacity: e.target.value })} placeholder="50ml, Hộp 10 ống x 5ml" /></label>
@@ -347,6 +382,30 @@ export function ProductForm({
         <input type="number" min={0} className={input} value={f.min_stock} onChange={(e) => set({ min_stock: e.target.value })} />
       </label>
       <label className="sm:col-span-2">Ghi chú<input className={input} value={f.note} onChange={(e) => set({ note: e.target.value })} /></label>
+      <div className="space-y-2 rounded-lg border border-beige-dark bg-white p-3 sm:col-span-2">
+        <label className="flex items-center gap-2 font-semibold text-navy">
+          <input type="checkbox" checked={f.show_on_web} onChange={(e) => set({ show_on_web: e.target.checked })} /> 🌐 Hiện trên website (trang Sản phẩm, kèm giá niêm yết)
+        </label>
+        <div className="flex items-center gap-3">
+          {f.image_url ? (
+            <img src={f.image_url} alt="" className="h-20 w-20 rounded-lg border border-beige bg-white object-contain" />
+          ) : (
+            <span className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-beige-dark text-center text-[10px] text-ink/50">chưa có ảnh</span>
+          )}
+          <div className="space-y-1">
+            <label className="btn-outline inline-block cursor-pointer py-1.5">
+              {upBusy ? "Đang tải ảnh…" : f.image_url ? "Đổi ảnh" : "Tải ảnh lên"}
+              <input type="file" accept="image/*" className="hidden" disabled={upBusy} onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadImage(file); e.target.value = ""; }} />
+            </label>
+            {f.image_url && <button type="button" className="block text-[#8A2323]" onClick={() => set({ image_url: "" })}>Bỏ ảnh</button>}
+            <p className="text-ink/55">Ảnh chụp tại spa hoặc ảnh nhà phân phối cấp. Không lấy ảnh từ website hãng.</p>
+          </div>
+        </div>
+        <label className="block">
+          Mô tả ngắn trên website (không bắt buộc)
+          <textarea className={input} rows={2} value={f.web_description} onChange={(e) => set({ web_description: e.target.value })} placeholder="vd Sữa rửa mặt dịu nhẹ cho da nhạy cảm" />
+        </label>
+      </div>
       <div className="flex flex-wrap gap-4 sm:col-span-2">
         <span className="w-full text-ink/60">Dùng cho (tick được cả 2 nếu sản phẩm vừa dùng liệu trình vừa bán lẻ):</span>
         <label className="flex items-center gap-1"><input type="checkbox" checked={f.for_treatment} onChange={(e) => set({ for_treatment: e.target.checked })} /> Hàng liệu trình</label>
@@ -382,8 +441,24 @@ export function ProductForm({
       {error && <p className="text-[#8A2323] sm:col-span-2">{error}</p>}
       <div className="flex justify-end gap-2 sm:col-span-2">
         <button className="btn-ghost py-1.5" onClick={onDone}>Đóng</button>
-        <button className="btn-primary py-1.5" disabled={busy || !valid} onClick={save}>{busy ? "Đang lưu…" : product ? "Lưu" : "Tạo sản phẩm"}</button>
+        <button className="btn-primary py-1.5" disabled={busy || upBusy || !valid} onClick={save}>{busy ? "Đang lưu…" : product ? "Lưu" : "Tạo sản phẩm"}</button>
       </div>
     </div>
   );
+}
+
+/** Thu nhỏ ảnh về cạnh dài tối đa `max` px, nền trắng, xuất JPEG — ảnh điện thoại 5–10MB còn ~200KB */
+async function shrinkImage(file: File, max: number): Promise<Blob> {
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const w = Math.round(bmp.width * scale);
+  const h = Math.round(bmp.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(bmp, 0, 0, w, h);
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Không đọc được ảnh"))), "image/jpeg", 0.85));
 }

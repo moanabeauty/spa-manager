@@ -79,6 +79,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       : []),
     ["Báo sắp hết khi còn ≤", String(p.min_stock)],
     ["Trạng thái", p.is_active ? "Đang lưu hành" : "Ngừng lưu hành"],
+    ["Website", p.show_on_web ? "🌐 Đang hiện trên website" : "Không hiện"],
+    ...(p.web_description ? [["Mô tả trên website", p.web_description] as [string, React.ReactNode]] : []),
     ...(p.note ? [["Ghi chú", p.note] as [string, React.ReactNode]] : []),
   ];
 
@@ -90,9 +92,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           Mã sản phẩm này đã bị xoá. Chỉ còn giữ để xem lại lịch sử nhập / xuất và giá vốn cũ.
         </p>
       )}
-      <div>
+      <div className="flex items-center gap-3">
+        {p.image_url && <img src={p.image_url} alt="" className="h-20 w-20 shrink-0 rounded-lg border border-beige bg-white object-contain" />}
+        <div>
         <h1 className="text-2xl font-bold text-navy">{productLabel(p)}</h1>
         {p.brand && <p className="text-sm text-ink/70">{p.brand}</p>}
+        </div>
       </div>
 
       <div className="card p-0">
