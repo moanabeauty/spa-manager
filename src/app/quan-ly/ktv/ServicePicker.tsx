@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { normalizeText } from "@/lib/format";
+import { normalizeText, textMatch } from "@/lib/format";
 
 export type PickService = { id: string; name: string; name_en: string | null; duration_minutes: number; branch_id: string | null; category: string | null };
 export type Pick = { serviceId: string; itemId: string | null; label: string; minutes: number };
@@ -44,7 +44,7 @@ export default function ServicePicker({
   const local = services.filter((s) => s.branch_id === null || s.branch_id === branchId);
   const comboIds = new Set(combos.map((c) => c.service_id));
   const nq = normalizeText(q.trim());
-  const match = (s: PickService) => !nq || normalizeText(`${s.name} ${s.name_en ?? ""}`).includes(nq);
+  const match = (s: PickService) => !nq || textMatch(`${s.name} ${s.name_en ?? ""}`, nq);
   const others = local.filter((s) => !comboIds.has(s.id) && match(s));
   // gom combo theo phần (1 phần có thể dùng nhiều dịch vụ)
   const comboRows = combos.filter((c) => byId.has(c.service_id) && match(byId.get(c.service_id)!));

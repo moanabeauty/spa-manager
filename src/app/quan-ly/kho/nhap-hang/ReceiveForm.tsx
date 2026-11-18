@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { formatTime, formatVnd, normalizeText, vnError } from "@/lib/format";
+import { formatTime, formatVnd, normalizeText, textMatch, vnError } from "@/lib/format";
 import {
   PRODUCT_COLUMNS,
   UNITS,
@@ -127,7 +127,7 @@ export default function ReceiveForm({
     if (!q) return [];
     return products
       .filter((p) => !p.deleted_at)
-      .filter((p) => normalizeText(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""} ${p.sku ?? ""} ${p.barcode ?? ""}`).includes(q))
+      .filter((p) => textMatch(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""} ${p.sku ?? ""} ${p.barcode ?? ""}`, q))
       .slice(0, 8);
   }, [search, products]);
 
@@ -516,7 +516,7 @@ function UnknownBarcode({
     const t = normalizeText(q.trim());
     return products
       .filter((p) => !p.barcode && !p.deleted_at)
-      .filter((p) => !t || normalizeText(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""}`).includes(t))
+      .filter((p) => !t || textMatch(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""}`, t))
       .slice(0, 8);
   }, [q, products]);
 

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { formatNumber, formatVnd, normalizeText, vnError } from "@/lib/format";
+import { formatNumber, formatVnd, normalizeText, textMatch, vnError } from "@/lib/format";
 
 export type MenuService = {
   id: string;
@@ -96,7 +96,7 @@ export default function MenuEditor({
         (showHidden || s.is_active) &&
         (!onlyMissing || s.technician_fee === 0) &&
         (!tierFilter || s.menu_tier === tierFilter) &&
-        (!q || normalizeText(`${s.name} ${s.name_en ?? ""} ${s.internal_name ?? ""}`).includes(q)),
+        (!q || textMatch(`${s.name} ${s.name_en ?? ""} ${s.internal_name ?? ""}`, q)),
     );
     const g = categories.map((c) => ({ id: c.id, name: c.name, items: list.filter((s) => s.category_id === c.id) }));
     const none = list.filter((s) => !s.category_id || !categories.some((c) => c.id === s.category_id));

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { cleanBarcode } from "@/lib/inventory";
@@ -33,6 +35,10 @@ export default function StaffSearch() {
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const drop = useRef<HTMLDivElement>(null);
+  // vị trí khung kết quả: vẽ ra ngoài thanh trên cùng (portal) vì trên iPhone, phần tràn ra khỏi
+  // thanh có hiệu ứng mờ (backdrop-blur) hiển thị được nhưng bấm không ăn
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
   const [scanMsg, setScanMsg] = useState<string | null>(null);
@@ -90,17 +96,43 @@ export default function StaffSearch() {
   }, [q]);
 
   useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    const close = (e: Event) => {
+      const t = e.target as Node;
+      if (box.current?.contains(t) || drop.current?.contains(t)) return;
+      setOpen(false);
     };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
   }, []);
+
+  const showDrop = open && q.trim().length >= 2;
+  useLayoutEffect(() => {
+    if (!showDrop) return;
+    const place = () => {
+      const r = box.current?.getBoundingClientRect();
+      if (!r || r.width === 0) return setPos(null); // ô đang ẩn (bản máy tính / điện thoại)
+      setPos({ top: r.bottom + 4, left: r.left, width: r.width });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    window.visualViewport?.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+      window.visualViewport?.removeEventListener("resize", place);
+    };
+  }, [showDrop]);
 
   function go(h: Hit) {
     setOpen(false);
     setQ("");
     router.push(KIND[h.kind].href(h.id));
+  }
+  function picked() {
+    setOpen(false);
+    setQ("");
+    (document.activeElement as HTMLElement | null)?.blur?.();
   }
 
   const groups = (["service", "customer", "invoice", "product"] as const).map((k) => ({ k, items: (hits ?? []).filter((h) => h.kind === k) }));
@@ -109,7 +141,7 @@ export default function StaffSearch() {
     <div ref={box} className="relative">
       <input
         type="search"
-        className="input py-2 pl-9 pr-12 text-sm"
+        className="input py-2 pl-9 pr-12 text-base sm:text-sm"
         placeholder="Tìm liệu trình, khách, SĐT, mã hoá đơn, sản phẩm…"
         value={q}
         onChange={(e) => {
@@ -146,38 +178,44 @@ export default function StaffSearch() {
         </div>
       )}
       {scanning && <CameraScanner closeOnScan onScan={onScan} onClose={() => setScanning(false)} />}
-      {open && q.trim().length >= 2 && (
-        <div className="absolute inset-x-0 top-full z-50 mt-1 max-h-[70vh] overflow-y-auto rounded-xl border border-beige-dark bg-white shadow-lg">
-          {busy && !hits && <p className="px-4 py-3 text-sm text-ink/60">Đang tìm…</p>}
-          {hits && hits.length === 0 && <p className="px-4 py-3 text-sm text-ink/60">Không tìm thấy “{q.trim()}”.</p>}
-          {groups.map(
-            (g) =>
-              g.items.length > 0 && (
-                <div key={g.k} className="border-b border-beige last:border-0">
-                  <p className="px-4 pt-2 text-[11px] font-bold uppercase tracking-wide text-brown">{KIND[g.k].label}</p>
-                  {g.items.map((h) => (
-                    <button key={h.id} onClick={() => go(h)} className="block w-full px-4 py-2 text-left text-sm hover:bg-cream">
-                      <span className="font-medium">{h.title}</span>
-                      {h.kind === "product" ? (
-                        <ProductLine h={h} />
-                      ) : (
-                        <>
-                          {h.subtitle && <span className="block text-xs text-ink/60">{h.subtitle}</span>}
-                          {h.kind === "service" && h.list_price != null && (
-                            <span className="block text-xs text-ink/60">
-                              Niêm yết {formatVnd(Number(h.list_price))}
-                              {h.min_price != null ? ` · Member ${formatVnd(Number(h.min_price))}` : ""}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              ),
-          )}
-        </div>
-      )}
+      {showDrop && pos && typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={drop}
+            style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width, maxHeight: `calc(100dvh - ${Math.round(pos.top) + 12}px)` }}
+            className="z-[60] overflow-y-auto overscroll-contain rounded-xl border border-beige-dark bg-surface shadow-lg"
+          >
+            {busy && !hits && <p className="px-4 py-3 text-sm text-ink/60">Đang tìm…</p>}
+            {hits && hits.length === 0 && <p className="px-4 py-3 text-sm text-ink/60">Không tìm thấy “{q.trim()}”.</p>}
+            {groups.map(
+              (g) =>
+                g.items.length > 0 && (
+                  <div key={g.k} className="border-b border-beige last:border-0">
+                    <p className="px-4 pt-2 text-[11px] font-bold uppercase tracking-wide text-brown">{KIND[g.k].label}</p>
+                    {g.items.map((h) => (
+                      <Link key={h.id} href={KIND[h.kind].href(h.id)} onClick={picked} className="block w-full px-4 py-2 text-left text-sm hover:bg-cream">
+                        <span className="font-medium">{h.title}</span>
+                        {h.kind === "product" ? (
+                          <ProductLine h={h} />
+                        ) : (
+                          <>
+                            {h.subtitle && <span className="block text-xs text-ink/60">{h.subtitle}</span>}
+                            {h.kind === "service" && h.list_price != null && (
+                              <span className="block text-xs text-ink/60">
+                                Niêm yết {formatVnd(Number(h.list_price))}
+                                {h.min_price != null ? ` · Member ${formatVnd(Number(h.min_price))}` : ""}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                ),
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

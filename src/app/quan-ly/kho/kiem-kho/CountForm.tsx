@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { normalizeText, vnError } from "@/lib/format";
+import { normalizeText, textMatch, vnError } from "@/lib/format";
 import { cleanBarcode } from "@/lib/inventory";
 import CameraScanner from "@/components/LazyCameraScanner";
 import { initPack } from "@/components/PackQty";
@@ -26,7 +26,7 @@ export default function CountForm({ warehouseId, products }: { warehouseId: stri
   const rows = useMemo(() => {
     const q = normalizeText(query.trim());
     return products
-      .filter((p) => !q || normalizeText(`${p.brand ?? ""} ${p.label} ${p.barcode ?? ""}`).includes(q))
+      .filter((p) => !q || textMatch(`${p.brand ?? ""} ${p.label} ${p.barcode ?? ""}`, q))
       .filter((p) => !onlyEntered || cells[p.id] !== undefined);
   }, [products, query, onlyEntered, cells]);
 

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { normalizeText, vnError } from "@/lib/format";
+import { normalizeText, textMatch, vnError } from "@/lib/format";
 import { openLevelLabel, productLabel, type Product } from "@/lib/inventory";
 
 type Line = { productId: string; qty: number };
@@ -34,7 +34,7 @@ export default function RequestForm({
     const q = normalizeText(search.trim());
     if (!q) return [];
     return products
-      .filter((p) => normalizeText(`${p.brand ?? ""} ${p.name} ${p.used_in ?? ""} ${p.barcode ?? ""}`).includes(q))
+      .filter((p) => textMatch(`${p.brand ?? ""} ${p.name} ${p.used_in ?? ""} ${p.barcode ?? ""}`, q))
       .slice(0, 10);
   }, [search, products]);
 

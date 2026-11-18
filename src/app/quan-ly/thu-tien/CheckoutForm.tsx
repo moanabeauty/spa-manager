@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate, formatTime, formatVnd, normalizePhone, normalizeText, vnError } from "@/lib/format";
+import { formatDate, formatTime, formatVnd, normalizePhone, normalizeText, textMatch, vnError } from "@/lib/format";
 import {
   allocateDiscount,
   cardBalance,
@@ -395,7 +395,7 @@ export default function CheckoutForm({
     if (!q) return [];
     return services
       .filter((s) => s.is_active && (s.branch_id === null || s.branch_id === branchId))
-      .filter((s) => normalizeText(`${s.name} ${s.name_en ?? ""}`).includes(q))
+      .filter((s) => textMatch(`${s.name} ${s.name_en ?? ""}`, q))
       .slice(0, 10);
   }, [query, services, branchId]);
 
@@ -429,7 +429,7 @@ export default function CheckoutForm({
     const q = normalizeText(pQuery.trim());
     if (!q) return [];
     return retailProducts
-      .filter((p) => normalizeText(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""} ${p.barcode ?? ""}`).includes(q))
+      .filter((p) => textMatch(`${p.brand ?? ""} ${p.name} ${p.capacity ?? ""} ${p.barcode ?? ""}`, q))
       .slice(0, 8);
   }, [pQuery, retailProducts]);
 

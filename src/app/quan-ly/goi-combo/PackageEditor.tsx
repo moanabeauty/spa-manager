@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { formatVnd, normalizeText, vnError } from "@/lib/format";
+import { formatVnd, normalizeText, textMatch, vnError } from "@/lib/format";
 import MoneyInput from "@/components/MoneyInput";
 
 export type Pkg = {
@@ -52,7 +52,7 @@ function ServicePicker({ services, onPick, exclude }: { services: Svc[]; onPick:
   const filtered = useMemo(() => {
     const q = normalizeText(query.trim());
     if (!q) return [];
-    return services.filter((s) => !exclude.includes(s.id) && normalizeText(`${s.name} ${s.name_en ?? ""}`).includes(q)).slice(0, 8);
+    return services.filter((s) => !exclude.includes(s.id) && textMatch(`${s.name} ${s.name_en ?? ""}`, q)).slice(0, 8);
   }, [query, services, exclude]);
   return (
     <div>

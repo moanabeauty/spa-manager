@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { formatVnd, normalizeText, vnError } from "@/lib/format";
+import { formatVnd, normalizeText, textMatch, vnError } from "@/lib/format";
 import { productLabel, type Product, type WarehouseType } from "@/lib/inventory";
 import { TileIconSvg, type TileIcon } from "@/components/StatTile";
 import Modal from "@/components/Modal";
@@ -70,7 +70,7 @@ export default function StockList({
   const rows = useMemo(() => {
     const q = normalizeText(query.trim());
     return products
-      .filter((p) => !q || normalizeText(`${p.brand ?? ""} ${p.name} ${p.category ?? ""} ${p.barcode ?? ""} ${p.sku ?? ""}`).includes(q))
+      .filter((p) => !q || textMatch(`${p.brand ?? ""} ${p.name} ${p.category ?? ""} ${p.barcode ?? ""} ${p.sku ?? ""}`, q))
       .filter((p) => status === "all" || stateOf(p) === status)
       .filter((p) => !group || groupOf(p) === group)
       .filter((p) => expiry === "all" || (expiry === "expired" ? expiryOf(p) === "expired" : expiryOf(p) !== null));

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { normalizeText, vnError } from "@/lib/format";
+import { normalizeText, textMatch, vnError } from "@/lib/format";
 import { cleanBarcode } from "@/lib/inventory";
 import CameraScanner from "@/components/LazyCameraScanner";
 
@@ -23,7 +23,7 @@ export default function TransferForm({ fromId, toId, fromName, toName, products 
   const found = useMemo(() => {
     const q = normalizeText(query.trim());
     if (!q) return [];
-    return products.filter((p) => normalizeText(`${p.brand ?? ""} ${p.label} ${p.barcode ?? ""}`).includes(q)).slice(0, 8);
+    return products.filter((p) => textMatch(`${p.brand ?? ""} ${p.label} ${p.barcode ?? ""}`, q)).slice(0, 8);
   }, [products, query]);
   const lines = Object.entries(picked).filter(([, n]) => n > 0);
   const over = lines.some(([id, n]) => n > (byId.get(id)?.qty ?? 0));

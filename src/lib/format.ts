@@ -137,3 +137,17 @@ export function formatDmy(iso: string | null | undefined, fallback = "—"): str
 export function formatDmy2(iso: string): string {
   return DMY2.format(new Date(iso));
 }
+
+/** Tìm kiếm mềm: bỏ dấu, không phân biệt hoa thường, bỏ qua khoảng trắng / dấu câu
+ *  ("Maruderm" khớp "MARU DERM", "ha collagen" khớp "HA+Collagen"), và các từ gõ theo thứ tự bất kỳ */
+export function textMatch(hay: string, q: string): boolean {
+  const n = normalizeText(q).trim();
+  if (!n) return true;
+  const h = normalizeText(hay);
+  if (h.includes(n)) return true;
+  const flat = (s: string) => s.replace(/[^a-z0-9]/g, "");
+  const fh = flat(h);
+  const fq = flat(n);
+  if (fq.length >= 2 && fh.includes(fq)) return true;
+  return n.split(/\s+/).every((w) => h.includes(w) || (flat(w).length > 0 && fh.includes(flat(w))));
+}

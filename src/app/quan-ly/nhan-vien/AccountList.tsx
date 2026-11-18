@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ROLE_LABEL, normalizeText, vnError } from "@/lib/format";
+import { ROLE_LABEL, normalizeText, textMatch, vnError } from "@/lib/format";
 
 export type Account = {
   id: string;
@@ -51,7 +51,7 @@ export default function AccountList({
   const list = useMemo(() => {
     const q = normalizeText(query.trim());
     return accounts.filter((a) => {
-      if (q) return normalizeText(`${a.full_name ?? ""} ${a.email ?? ""} ${a.phone ?? ""}`).includes(q);
+      if (q) return textMatch(`${a.full_name ?? ""} ${a.email ?? ""} ${a.phone ?? ""}`, q);
       return tab === "staff" ? a.role !== "customer" : a.role === "customer";
     });
   }, [accounts, tab, query]);

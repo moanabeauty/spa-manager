@@ -9,7 +9,7 @@ import {
   formatTime,
   formatVnd,
   normalizePhone,
-  normalizeText,
+  normalizeText, textMatch,
   todayVn,
   vnDateTime,
   vnError,
@@ -173,7 +173,7 @@ export default function StaffBookingForm({
     if (!q) return [];
     return services
       .filter((s) => s.branch_id === null || s.branch_id === branchId)
-      .filter((s) => normalizeText(`${s.name} ${s.name_en ?? ""}`).includes(q))
+      .filter((s) => textMatch(`${s.name} ${s.name_en ?? ""}`, q))
       .slice(0, 12);
   }, [services, query, branchId]);
 
