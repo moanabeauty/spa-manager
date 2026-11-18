@@ -1,6 +1,6 @@
 // Trang Liệu trình, Promotion (ưu đãi theo tháng + các gói/combo), Bảng giá (+ trang chi tiết).
 // Giá liệu trình & gói CHỈ hiện ở trang Bảng giá (quy ước đã chốt). Trên web, "combo" trong app được gọi là Promotion.
-import { SITE, GROUPS, COMBO_IMAGES } from '../site.mjs';
+import { SITE, GROUPS, COMBO_IMAGES, SERVICE_IMAGES } from '../site.mjs';
 import { esc, page } from '../layout.mjs';
 import { banner, crumbs, ctaBand, zaloButtons } from '../parts.mjs';
 import { slugify, img, money, webText, svcName, titleEn, svcSlug, pkgSlug, paragraphs, fmtDate } from '../util.mjs';
@@ -123,9 +123,10 @@ ${ctaBand()}`;
 function renderService(s, ctx, buildId) {
   const g = s.group;
   const others = g.items.filter((x) => x !== s);
+  const pics = SERVICE_IMAGES[(s.name_en || '').trim().toUpperCase()] || [g.image];
   const body = `${crumbs([{ href: '/lieu-trinh', label: 'Liệu trình' }, { href: `/lieu-trinh#${g.slug}`, label: g.title }, { label: s.en }])}
 <section class="wrap detail">
-  <div class="detail-img">${img(g.image, g.title, { eager: true, sizes: '(min-width: 900px) 50vw, 100vw' })}</div>
+  <div class="detail-img">${img(pics[0], `${s.en} — ${s.vn}`, { eager: true, sizes: '(min-width: 900px) 50vw, 100vw' })}</div>
   <div class="detail-text">
     <p class="label">${esc(g.title)}</p>
     <h1 class="detail-title">${esc(s.en)}</h1>
@@ -140,6 +141,10 @@ function renderService(s, ctx, buildId) {
     <p class="mt-s"><a class="link" href="/bang-gia#${s.slug}">Xem giá liệu trình tại Bảng giá</a></p>
   </div>
 </section>
+${pics.length > 1 ? `
+<section class="wrap pt-0 gallery">${pics.slice(1).map((p) => `
+  <div class="gallery-img">${img(p, `${s.en} tại Moana`, { sizes: '(min-width: 900px) 33vw, 50vw' })}</div>`).join('')}
+</section>` : ''}
 
 <section class="journey">
   <div class="wrap section">

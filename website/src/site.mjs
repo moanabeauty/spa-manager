@@ -104,6 +104,15 @@ export const PRODUCT_CATS = [
   { key: 'CHĂM SÓC TÓC', label: 'Tóc', area: 'Tóc' },
 ];
 
+// Ảnh riêng cho từng liệu trình (khoá = tên tiếng Anh name_en trong app). Ảnh đầu là ảnh chính ở trang chi tiết,
+// các ảnh sau hiện thành dải ảnh bên dưới. Liệu trình không có ở đây dùng ảnh của nhóm.
+export const SERVICE_IMAGES = {
+  'DETOX SKIN': ['nhom-co-ban', 'lt-detox-1', 'lt-detox-2'],
+  'ION BRIGHT': ['lt-ion-bright'],
+  'PRO CALM': ['lt-procalm-enzyme'],
+  'ENZYME POWER': ['lt-procalm-enzyme'],
+};
+
 // Ảnh minh hoạ cho các gói Promotion theo nhóm gói (khớp đầu tên nhóm trong app).
 export const COMBO_IMAGES = [
   { match: 'Chăm sóc da cơ bản', image: 'nhom-co-ban' },
