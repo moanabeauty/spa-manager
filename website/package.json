@@ -1,0 +1,14 @@
+{
+  "name": "moana-website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Website giới thiệu Moana Beauty (moanabeauty.vn) — trang tĩnh, đọc dữ liệu công khai từ app spa-manager",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:offline": "WEBSITE_OFFLINE=1 node build.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
