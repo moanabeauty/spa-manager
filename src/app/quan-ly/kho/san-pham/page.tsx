@@ -1,5 +1,5 @@
 import { getCurrentUser, isStaffRole } from "@/lib/supabase/server";
-import { PRODUCT_COLUMNS, canEditProducts, fetchDefaultDiscountPct, type Product } from "@/lib/inventory";
+import { fetchAll, PRODUCT_COLUMNS, canEditProducts, fetchDefaultDiscountPct, type Product } from "@/lib/inventory";
 import ProductEditor from "./ProductEditor";
 
 export const metadata = { title: "Sản phẩm – Moana Beauty" };
@@ -9,7 +9,7 @@ export default async function ProductsPage() {
   if (!isStaffRole(profile?.role)) return <p className="card text-sm">Trang dành cho nhân viên.</p>;
   const canEdit = canEditProducts(profile?.roles);
   const [{ data: products }, pct] = await Promise.all([
-    supabase.from("products").select(PRODUCT_COLUMNS).is("deleted_at", null).order("name"),
+    fetchAll(() => supabase.from("products").select(PRODUCT_COLUMNS).is("deleted_at", null).order("name").order("id")),
     fetchDefaultDiscountPct(supabase),
   ]);
 

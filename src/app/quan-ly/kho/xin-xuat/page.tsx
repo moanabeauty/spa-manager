@@ -1,6 +1,6 @@
 import { activeBranches } from "@/lib/refData";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { PRODUCT_COLUMNS, canManageStock, fetchOpened, fetchStock, type Product, type Warehouse } from "@/lib/inventory";
+import { fetchAll, PRODUCT_COLUMNS, canManageStock, fetchOpened, fetchStock, type Product, type Warehouse } from "@/lib/inventory";
 import { KhoNav, pickBranch } from "../shared";
 import RequestForm from "./RequestForm";
 import RequestCard, { type StockRequest } from "./RequestCard";
@@ -24,7 +24,7 @@ export default async function StockRequestPage({ searchParams }: { searchParams:
   const reviewWh = profile?.role === "warehouse" ? treatment.filter((w) => w.branch_id === profile!.branch_id) : treatment;
 
   const [{ data: products }, stock, opened, { data: mine }, { data: toReview }] = await Promise.all([
-    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).eq("for_treatment", true).order("name"),
+    fetchAll(() => supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).eq("for_treatment", true).order("name").order("id")),
     fetchStock(supabase, wh ? [wh.id] : []),
     fetchOpened(supabase, wh?.id ?? ""),
     supabase.from("stock_requests").select(SELECT).eq("requested_by", profile!.id).order("created_at", { ascending: false }).limit(20),

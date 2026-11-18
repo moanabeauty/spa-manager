@@ -1,7 +1,7 @@
 import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { PRODUCT_COLUMNS, WAREHOUSE_LABEL, canEditProducts, canManageStock, fetchDefaultDiscountPct, fetchStock, type Product, type Warehouse, type WarehouseType } from "@/lib/inventory";
+import { fetchAll, PRODUCT_COLUMNS, WAREHOUSE_LABEL, canEditProducts, canManageStock, fetchDefaultDiscountPct, fetchStock, type Product, type Warehouse, type WarehouseType } from "@/lib/inventory";
 import { KhoNav, pickBranch } from "./shared";
 import StockList from "./StockList";
 
@@ -18,7 +18,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const canEdit = canEditProducts(profile?.roles);
   const [{ data: whs }, { data: products }, defaultPct] = await Promise.all([
     supabase.from("warehouses").select("id, branch_id, type, name").eq("branch_id", branchId),
-    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).order("name"),
+    fetchAll(() => supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).order("name").order("id")),
     canEdit ? fetchDefaultDiscountPct(supabase) : Promise.resolve(0),
   ]);
   const warehouses = (whs ?? []) as Warehouse[];

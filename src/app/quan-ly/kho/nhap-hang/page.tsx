@@ -1,6 +1,6 @@
 import { activeBranches } from "@/lib/refData";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { PRODUCT_COLUMNS, canManageStock, type Product, type Warehouse } from "@/lib/inventory";
+import { fetchAll, PRODUCT_COLUMNS, canManageStock, type Product, type Warehouse } from "@/lib/inventory";
 import { KhoNav, pickBranch } from "../shared";
 import ReceiveForm, { type RecentReceipt } from "./ReceiveForm";
 import ApproveReceipts, { type PendingReceipt } from "./ApproveReceipts";
@@ -19,7 +19,7 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
   const isOwner = profile!.role === "owner";
   const [{ data: whs }, { data: products }, { data: costs }, { data: receipts }, { data: pendingData }, { data: sups }, { data: ledger }, { data: lp }] = await Promise.all([
     supabase.from("warehouses").select("id, branch_id, type, name"),
-    supabase.from("products").select(PRODUCT_COLUMNS).order("name"),
+    fetchAll(() => supabase.from("products").select(PRODUCT_COLUMNS).order("name").order("id")),
     isOwner ? supabase.rpc("product_costs") : Promise.resolve({ data: [] }),
     (() => {
       // NV kho: chỉ phiếu mình tạo; chủ / quản lý: mọi phiếu

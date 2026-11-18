@@ -65,6 +65,19 @@ export default function ReceiveForm({
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  // trang tải lại dữ liệu mới (vd vừa tạo sản phẩm ở nơi khác) → cập nhật danh mục, giữ sản phẩm vừa thêm tại đây
+  useEffect(() => {
+    setProducts((prev) => {
+      const ids = new Set(initialProducts.map((p) => p.id));
+      return [...initialProducts, ...prev.filter((p) => !ids.has(p.id))];
+    });
+  }, [initialProducts]);
+  const mergeProducts = (more: Product[]) =>
+    setProducts((prev) => {
+      const m = new Map(prev.map((p) => [p.id, p]));
+      more.forEach((p) => m.set(p.id, p));
+      return [...m.values()];
+    });
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const byBarcode = useMemo(() => new Map(products.filter((p) => p.barcode && !p.deleted_at).map((p) => [p.barcode!, p])), [products]);
 
@@ -106,11 +119,25 @@ export default function ReceiveForm({
   }
   const setPe = (id: string, pe: PackEntry) => setLines((ls) => ls.map((x) => (x.productId === id ? { ...x, pe } : x)));
 
-  function handleCode(raw: string) {
+  async function handleCode(raw: string) {
     const c = cleanBarcode(raw);
     if (!c) return;
     // mã vạch, hoặc mã sản phẩm (SKU) gõ tay
-    const p = byBarcode.get(c) ?? products.find((x) => !x.deleted_at && x.sku && x.sku.toLowerCase() === c.toLowerCase());
+    let p = byBarcode.get(c) ?? products.find((x) => !x.deleted_at && x.sku && x.sku.toLowerCase() === c.toLowerCase());
+    if (!p && /^[\w.-]+$/.test(c)) {
+      // không có trong danh mục đã tải → hỏi thẳng cơ sở dữ liệu (sản phẩm vừa được tạo)
+      const { data } = await supabase
+        .from("products")
+        .select(PRODUCT_COLUMNS)
+        .is("deleted_at", null)
+        .or(`barcode.eq.${c},sku.ilike.${c}`)
+        .limit(1);
+      const hit = ((data ?? []) as Product[])[0];
+      if (hit) {
+        mergeProducts([hit]);
+        p = hit;
+      }
+    }
     if (p) {
       addProduct(p);
       setUnknown(null);
@@ -121,6 +148,25 @@ export default function ReceiveForm({
     }
     setCode("");
   }
+
+  // gõ tìm mà danh mục đã tải không có → tìm thẳng trên cơ sở dữ liệu rồi bổ sung vào danh mục
+  useEffect(() => {
+    const t = search.trim();
+    if (t.length < 2) return;
+    let alive = true;
+    const id = setTimeout(async () => {
+      const { data } = await supabase.rpc("staff_search_v3", { p_q: t });
+      const ids = ((data ?? []) as { kind: string; id: string }[]).filter((h) => h.kind === "product").map((h) => h.id);
+      if (!alive || ids.length === 0) return;
+      const { data: rows } = await supabase.from("products").select(PRODUCT_COLUMNS).in("id", ids);
+      if (alive && rows?.length) mergeProducts(rows as Product[]);
+    }, 300);
+    return () => {
+      alive = false;
+      clearTimeout(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   const found = useMemo(() => {
     const q = normalizeText(search.trim());

@@ -2,7 +2,7 @@ import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { formatShortDate, formatTime } from "@/lib/format";
-import { PRODUCT_COLUMNS, WAREHOUSE_LABEL, openLevelLabel, canManageStock, fetchStock, productLabel, type Product, type Warehouse, type WarehouseType } from "@/lib/inventory";
+import { fetchAll, PRODUCT_COLUMNS, WAREHOUSE_LABEL, openLevelLabel, canManageStock, fetchStock, productLabel, type Product, type Warehouse, type WarehouseType } from "@/lib/inventory";
 import { pickBranch } from "../shared";
 import CountForm, { CountReview } from "./CountForm";
 import OpeningForm from "./OpeningForm";
@@ -31,7 +31,7 @@ export default async function StockCountPage({ searchParams }: { searchParams: P
   const { branchId, canSwitch } = pickBranch(profile, branches ?? [], sp.cn);
   const [{ data: whs }, { data: products }] = await Promise.all([
     supabase.from("warehouses").select("id, branch_id, type, name"),
-    supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).order("name"),
+    fetchAll(() => supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).order("name").order("id")),
   ]);
   const warehouses = (whs ?? []) as Warehouse[];
   const wh = warehouses.find((w) => w.branch_id === branchId && w.type === type);

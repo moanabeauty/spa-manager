@@ -97,10 +97,14 @@ export async function fetchStock(supabase: Db, warehouseIds: string[]): Promise<
   const out = new Map<string, Map<string, number>>();
   warehouseIds.forEach((w) => out.set(w, new Map()));
   if (warehouseIds.length === 0) return out;
-  const { data } = await supabase
-    .from("stock_levels")
-    .select("warehouse_id, product_id, quantity")
-    .in("warehouse_id", warehouseIds);
+  const { data } = await fetchAll(() =>
+    supabase
+      .from("stock_levels")
+      .select("warehouse_id, product_id, quantity")
+      .in("warehouse_id", warehouseIds)
+      .order("warehouse_id")
+      .order("product_id"),
+  );
   ((data ?? []) as { warehouse_id: string; product_id: string; quantity: number }[]).forEach((r) =>
     out.get(r.warehouse_id)?.set(r.product_id, Number(r.quantity)),
   );
@@ -185,4 +189,21 @@ export function parseDec(s: string | null | undefined): number | null {
   if (t === "") return null;
   const n = Number(t);
   return Number.isFinite(n) ? n : null;
+}
+
+/** Lấy HẾT các dòng (không bị giới hạn số dòng mỗi lần gọi của Supabase): gọi từng trang cho đến khi hết.
+ *  `make` phải trả về câu truy vấn mới mỗi lần và có sắp xếp cố định (vd .order("name").order("id")). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function fetchAll<T = any>(make: () => any): Promise<{ data: T[]; error: { message: string } | null }> {
+  const out: T[] = [];
+  const PAGE = 500;
+  for (let from = 0, guard = 0; guard < 100; guard++) {
+    const { data, error } = await make().range(from, from + PAGE - 1);
+    if (error) return { data: out, error };
+    const rows = (data ?? []) as T[];
+    if (rows.length === 0) break;
+    out.push(...rows);
+    from += rows.length; // nhích theo số dòng thực nhận (phòng khi máy chủ trả ít hơn PAGE)
+  }
+  return { data: out, error: null };
 }
