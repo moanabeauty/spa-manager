@@ -52,13 +52,13 @@ export function renderHome(data, buildId) {
     <a class="btn btn-outline" href="#ghe-tham">Nhắn Zalo</a>
   </article>
   <article class="entry">
-    <div class="entry-img">${img('san-pham-br', 'Sản phẩm Biologique Recherche dùng tại Moana', { sizes: '(min-width: 900px) 33vw, 100vw' })}</div>
+    <div class="entry-img">${img('ca-nhan-hoa', 'Chuyên viên Moana massage vùng thái dương trong liệu trình Biologique Recherche', { sizes: '(min-width: 900px) 33vw, 100vw' })}</div>
     <h2 class="h3">Cá nhân hoá từng bước</h2>
     <p>Liệu trình và sản phẩm được lựa chọn, điều chỉnh cho riêng bạn.</p>
     <a class="btn btn-outline" href="/lieu-trinh">Khám phá liệu trình</a>
   </article>
   <article class="entry">
-    <div class="entry-img">${img('hoa-thu-gian', 'Hoa tươi trong không gian Moana', { sizes: '(min-width: 900px) 33vw, 100vw' })}</div>
+    <div class="entry-img">${img('uu-dai-san-pham', 'Sản phẩm Biologique Recherche dùng tại Moana', { sizes: '(min-width: 900px) 33vw, 100vw' })}</div>
     <h2 class="h3">Ưu đãi của Moana</h2>
     <p>Ưu đãi theo tháng và các gói chăm sóc nhiều buổi.</p>
     <a class="btn btn-outline" href="/promotion">Xem Promotion</a>
