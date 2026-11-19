@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { autoPickCustomer } from "@/lib/customerSearch";
 import { normalizePhone, todayVn, vnDateTime, vnError } from "@/lib/format";
 import { addDays, daySlots, peakLoad, toIntervals, type Interval } from "@/lib/calendar";
 import { nowVnHHMM, weekdayShort, weekdayTiny } from "@/lib/ktv";
@@ -53,7 +54,14 @@ export default function KtvBookingForm({
     let off = false;
     const h = setTimeout(async () => {
       const { data } = await supabase.rpc("search_customers", { p_q: t, p_limit: 8 });
-      if (!off) setFound((data ?? []) as Found[]);
+      if (off) return;
+      const list = (data ?? []) as Found[];
+      const pick = autoPickCustomer(t, list, { byName: false }); // đủ mã KH / tên chỉ ra 1 khách → tự chọn
+      if (pick) {
+        setCustomer(pick);
+        setQ("");
+      }
+      else setFound(list);
     }, 300);
     return () => {
       off = true;

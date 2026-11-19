@@ -1,3 +1,4 @@
+import { PROCEDURE_CHANGE_KIND } from "@/lib/ktv";
 import { allBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -46,7 +47,7 @@ export default async function KtvMonitorPage() {
     supabase
       .from("procedure_change_requests")
       .select(
-        "id, step_no, from_product, to_product, reason, created_at, requester:profiles!procedure_change_requests_requested_by_fkey(full_name), appointment_services(services(name_en, name), appointments(customers(full_name)))",
+        "id, step_no, kind, from_product, to_product, reason, created_at, requester:profiles!procedure_change_requests_requested_by_fkey(full_name), appointment_services(services(name_en, name), appointments(customers(full_name)))",
       )
       .eq("status", "pending")
       .order("created_at"),
@@ -83,7 +84,7 @@ export default async function KtvMonitorPage() {
   const doneToday = live.filter((l) => l.work_done_at);
   const notStarted = live.filter((l) => !l.work_started_at);
   const changes = (changeR.data ?? []) as unknown as {
-    id: string; step_no: number; from_product: string | null; to_product: string; reason: string; created_at: string;
+    id: string; step_no: number; kind: string; from_product: string | null; to_product: string; reason: string; created_at: string;
     requester: { full_name: string | null } | null;
     appointment_services: { services: { name_en: string | null; name: string } | null; appointments: { customers: { full_name: string } | null } | null } | null;
   }[];
@@ -144,16 +145,17 @@ export default async function KtvMonitorPage() {
       </section>
 
       <section className="card space-y-2 p-4">
-        <h2 className="font-semibold text-navy">Đổi sản phẩm chờ duyệt ({changes.length})</h2>
+        <h2 className="font-semibold text-navy">Điều chỉnh quy trình chờ duyệt ({changes.length})</h2>
         {changes.length === 0 && <p className="text-sm text-[#22612A]">✓ Không có yêu cầu.</p>}
         {changes.map((c) => (
           <div key={c.id} className="rounded-xl bg-[#FFF4DB] px-3 py-2 text-sm">
             <p>
               <b>{c.requester?.full_name ?? "KTV"}</b> · {c.appointment_services?.appointments?.customers?.full_name} ·{" "}
-              {c.appointment_services?.services?.name_en || c.appointment_services?.services?.name} · bước {c.step_no}
+              {c.appointment_services?.services?.name_en || c.appointment_services?.services?.name}
             </p>
             <p className="text-xs">
-              Đổi {c.from_product ? <s>{c.from_product}</s> : "sản phẩm"} sang <b>{c.to_product}</b> · lý do: {c.reason} · {formatTime(c.created_at)}
+              <b>{PROCEDURE_CHANGE_KIND[c.kind] ?? "Đổi sản phẩm"}:</b> {c.from_product ? `${c.from_product} → ` : ""}
+              <b>{c.to_product}</b> · lý do: {c.reason} · {formatTime(c.created_at)}
             </p>
             <ReviewButtons fn="review_procedure_change" args={{ p_id: c.id }} withNote />
           </div>

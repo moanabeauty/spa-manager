@@ -75,3 +75,13 @@ export function elapsed(fromIso: string, now = Date.now()): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return h ? `${h}:${p(m)}:${p(ss)}` : `${p(m)}:${p(ss)}`;
 }
+
+/** Tên loại điều chỉnh quy trình (KTV xin, quản lý duyệt) */
+export const PROCEDURE_CHANGE_KIND: Record<string, string> = {
+  swap: "Đổi sản phẩm",
+  remove: "Bỏ sản phẩm",
+  qty: "Đổi định lượng",
+  add_product: "Thêm sản phẩm",
+  remove_step: "Bỏ bước",
+  add_step: "Thêm bước",
+};

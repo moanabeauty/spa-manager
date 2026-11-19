@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import type { ServiceGuide } from "@/components/ServiceGuideSections";
 import { loadCustomerPhotos, photosRequired } from "@/lib/photos";
-import ProcedureRunner, { type Change, type Step, type Usage } from "./ProcedureRunner";
+import ProcedureRunner, { type Change, type Item, type Step, type Usage } from "./ProcedureRunner";
 import { volumeUnit } from "@/lib/inventory";
 
 export const metadata = { title: "Quy trình liệu trình – Moana Beauty" };
@@ -44,7 +44,7 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       </div>
     );
   }
-  const [{ data: steps }, { data: changes }, { data: guide }, photoSessions, needPhotos, { data: used }] = await Promise.all([
+  const [{ data: steps }, { data: changes }, { data: guide }, photoSessions, needPhotos, { data: used }, { data: itemRows }] = await Promise.all([
     supabase
       .from("service_procedure_steps")
       .select("step_no, title, products, instructions, note")
@@ -52,7 +52,10 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       .order("step_no"),
     supabase
       .from("procedure_change_requests")
-      .select("id, step_no, from_product, to_product, reason, status, review_note")
+      .select(
+        "id, step_no, from_product, to_product, reason, status, review_note, kind, item_id, new_qty, step_title, parent_id, product_label, to_product_id, requested_by, prod:products!procedure_change_requests_to_product_id_fkey(capacity, unit)",
+      )
+      .neq("status", "cancelled")
       .eq("appointment_service_id", id)
       .order("created_at"),
     supabase
@@ -63,7 +66,28 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
     loadCustomerPhotos(supabase, row.appointments?.customer_id ?? "", row.appointment_id),
     photosRequired(supabase, row.services?.id ? [row.services.id] : []),
     supabase.from("treatment_usages").select("qty, product_id, products(name, capacity, unit)").eq("appointment_service_id", id),
+    supabase
+      .from("service_step_items")
+      .select("id, step_no, sort, product_name, product_id, qty, products(capacity, unit)")
+      .eq("service_id", row.services?.id ?? "")
+      .order("step_no")
+      .order("sort"),
   ]);
+  type ItemRow = { id: string; step_no: number; sort: number; product_name: string; product_id: string | null; qty: number | null; products: { capacity: string | null; unit: string } | null };
+  const items: Item[] = ((itemRows ?? []) as unknown as ItemRow[]).map((i) => ({
+    id: i.id,
+    step_no: i.step_no,
+    name: i.product_name,
+    product_id: i.product_id,
+    qty: i.qty == null ? null : Number(i.qty),
+    unit: i.products ? volumeUnit(i.products.capacity, i.products.unit) : "",
+  }));
+  type ChangeRow = Omit<Change, "unit"> & { prod: { capacity: string | null; unit: string } | null };
+  const changeList: Change[] = ((changes ?? []) as unknown as ChangeRow[]).map(({ prod, ...c }) => ({
+    ...c,
+    new_qty: c.new_qty == null ? null : Number(c.new_qty),
+    unit: prod ? volumeUnit(prod.capacity, prod.unit) : "",
+  }));
   // gộp lượng đã trừ theo sản phẩm
   const usageMap = new Map<string, Usage>();
   ((used ?? []) as unknown as { qty: number; product_id: string; products: { name: string; capacity: string | null; unit: string } | null }[]).forEach((u) => {
@@ -90,7 +114,9 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       stepsDone={row.steps_done}
       stepLog={row.step_log ?? []}
       steps={(steps ?? []) as Step[]}
-      changes={(changes ?? []) as Change[]}
+      changes={changeList}
+      items={items}
+      myId={profile.id}
       guide={(guide ?? null) as ServiceGuide | null}
       closed={["cancelled", "no_show"].includes(row.appointments?.status ?? "")}
       appointmentId={row.appointment_id}

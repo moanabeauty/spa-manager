@@ -20,6 +20,7 @@ import {
 import RefundButton from "./RefundButton";
 import { SkinDot, SkinRecordCard, shortDay, type SkinRecord } from "@/lib/skin";
 import CrmProfileForm from "./CrmProfileForm";
+import CustomerQuickSearch from "./CustomerQuickSearch";
 import PhotoHistory from "@/components/PhotoHistory";
 import { loadCustomerPhotos } from "@/lib/photos";
 import ReminderActions, { AddReminderForm } from "../cham-soc/ReminderActions";
@@ -67,7 +68,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   if (sp.id) {
     const [{ data: statRows }, { data: cRaw }, { data: crm }, { data: rems }, { data: visits }] = await Promise.all([
       supabase.rpc("crm_customers", { p_id: sp.id, p_limit: 1 }),
-      supabase.from("customers").select("id, full_name, email, birthday, gender, note, home_branch_id, created_at").eq("id", sp.id).maybeSingle(),
+      supabase.from("customers").select("id, code, full_name, email, birthday, gender, note, home_branch_id, created_at").eq("id", sp.id).maybeSingle(),
       supabase.from("customer_crm").select("*").eq("customer_id", sp.id).maybeSingle<CrmProfile>(),
       supabase
         .from("care_reminders")
@@ -139,12 +140,20 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
 
     return (
       <div className="space-y-4">
-        <Link href="/quan-ly/khach-hang" className="text-sm font-semibold text-navy">← Danh sách khách</Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/quan-ly/khach-hang" className="shrink-0 text-sm font-semibold text-navy">← Danh sách khách</Link>
+          <div className="flex min-w-[220px] flex-1">
+            <CustomerQuickSearch />
+          </div>
+        </div>
 
         <div className="card">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-xl font-bold text-navy">{c.full_name}</h1>
+              <h1 className="text-xl font-bold text-navy">
+                {c.full_name}
+                {c.code && <span className="ml-2 align-middle text-sm font-medium text-ink/55">{c.code}</span>}
+              </h1>
               <p className="text-sm text-ink/70">
                 {c.phone ? <a href={`tel:${c.phone}`} className="font-medium text-navy underline">{c.phone}</a> : seePhone ? "(chưa có SĐT)" : "(SĐT ẩn)"} {c.email && `· ${c.email}`}
               </p>
@@ -451,7 +460,8 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const grp = sp.nhom && groupById.has(sp.nhom) ? sp.nhom : null;
   const cn = sp.cn && branches.some((b) => b.id === sp.cn) ? sp.cn : null;
   const { data: rows, error } = await supabase.rpc("crm_customers", {
-    p_q: q || null,
+    // mã KH gõ tắt (KH12) → KH00012
+    p_q: (/^kh\s*\d{1,5}$/i.test(q) ? `KH${q.replace(/\D/g, "").padStart(5, "0")}` : q) || null,
     p_segment: seg,
     p_group: grp,
     p_branch: cn,
@@ -478,7 +488,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
 
       <form action="/quan-ly/khach-hang" className="card space-y-3 p-3">
         <div className="flex gap-2">
-          <input name="q" defaultValue={q} className="input py-2" placeholder="Tìm theo SĐT hoặc tên" />
+          <CustomerQuickSearch defaultQ={q} />
           <button className="btn-primary shrink-0">Tìm</button>
         </div>
         <div className="grid grid-cols-2 gap-2">

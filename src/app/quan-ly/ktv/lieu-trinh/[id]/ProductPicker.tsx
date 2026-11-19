@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { cleanBarcode } from "@/lib/inventory";
+import { cleanBarcode, volumeUnit } from "@/lib/inventory";
 import CameraScanner from "@/components/LazyCameraScanner";
 
-type P = { id: string; name: string; brand: string | null; capacity: string | null; sku: string | null; barcode: string | null; for_retail: boolean };
-const COLS = "id, name, brand, capacity, sku, barcode, for_retail";
+type P = { id: string; name: string; brand: string | null; capacity: string | null; sku: string | null; barcode: string | null; for_retail: boolean; unit: string | null };
+const COLS = "id, name, brand, capacity, sku, barcode, for_retail, unit";
 
 /** Hiển thị: NHÃN HÀNG Tên · dung tích (giống cách ghi trong quy trình gốc) */
 export function productLabel(p: P) {
@@ -19,7 +19,11 @@ export function productLabel(p: P) {
  * Ô "Đổi sang sản phẩm": gõ tên / nhãn hàng / mã → hiện danh sách sản phẩm trong kho để chọn,
  * hoặc bấm 📷 quét mã vạch trên vỏ hộp. Vẫn gõ tay được nếu sản phẩm chưa có trong hệ thống.
  */
-export default function ProductPicker({ value, onChange }: { value: string; onChange: (v: string, productId?: string | null) => void }) {
+export default function ProductPicker({ value, onChange, placeholder = "Đổi sang sản phẩm… (gõ tên hoặc quét mã)" }: {
+  value: string;
+  onChange: (v: string, productId?: string | null, unit?: string) => void;
+  placeholder?: string;
+}) {
   const [hits, setHits] = useState<P[] | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -65,7 +69,7 @@ export default function ProductPicker({ value, onChange }: { value: string; onCh
 
   function pick(p: P) {
     picked.current = true;
-    onChange(productLabel(p), p.id);
+    onChange(productLabel(p), p.id, volumeUnit(p.capacity, p.unit));
     setOpen(false);
     setMsg(null);
   }
@@ -89,7 +93,7 @@ export default function ProductPicker({ value, onChange }: { value: string; onCh
     <div ref={box} className="relative">
       <input
         className="input py-2 pr-12 text-sm"
-        placeholder="Đổi sang sản phẩm… (gõ tên hoặc quét mã)"
+        placeholder={placeholder}
         value={value}
         autoFocus
         onChange={(e) => {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { CUSTOMER_SEARCH_HINT, autoPickCustomer, customerQueryReady } from "@/lib/customerSearch";
 import { normalizePhone, todayVn, vnDateTime, vnError } from "@/lib/format";
 import { TIME_SLOTS } from "@/app/khuyen-mai/RegisterForm";
 
@@ -17,7 +18,7 @@ type PromoOpt = {
   summary: string;
   ended: boolean; // hết thời gian đăng ký (chỉ chủ / quản lý thấy)
 };
-type Cust = { id: string; full_name: string; phone: string | null };
+type Cust = { id: string; full_name: string; phone: string | null; code?: string | null };
 
 /** Nhân viên đăng ký hộ khách gọi điện / đến quầy: đăng ký được xác nhận luôn */
 export default function StaffRegisterForm({
@@ -44,22 +45,31 @@ export default function StaffRegisterForm({
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
 
-  const digits = normalizePhone(phone);
+  // tìm khách theo tên, mã KH hoặc SĐT; chắc chắn đúng 1 người thì tự chọn
+  const digits = /^[\d\s.+-]+$/.test(phone.trim()) ? normalizePhone(phone) : "";
   useEffect(() => {
-    if (customer || digits.length < 4) {
+    if (customer || !customerQueryReady(phone)) {
       setMatches(null);
       return;
     }
     let cancelled = false;
+    const q = phone.trim();
     const t = setTimeout(async () => {
-      const { data } = await supabase.rpc("search_customers", { p_q: digits, p_limit: 8 });
-      if (!cancelled) setMatches((data ?? []) as Cust[]);
+      const { data } = await supabase.rpc("search_customers", { p_q: q, p_limit: 8 });
+      if (cancelled) return;
+      const list = (data ?? []) as Cust[];
+      const pick = autoPickCustomer(q, list);
+      if (pick) {
+        setCustomer(pick);
+        setPhone("");
+        setOkMsg(null);
+      } else setMatches(list);
     }, 300);
     return () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [digits, customer, supabase]);
+  }, [phone, customer, supabase]);
 
   const promo = promotions.find((p) => p.id === promoId);
   const branchOpts = promo?.branch_id ? branches.filter((b) => b.id === promo.branch_id) : branches;
@@ -110,26 +120,29 @@ export default function StaffRegisterForm({
       {customer ? (
         <div className="flex items-center justify-between rounded-xl bg-cream px-3 py-2">
           <span>
-            <b>{customer.full_name}</b> <span className="text-ink/60">{customer.phone}</span>
+            <b>{customer.full_name}</b> {customer.code && <span className="text-xs text-ink/55">{customer.code}</span>} <span className="text-ink/60">{customer.phone}</span>
           </span>
           <button className="text-xs text-[#8A2323] underline" onClick={() => setCustomer(null)}>Đổi khách</button>
         </div>
       ) : (
         <div>
-          <span className="label">Khách hàng (gõ SĐT)</span>
-          <input className="input py-2" inputMode="tel" placeholder="09…" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <span className="label">Khách hàng (gõ tên, mã KH hoặc SĐT)</span>
+          <input className="input py-2" placeholder={CUSTOMER_SEARCH_HINT} value={phone} onChange={(e) => setPhone(e.target.value)} />
           {matches && (
             <ul className="mt-2 divide-y divide-beige rounded-xl border border-beige-dark">
               {matches.length === 0 && (
                 <li className="px-3 py-2 text-ink/60">
                   Chưa có khách này. Tạo hồ sơ ở trang{" "}
-                  <Link href={`/quan-ly/tao-lich?sdt=${digits}`} className="text-navy underline">Tạo lịch</Link>.
+                  <Link href={digits ? `/quan-ly/tao-lich?sdt=${digits}` : "/quan-ly/tao-lich"} className="text-navy underline">Tạo lịch</Link>.
                 </li>
               )}
               {matches.map((c) => (
                 <li key={c.id}>
                   <button className="flex w-full justify-between px-3 py-2 text-left hover:bg-cream" onClick={() => { setCustomer(c); setOkMsg(null); }}>
-                    <span className="font-medium">{c.full_name}</span>
+                    <span className="font-medium">
+                      {c.full_name}
+                      {c.code && <span className="ml-2 text-xs font-normal text-ink/55">{c.code}</span>}
+                    </span>
                     <span className="text-ink/60">{c.phone}</span>
                   </button>
                 </li>

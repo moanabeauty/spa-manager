@@ -1,3 +1,4 @@
+import { PROCEDURE_CHANGE_KIND } from "@/lib/ktv";
 import { allBranches, payrollSettings } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -70,7 +71,7 @@ export default async function ApprovalsPage() {
     supabase
       .from("procedure_change_requests")
       .select(
-        "id, step_no, from_product, to_product, reason, created_at, requester:profiles!procedure_change_requests_requested_by_fkey(full_name), appointment_services(services(name_en, name), appointments(customers(full_name)))",
+        "id, step_no, kind, from_product, to_product, reason, created_at, requester:profiles!procedure_change_requests_requested_by_fkey(full_name), appointment_services(services(name_en, name), appointments(customers(full_name)))",
       )
       .eq("status", "pending")
       .order("created_at"),
@@ -127,7 +128,7 @@ export default async function ApprovalsPage() {
   const fixes = (fixR.data ?? []) as unknown as { id: string; work_date: string; check_in: string | null; check_out: string | null; reason: string; staff: Named }[];
   const leaves = (leaveR.data ?? []) as unknown as { id: string; staff_id: string; leave_date: string; kind: string; half_day: boolean; work_shift: string | null; reason: string | null }[];
   const changes = (chgR.data ?? []) as unknown as {
-    id: string; step_no: number; from_product: string | null; to_product: string; reason: string; created_at: string; requester: Named;
+    id: string; step_no: number; kind: string; from_product: string | null; to_product: string; reason: string; created_at: string; requester: Named;
     appointment_services: { services: { name_en: string | null; name: string } | null; appointments: { customers: { full_name: string } | null } | null } | null;
   }[];
   const stockReqs = (reqR.data ?? []) as unknown as StockRequest[];
@@ -273,15 +274,16 @@ export default async function ApprovalsPage() {
       )}
 
       {early.length + fixes.length + changes.length > 0 && (
-        <Section id="ktv" title="Vào sớm · quên chấm công · đổi sản phẩm" more="/quan-ly/theo-doi-ktv">
+        <Section id="ktv" title="Vào sớm · quên chấm công · điều chỉnh quy trình" more="/quan-ly/theo-doi-ktv">
           {changes.map((c) => (
             <div key={c.id} className={item}>
               <p>
-                <b>{c.requester?.full_name ?? "KTV"}</b> xin đổi sản phẩm · {c.appointment_services?.appointments?.customers?.full_name} ·{" "}
-                {c.appointment_services?.services?.name_en || c.appointment_services?.services?.name} · bước {c.step_no}
+                <b>{c.requester?.full_name ?? "KTV"}</b> xin {(PROCEDURE_CHANGE_KIND[c.kind] ?? "Đổi sản phẩm").toLowerCase()} ·{" "}
+                {c.appointment_services?.appointments?.customers?.full_name} ·{" "}
+                {c.appointment_services?.services?.name_en || c.appointment_services?.services?.name}
               </p>
               <p className="text-xs">
-                {c.from_product ? <s>{c.from_product}</s> : "Sản phẩm"} → <b>{c.to_product}</b> · lý do: {c.reason} · {when(c.created_at)}
+                {c.from_product ? `${c.from_product} → ` : ""}<b>{c.to_product}</b> · lý do: {c.reason} · {when(c.created_at)}
               </p>
               <ReviewButtons fn="review_procedure_change" args={{ p_id: c.id }} withNote />
             </div>

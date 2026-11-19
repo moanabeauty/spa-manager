@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { autoPickCustomer } from "@/lib/customerSearch";
 import {
   formatDate,
   formatDuration,
@@ -118,7 +119,7 @@ export default function StaffBookingForm({
       const list = (data ?? []) as Customer[];
       setMatches(list);
       setSearching(false);
-      const exact = digits.length >= 9 ? list.find((c) => c.phone === digits) : undefined;
+      const exact = (digits.length >= 9 ? list.find((c) => c.phone === digits) : undefined) ?? autoPickCustomer(q, list, { byName: false });
       if (exact) setCustomer(exact);
     }, 300);
     return () => {

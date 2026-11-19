@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { CUSTOMER_SEARCH_HINT, autoPickCustomer, customerQueryReady } from "@/lib/customerSearch";
 import { formatDate, formatTime, formatVnd, normalizePhone, normalizeText, textMatch, vnError } from "@/lib/format";
 import {
   allocateDiscount,
@@ -40,7 +41,7 @@ export type CheckoutPackage = {
   validity_days: number | null;
   package_items: { label: string; quantity: number | null; sort_order: number }[];
 };
-export type CustomerInfo = { id: string; full_name: string; phone: string | null; note: string | null };
+export type CustomerInfo = { id: string; full_name: string; phone: string | null; note: string | null; code?: string | null };
 export type DiscountRequest = {
   id: string;
   amount: number;
@@ -315,22 +316,29 @@ export default function CheckoutForm({
   // ---- khách (khi bán gói / nạp thẻ không theo lịch) ----
   const [phone, setPhone] = useState("");
   const [matches, setMatches] = useState<CustomerInfo[] | null>(null);
-  const digits = normalizePhone(phone);
+  // tìm khách theo tên, mã KH hoặc SĐT; chắc chắn đúng 1 người thì tự chọn
+  const digits = /^[\d\s.+-]+$/.test(phone.trim()) ? normalizePhone(phone) : "";
   useEffect(() => {
-    if (appt || digits.length < 4) {
+    if (appt || !customerQueryReady(phone)) {
       setMatches(null);
       return;
     }
     let cancelled = false;
+    const q = phone.trim();
     const t = setTimeout(async () => {
-      const { data } = await supabase.rpc("search_customers", { p_q: digits, p_limit: 8 });
-      if (!cancelled) setMatches((data ?? []) as CustomerInfo[]);
+      const { data } = await supabase.rpc("search_customers", { p_q: q, p_limit: 8 });
+      if (cancelled) return;
+      const list = (data ?? []) as CustomerInfo[];
+      const pick = autoPickCustomer(q, list);
+      if (pick) chooseCustomer(pick);
+      else setMatches(list);
     }, 300);
     return () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [digits, appt, supabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone, appt, supabase]);
 
   async function chooseCustomer(c: CustomerInfo | null) {
     setCustomer(c);
@@ -630,7 +638,10 @@ export default function CheckoutForm({
         {customer ? (
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="font-semibold">{customer.full_name}</p>
+              <p className="font-semibold">
+                {customer.full_name}
+                {customer.code && <span className="ml-2 text-xs font-normal text-ink/55">{customer.code}</span>}
+              </p>
               <p className="text-sm text-ink/60">{customer.phone ?? "(SĐT ẩn hoặc chưa có)"}</p>
               {customer.note && <p className="mt-1 rounded-lg bg-[#FFE8BA]/60 px-2 py-1 text-xs">{customer.note}</p>}
             </div>
@@ -646,20 +657,23 @@ export default function CheckoutForm({
           </div>
         ) : (
           <div>
-            <span className="label">Khách hàng (gõ SĐT) — bỏ trống nếu khách lẻ chỉ làm dịch vụ</span>
-            <input className="input" inputMode="tel" placeholder="09…" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <span className="label">Khách hàng (gõ tên, mã KH hoặc SĐT) — bỏ trống nếu khách lẻ chỉ làm dịch vụ</span>
+            <input className="input" placeholder={CUSTOMER_SEARCH_HINT} value={phone} onChange={(e) => setPhone(e.target.value)} />
             {matches && (
               <ul className="mt-2 divide-y divide-beige rounded-xl border border-beige-dark">
                 {matches.length === 0 && (
                   <li className="px-3 py-2 text-sm text-ink/60">
                     Chưa có khách này. Tạo hồ sơ ở trang{" "}
-                    <Link href={`/quan-ly/tao-lich?sdt=${digits}`} className="text-navy underline">Tạo lịch</Link>.
+                    <Link href={digits ? `/quan-ly/tao-lich?sdt=${digits}` : "/quan-ly/tao-lich"} className="text-navy underline">Tạo lịch</Link>.
                   </li>
                 )}
                 {matches.map((c) => (
                   <li key={c.id}>
                     <button className="flex w-full justify-between px-3 py-2 text-left text-sm hover:bg-cream" onClick={() => chooseCustomer(c)}>
-                      <span className="font-medium">{c.full_name}</span>
+                      <span className="font-medium">
+                        {c.full_name}
+                        {c.code && <span className="ml-2 text-xs font-normal text-ink/55">{c.code}</span>}
+                      </span>
                       <span className="text-ink/60">{c.phone}</span>
                     </button>
                   </li>
