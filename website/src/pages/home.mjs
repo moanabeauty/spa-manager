@@ -46,7 +46,7 @@ export function renderHome(data, buildId) {
 
 <section class="wrap entries">
   <article class="entry">
-    <div class="entry-img">${img('tu-van', 'Chuyên viên Moana trong buổi chăm sóc', { sizes: '(min-width: 900px) 33vw, 100vw' })}</div>
+    <div class="entry-img">${img('tu-van-da', 'Chuyên viên Moana tư vấn da cho khách tại quầy', { sizes: '(min-width: 900px) 33vw, 100vw' })}</div>
     <h2 class="h3">Tư vấn theo làn da</h2>
     <p>Mỗi buổi bắt đầu từ tình trạng và nhu cầu cụ thể của da bạn.</p>
     <a class="btn btn-outline" href="#ghe-tham">Nhắn Zalo</a>
