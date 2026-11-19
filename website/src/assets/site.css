@@ -100,6 +100,8 @@ a:hover { color: var(--navy-2); }
 .hero-text, .space-text { position: relative; max-width: 820px; }
 .hero h1 { margin: 0 0 12px; font-weight: 300; font-size: clamp(28px, 4.2vw, 42px); line-height: 1.2; letter-spacing: 0.02em; text-transform: uppercase; }
 .hero p, .space-text > p:not(.eyebrow) { margin: 0 auto 28px; max-width: 560px; color: #F3F0EA; }
+.hero .eyebrow { margin: 0 auto 14px; max-width: none; color: #fff; }
+.hero .hero-sub { font-size: clamp(15px, 1.6vw, 17px); line-height: 1.6; letter-spacing: 0.01em; }
 .space h2 { margin: 0 0 16px; font-weight: 300; font-size: clamp(26px, 3.6vw, 36px); line-height: 1.25; letter-spacing: 0.03em; text-transform: uppercase; }
 
 /* 3 lối vào */
