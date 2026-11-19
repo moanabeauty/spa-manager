@@ -96,7 +96,7 @@ export default async function ApprovalsPage() {
     payrollSettings(),
     supabase
       .from("usage_stock_confirms")
-      .select("id, note, created_at, warehouses(name), products(name, capacity), requester:profiles!usage_stock_confirms_requested_by_fkey(full_name), appointment_services(services(name_en, name), appointments(customers(full_name)))")
+      .select("id, note, created_at, warehouses(name), products!usage_stock_confirms_product_id_fkey(name, capacity), requester:profiles!usage_stock_confirms_requested_by_fkey(full_name), appointment_services(services(name_en, name), appointments(customers(full_name)))")
       .eq("status", "pending")
       .order("created_at"),
     O
