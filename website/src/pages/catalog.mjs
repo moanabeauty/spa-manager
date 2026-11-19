@@ -115,7 +115,7 @@ ${ctx.groups.map((g, i) => `
 ${ctaBand()}`;
   return page({
     path: '/lieu-trinh', title: 'Liệu trình', body, buildId,
-    description: `Liệu trình chăm sóc da tại Moana Beauty: ${ctx.groups.map((g) => g.title.toLowerCase()).join(', ')}. Tư vấn theo tình trạng da tại Cầu Giấy và Long Biên, Hà Nội.`,
+    description: 'Liệu trình chăm sóc da mặt tại Moana Beauty Hà Nội: lấy nhân mụn không đau, kiểm soát mụn, Biologique Recherche (Pháp), peel, phi kim, vùng mắt… Tư vấn theo từng làn da tại Cầu Giấy và Long Biên.',
   });
 }
 

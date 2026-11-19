@@ -3,7 +3,9 @@ export const SITE = {
   name: 'Moana Beauty',
   url: 'https://moanabeauty.vn',
   description:
-    'Moana Beauty — spa chăm sóc vấn đề da kết hợp thư giãn tại Hà Nội, cùng dược mỹ phẩm châu Âu và Mỹ. Cơ sở Trung Hoà (Cầu Giấy) và Long Biên.',
+    'Spa chuyên chăm sóc da mặt ở Hà Nội: lấy nhân mụn không đau, kiểm soát mụn hạn chế tái phát, đầy đủ liệu trình Biologique Recherche (Pháp). Cầu Giấy & Long Biên.',
+  // Tiêu đề trang chủ hiện trên Google (nên dưới ~60 ký tự)
+  homeTitle: 'Spa da mặt Hà Nội – Lấy nhân mụn không đau | Moana Beauty',
   founded: 2019,
   hours: 'Mở cửa 9:00 – 18:00 hằng ngày, trừ ngày lễ Tết',
   email: 'info@moanabeauty.vn',

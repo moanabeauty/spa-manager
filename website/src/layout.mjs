@@ -88,6 +88,7 @@ function jsonLd() {
     '@graph': BRANCHES.map((b) => ({
       '@type': 'BeautySalon',
       name: `Moana Beauty — ${b.name}`,
+      description: SITE.description,
       url: SITE.url,
       telephone: `+84${b.phone.slice(1)}`,
       email: SITE.email,
@@ -100,7 +101,7 @@ function jsonLd() {
 }
 
 export function page({ path = '/', title, description = SITE.description, body, buildId, noindex = false, ld = false }) {
-  const fullTitle = title ? `${title} | Moana Beauty` : 'Moana Beauty — Chăm sóc bằng sự thấu hiểu từng làn da';
+  const fullTitle = title ? `${title} | Moana Beauty` : SITE.homeTitle;
   const canonical = `${SITE.url}${path === '/' ? '/' : path}`;
   return `<!doctype html>
 <html lang="vi">

@@ -73,7 +73,7 @@ export function renderAbout(buildId) {
 ${ctaBand('Đặt lịch chăm sóc cùng Moana', 'Moana mở cửa 9:00 – 18:00 tất cả các ngày, trừ ngày lễ Tết.')}`;
   return page({
     path: '/ve-moana', title: 'Về Moana', body, buildId, ld: true,
-    description: `Moana Beauty — spa chăm sóc vấn đề da kết hợp thư giãn tại Hà Nội từ ${SITE.founded}, dùng dược mỹ phẩm châu Âu và Mỹ. Hai cơ sở tại Cầu Giấy và Long Biên.`,
+    description: `Moana Beauty — spa chuyên chăm sóc da mặt tại Hà Nội từ ${SITE.founded}: lấy nhân mụn không đau, kiểm soát mụn hạn chế tái phát, đầy đủ liệu trình Biologique Recherche (Pháp). Hai cơ sở Cầu Giấy và Long Biên.`,
   });
 }
 
