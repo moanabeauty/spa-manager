@@ -9,7 +9,7 @@ import FinishButton from "./FinishButton";
 export const metadata = { title: "Chai đang mở – Moana Beauty" };
 
 type Row = {
-  id: string; product_id: string; remaining_pct: number; remaining_qty: number | null; source: "opening" | "request" | "confirm"; status: string;
+  id: string; product_id: string; remaining_pct: number; remaining_qty: number | null; source: "opening" | "request" | "confirm" | "new_bottle"; status: string;
   opened_at: string; finished_at: string | null; finish_note: string | null;
   products: { name: string; capacity: string | null; brand: string | null; unit: string; volume: number | null } | null;
   opener: { full_name: string | null } | null;
@@ -77,7 +77,7 @@ export default async function OpenedPage({ searchParams }: { searchParams: Promi
                             : o.source === "opening" ? `Đầu kỳ còn ${openLevelLabel(Number(o.remaining_pct))}` : "Chai mới"}
                         </b>
                         <span className="text-ink/55">
-                          {o.source === "opening" ? " · đầu kỳ" : o.source === "confirm" ? " · chủ spa xác nhận còn hàng" : ""}
+                          {o.source === "opening" ? " · đầu kỳ" : o.source === "confirm" ? " · chủ spa xác nhận còn hàng" : o.source === "new_bottle" ? " · duyệt mở lọ mới" : ""}
                         </span>
                         <span className="text-ink/55"> · mở {formatShortDate(o.opened_at)}{o.opener?.full_name ? ` · ${o.opener.full_name}` : ""}</span>
                       </span>

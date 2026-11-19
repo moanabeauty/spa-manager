@@ -103,7 +103,7 @@ export default function UsagePanel({ apsId, busy, onCancel, onConfirm }: {
                   Xin xuất chai mới
                 </Link>
                 {p.confirm === "pending" ? (
-                  <span className="text-[11px] font-semibold">⏳ Đang chờ chủ spa xác nhận còn hàng</span>
+                  <span className="text-[11px] font-semibold">⏳ Đang chờ chủ spa / quản lý xác nhận còn hàng hoặc mở lọ mới</span>
                 ) : (
                   <button
                     type="button"
@@ -111,7 +111,7 @@ export default function UsagePanel({ apsId, busy, onCancel, onConfirm }: {
                     onClick={() => askConfirm(p.product_id)}
                     className="rounded-lg border border-[#8C1D18] px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50"
                   >
-                    {p.confirm === "rejected" ? "Chủ spa chưa xác nhận · xin lại" : "Xin chủ spa xác nhận còn hàng"}
+                    {p.confirm === "rejected" ? "Chưa được duyệt · xin lại" : "Xin xác nhận còn hàng / mở lọ mới"}
                   </button>
                 )}
               </div>

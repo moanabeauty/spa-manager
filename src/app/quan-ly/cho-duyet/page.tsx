@@ -94,13 +94,11 @@ export default async function ApprovalsPage() {
     O ? supabase.from("marketing_posts").select("id, title, publish_date, due_date, channels").eq("status", "review").order("publish_date") : none,
     supabase.from("profiles").select("id, full_name"),
     payrollSettings(),
-    O
-      ? supabase
-          .from("usage_stock_confirms")
-          .select("id, note, created_at, warehouses(name), products(name, capacity), requester:profiles!usage_stock_confirms_requested_by_fkey(full_name), appointment_services(services(name_en, name), appointments(customers(full_name)))")
-          .eq("status", "pending")
-          .order("created_at")
-      : none,
+    supabase
+      .from("usage_stock_confirms")
+      .select("id, note, created_at, warehouses(name), products(name, capacity), requester:profiles!usage_stock_confirms_requested_by_fkey(full_name), appointment_services(services(name_en, name), appointments(customers(full_name)))")
+      .eq("status", "pending")
+      .order("created_at"),
     O
       ? supabase
           .from("packages")
@@ -329,7 +327,10 @@ export default async function ApprovalsPage() {
 
       {confirms.length > 0 && (
         <Section id="con-hang" title="Xác nhận còn hàng (KTV chưa hoàn thành được buổi)" more="/quan-ly/kho/chai-dang-mo">
-          <p className="text-xs text-ink/60">Máy báo chi nhánh không còn đủ trong chai đang mở. Nếu thực tế vẫn còn chai, chọn mức còn để KTV hoàn thành buổi.</p>
+          <p className="text-xs text-ink/60">
+            Máy báo chi nhánh không còn đủ trong chai đang mở.{" "}
+            {O ? "Thực tế vẫn còn chai → Xác nhận còn hàng; hết thật → Duyệt mở lọ mới (chọn sản phẩm trong kho để thay)." : "Duyệt mở lọ mới: chọn sản phẩm trong kho để KTV hoàn thành buổi."}
+          </p>
           {confirms.map((c) => (
             <div key={c.id} className={item}>
               <p>
@@ -339,7 +340,7 @@ export default async function ApprovalsPage() {
                 Khách {c.appointment_services?.appointments?.customers?.full_name} · {c.appointment_services?.services?.name_en || c.appointment_services?.services?.name} · {when(c.created_at)}
                 {c.note ? ` · ${c.note}` : ""}
               </p>
-              <StockConfirmReview id={c.id} />
+              <StockConfirmReview id={c.id} isOwner={O} />
             </div>
           ))}
         </Section>

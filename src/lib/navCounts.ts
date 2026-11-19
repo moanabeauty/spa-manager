@@ -39,7 +39,7 @@ export const loadNavCounts = cache(async (role: string, branchId: string | null)
     M ? supabase.from("staff_attendance").select("staff_id", head).eq("in_status", "pending") : zero,
     M ? supabase.from("attendance_fix_requests").select("id", head).eq("status", "pending") : zero,
     O || MK ? supabase.from("marketing_posts").select("id", head).eq("status", O ? "review" : "revise") : zero,
-    O ? supabase.from("usage_stock_confirms").select("id", head).eq("status", "pending") : zero,
+    M ? supabase.from("usage_stock_confirms").select("id", head).eq("status", "pending") : zero,
   ]);
   return {
     discounts: disc.count ?? 0,
