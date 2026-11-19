@@ -3,7 +3,10 @@ export const SITE = {
   name: 'Moana Beauty',
   url: 'https://moanabeauty.vn',
   description:
-    'Spa chuyên chăm sóc da mặt ở Hà Nội: lấy nhân mụn không đau, kiểm soát mụn hạn chế tái phát, đầy đủ liệu trình Biologique Recherche (Pháp). Cầu Giấy & Long Biên.',
+    'Spa chăm sóc da mặt Hà Nội: lấy nhân mụn không đau, kiểm soát mụn nội tiết, mụn dậy thì, mụn do thay đổi thời tiết; đầy đủ liệu trình Biologique Recherche (Pháp).',
+  // Mô tả dài hơn cho dữ liệu cơ sở (BeautySalon) mà Google đọc
+  longDescription:
+    'Moana Beauty là spa chuyên chăm sóc da mặt ở Hà Nội: lấy nhân mụn không đau bằng kỹ thuật Acne Tweezer kết hợp đa phương pháp; kiểm soát mụn nội tiết, kiểm soát mụn dậy thì, kiểm soát mụn do thay đổi thời tiết theo lộ trình riêng cho từng làn da, hạn chế tái phát; spa với đầy đủ liệu trình Biologique Recherche (Pháp). Hai cơ sở tại Cầu Giấy và Long Biên.',
   // Tiêu đề trang chủ hiện trên Google (nên dưới ~60 ký tự)
   homeTitle: 'Spa da mặt Hà Nội – Lấy nhân mụn không đau | Moana Beauty',
   founded: 2019,

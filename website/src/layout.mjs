@@ -87,11 +87,11 @@ function footer() {
 const ORG_ID = `${SITE.url}/#moana-beauty`;
 const SPECIALTIES = [
   { name: 'Lấy nhân mụn không đau', description: 'Kỹ thuật Acne Tweezer kết hợp đa phương pháp lấy nhân mụn: lấy nhân sạch, nhẹ nhàng, hạn chế tổn thương da.', url: '/lieu-trinh/kiem-soat-mun-chuyen-sau' },
-  { name: 'Kiểm soát mụn, hạn chế tái phát', description: 'Lộ trình kiểm soát mụn theo từng làn da, theo dõi da qua từng buổi và hướng dẫn chăm sóc tại nhà.', url: '/promotion' },
+  { name: 'Kiểm soát mụn, hạn chế tái phát', description: 'Kiểm soát mụn nội tiết, kiểm soát mụn dậy thì, kiểm soát mụn do thay đổi thời tiết — lộ trình kiểm soát mụn theo từng làn da, theo dõi da qua từng buổi và hướng dẫn chăm sóc tại nhà.', url: '/promotion' },
   { name: 'Liệu trình Biologique Recherche (Pháp)', description: 'Đầy đủ các liệu trình chăm sóc da mặt của Biologique Recherche.', url: '/lieu-trinh#biologique-recherche' },
   { name: 'Chăm sóc da mặt', description: 'Liệu trình chăm sóc da mặt cá nhân hoá theo tình trạng da, cùng dược mỹ phẩm châu Âu và Mỹ.', url: '/lieu-trinh' },
 ];
-const KNOWS_ABOUT = ['Chăm sóc da mặt', 'Lấy nhân mụn không đau', 'Acne Tweezer', 'Kiểm soát mụn', 'Biologique Recherche', 'Peel da', 'Phi kim MTS'];
+const KNOWS_ABOUT = ['Chăm sóc da mặt', 'Lấy nhân mụn không đau', 'Acne Tweezer', 'Kiểm soát mụn', 'Kiểm soát mụn nội tiết', 'Kiểm soát mụn dậy thì', 'Kiểm soát mụn do thay đổi thời tiết', 'Biologique Recherche', 'Peel da', 'Phi kim MTS'];
 
 function jsonLd() {
   const sameAs = [SITE.instagram, SITE.tiktok, ...BRANCHES.map((b) => b.facebook)];
@@ -103,7 +103,7 @@ function jsonLd() {
     url: `${SITE.url}/`,
     logo: `${SITE.url}/brand/logo-moana.png`,
     image: `${SITE.url}/images/og-moana.jpg`,
-    description: SITE.description,
+    description: SITE.longDescription,
     slogan: 'Chăm sóc bằng sự thấu hiểu từng làn da',
     foundingDate: String(SITE.founded),
     email: SITE.email,
@@ -115,7 +115,7 @@ function jsonLd() {
     '@type': 'BeautySalon',
     '@id': `${SITE.url}/#${b.key}`,
     name: `Moana Beauty – ${b.name}`,
-    description: `Moana Beauty ${b.name} (${b.address}): spa chuyên chăm sóc da mặt — lấy nhân mụn không đau, kiểm soát mụn hạn chế tái phát, đầy đủ liệu trình Biologique Recherche (Pháp).`,
+    description: `Moana Beauty ${b.name} (${b.address}): spa chuyên chăm sóc da mặt — lấy nhân mụn không đau; kiểm soát mụn nội tiết, mụn dậy thì, mụn do thay đổi thời tiết, hạn chế tái phát; đầy đủ liệu trình Biologique Recherche (Pháp).`,
     url: `${SITE.url}/lien-he`,
     parentOrganization: { '@id': ORG_ID },
     telephone: `+84${b.phone.slice(1)}`,
