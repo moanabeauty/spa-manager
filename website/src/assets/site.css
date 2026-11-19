@@ -373,5 +373,6 @@ a:hover { color: var(--navy-2); }
 .cta-band .h2 { margin-bottom: 12px; }
 .cta-band p { margin: 0 auto 24px; max-width: 560px; }
 .about-intro .detail-img { aspect-ratio: 4 / 3; }
+.about-focus { padding-top: 32px; padding-bottom: 0; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }

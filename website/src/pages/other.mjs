@@ -2,7 +2,7 @@
 import { SITE, BRANCHES, BRANDS } from '../site.mjs';
 import { esc, page, zaloIcon } from '../layout.mjs';
 import { banner, crumbs, ctaBand, zaloButtons } from '../parts.mjs';
-import { img, fmtDate, webText, postBody, videoBlock, videoEmbed } from '../util.mjs';
+import { img, fmtDate, webText, postBody, videoBlock, videoEmbed, svcSlug, pkgSlug } from '../util.mjs';
 
 const contactBlock = (tag = 'h2') => `
   <div class="branches">
@@ -21,16 +21,50 @@ const contactBlock = (tag = 'h2') => `
   </div>`;
 
 // ---------- /ve-moana ----------
-export function renderAbout(buildId) {
-  const body = `${banner('Về Moana', `Spa chăm sóc vấn đề da kết hợp thư giãn tại Hà Nội, từ ${SITE.founded}.`)}
+// Định vị (chủ spa chốt 19/11/2026): spa chuyên chăm sóc da mặt ở Hà Nội — lấy nhân mụn không đau,
+// kiểm soát mụn hạn chế tái phát, đầy đủ liệu trình Biologique Recherche (Pháp).
+export function renderAbout(data, buildId) {
+  const services = data.services || [];
+  const packages = data.packages || [];
+  const tweezer = services.find((s) => (s.name_en || '').toUpperCase() === 'ACNE TWEEZER');
+  const acneLink = tweezer ? `/lieu-trinh/${svcSlug(tweezer)}` : '/lieu-trinh#cham-soc-da-co-ban';
+  const acneGroup = packages.find((p) => /^Mụn/i.test(p.category || ''))?.category;
+  const acnePkgLink = acneGroup ? `/promotion#${pkgSlug({ name: acneGroup })}` : '/promotion';
+  const brCount = services.filter((s) => (s.category || '').startsWith('Biologique Recherche')).length;
+
+  const body = `${banner('Về Moana', `Spa chuyên chăm sóc da mặt tại Hà Nội, từ ${SITE.founded}.`)}
 <section class="wrap detail about-intro">
-  <div class="detail-img">${img('tu-van', 'Chuyên viên Moana trong buổi chăm sóc da', { eager: true, sizes: '(min-width: 900px) 50vw, 100vw' })}</div>
+  <div class="detail-img">${img('tu-van', 'Chuyên viên Moana trong buổi chăm sóc da mặt', { eager: true, sizes: '(min-width: 900px) 50vw, 100vw' })}</div>
   <div class="detail-text">
     <p class="label">Câu chuyện của Moana</p>
     <h2 class="detail-title">Chăm sóc bằng sự thấu hiểu từng làn da</h2>
-    <p>Moana Beauty mở cửa từ năm ${SITE.founded}, là spa chú trọng chăm sóc các vấn đề da mặt bằng dược mỹ phẩm châu Âu và Mỹ, kết hợp thiết bị công nghệ cao.</p>
-    <p>Với Moana, mỗi buổi chăm sóc vừa là thời gian dành cho làn da, vừa là một khoảng nghỉ cho chính bạn — trong không gian thanh lịch, yên tĩnh và sạch sẽ.</p>
+    <p>Moana Beauty là spa chuyên chăm sóc da mặt tại Hà Nội, mở cửa từ năm ${SITE.founded}. Moana tập trung vào ba điều: <strong>lấy nhân mụn không đau</strong>, <strong>kiểm soát tình trạng mụn để hạn chế tái phát</strong> và mang đến <strong>đầy đủ các liệu trình Biologique Recherche (Pháp)</strong>.</p>
+    <p>Mỗi buổi chăm sóc bắt đầu từ việc lắng nghe và xem kỹ tình trạng da của bạn, sau đó Moana mới chọn liệu trình và sản phẩm phù hợp. Với Moana, đó vừa là thời gian dành cho làn da, vừa là một khoảng nghỉ cho chính bạn — trong không gian yên tĩnh, sạch sẽ.</p>
     <p>Hiện Moana có hai cơ sở tại Cầu Giấy và Long Biên, Hà Nội.</p>
+  </div>
+</section>
+
+<section class="wrap section pt-0">
+  <h2 class="h2 center">Moana chuyên về</h2>
+  <div class="entries about-focus">
+    <article class="entry">
+      <div class="entry-img">${img('nhom-co-ban', 'Chăm sóc da mặt cho khách tại Moana', { sizes: '(min-width: 900px) 33vw, 100vw' })}</div>
+      <h3 class="h3">Lấy nhân mụn không đau</h3>
+      <p>Moana dùng kỹ thuật Acne Tweezer kết hợp nhiều phương pháp lấy nhân mụn, giúp lấy nhân sạch, nhẹ nhàng và hạn chế tổn thương cho da.</p>
+      <a class="btn btn-outline" href="${acneLink}">Xem liệu trình Acne Tweezer</a>
+    </article>
+    <article class="entry">
+      <div class="entry-img">${img('tu-van-da', 'Chuyên viên Moana tư vấn lộ trình kiểm soát mụn cho khách', { sizes: '(min-width: 900px) 33vw, 100vw' })}</div>
+      <h3 class="h3">Kiểm soát mụn, hạn chế tái phát</h3>
+      <p>Không dừng ở một buổi lấy nhân mụn, Moana xây dựng lộ trình kiểm soát mụn theo từng làn da, theo dõi da qua từng buổi và hướng dẫn bạn chăm sóc tại nhà.</p>
+      <a class="btn btn-outline" href="${acnePkgLink}">Gói kiểm soát mụn</a>
+    </article>
+    <article class="entry">
+      <div class="entry-img">${img('nhom-biologique', 'Liệu trình Biologique Recherche tại Moana', { sizes: '(min-width: 900px) 33vw, 100vw' })}</div>
+      <h3 class="h3">Đầy đủ liệu trình Biologique Recherche</h3>
+      <p>Moana mang đến đầy đủ các liệu trình của Biologique Recherche — thương hiệu chăm sóc da đến từ Pháp${brCount ? `, với ${brCount} liệu trình đang có tại spa` : ''}. Sản phẩm được chọn theo tình trạng da của bạn ở từng buổi.</p>
+      <a class="btn btn-outline" href="/lieu-trinh#biologique-recherche">Liệu trình Biologique Recherche</a>
+    </article>
   </div>
 </section>
 
@@ -58,7 +92,7 @@ export function renderAbout(buildId) {
 
 <section class="wrap section center">
   <h2 class="h2">Dược mỹ phẩm tại Moana</h2>
-  <p class="lead">Moana sử dụng dược mỹ phẩm từ châu Âu và Mỹ, lựa chọn theo tình trạng da trong từng buổi chăm sóc.</p>
+  <p class="lead">Bên cạnh Biologique Recherche, Moana sử dụng dược mỹ phẩm từ châu Âu và Mỹ, lựa chọn theo tình trạng da trong từng buổi chăm sóc.</p>
   <ul class="brands" aria-label="Các hãng dược mỹ phẩm Moana đang dùng">${BRANDS.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>
   <div class="btn-row center mt">
     <a class="btn btn-outline" href="/lieu-trinh">Khám phá liệu trình</a>
@@ -70,9 +104,9 @@ export function renderAbout(buildId) {
   <h2 class="h2 center">Hai cơ sở của Moana</h2>
   ${contactBlock('h3')}
 </section>
-${ctaBand('Đặt lịch chăm sóc cùng Moana', 'Moana mở cửa 9:00 – 18:00 tất cả các ngày, trừ ngày lễ Tết.')}`;
+${ctaBand('Đặt lịch chăm sóc da cùng Moana', 'Moana mở cửa 9:00 – 18:00 tất cả các ngày, trừ ngày lễ Tết.')}`;
   return page({
-    path: '/ve-moana', title: 'Về Moana', body, buildId, ld: true,
+    path: '/ve-moana', title: 'Về Moana – Spa chăm sóc da mặt Hà Nội', body, buildId, ld: true,
     description: `Moana Beauty — spa chuyên chăm sóc da mặt tại Hà Nội từ ${SITE.founded}: lấy nhân mụn không đau, kiểm soát mụn hạn chế tái phát, đầy đủ liệu trình Biologique Recherche (Pháp). Hai cơ sở Cầu Giấy và Long Biên.`,
   });
 }

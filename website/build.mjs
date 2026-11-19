@@ -33,7 +33,7 @@ const pages = [
   { path: '/', html: renderHome(data, buildId) },
   ...catalogPages(data, buildId).pages,
   ...productPages(data, buildId),
-  { path: '/ve-moana', html: renderAbout(buildId) },
+  { path: '/ve-moana', html: renderAbout(data, buildId) },
   ...vlogPages(data, buildId),
   { path: '/lien-he', html: renderContact(buildId) },
   { path: '/chinh-sach-bao-mat', html: renderPrivacy(buildId) },
@@ -45,6 +45,8 @@ for (const p of pages) {
   write(p.path, p.html);
 }
 write('/404', render404(buildId));
+// Dữ liệu Google (layout.mjs › SPECIALTIES) trỏ cố định tới trang Acne Tweezer — báo nếu tên trong app đổi làm đổi đường dẫn.
+if (!seen.has('/lieu-trinh/kiem-soat-mun-chuyen-sau')) console.warn('⚠ Không còn trang /lieu-trinh/kiem-soat-mun-chuyen-sau — sửa SPECIALTIES trong src/layout.mjs');
 const indexed = pages.map((p) => p.path);
 console.log(`${pages.length} trang`);
 

@@ -52,7 +52,7 @@ function footer() {
   <div class="wrap footer-grid">
     <div class="footer-brand">
       <img src="/brand/logo-moana-light.png" alt="Moana Beauty" width="140" height="49">
-      <p>Spa chăm sóc vấn đề da kết hợp thư giãn tại Hà Nội, từ ${SITE.founded}.</p>
+      <p>Spa chuyên chăm sóc da mặt tại Hà Nội, từ ${SITE.founded}: lấy nhân mụn không đau, kiểm soát mụn, liệu trình Biologique Recherche.</p>
     </div>
     <div>
       <p class="footer-h">Khám phá</p>
@@ -82,22 +82,78 @@ function footer() {
 </footer>`;
 }
 
+// Dữ liệu khai báo cho Google (schema.org): 1 thương hiệu Moana Beauty + 2 cơ sở BeautySalon.
+// Định vị theo brief 19/11/2026: spa chuyên chăm sóc da mặt Hà Nội — lấy nhân mụn không đau, kiểm soát mụn, Biologique Recherche.
+const ORG_ID = `${SITE.url}/#moana-beauty`;
+const SPECIALTIES = [
+  { name: 'Lấy nhân mụn không đau', description: 'Kỹ thuật Acne Tweezer kết hợp đa phương pháp lấy nhân mụn: lấy nhân sạch, nhẹ nhàng, hạn chế tổn thương da.', url: '/lieu-trinh/kiem-soat-mun-chuyen-sau' },
+  { name: 'Kiểm soát mụn, hạn chế tái phát', description: 'Lộ trình kiểm soát mụn theo từng làn da, theo dõi da qua từng buổi và hướng dẫn chăm sóc tại nhà.', url: '/promotion' },
+  { name: 'Liệu trình Biologique Recherche (Pháp)', description: 'Đầy đủ các liệu trình chăm sóc da mặt của Biologique Recherche.', url: '/lieu-trinh#biologique-recherche' },
+  { name: 'Chăm sóc da mặt', description: 'Liệu trình chăm sóc da mặt cá nhân hoá theo tình trạng da, cùng dược mỹ phẩm châu Âu và Mỹ.', url: '/lieu-trinh' },
+];
+const KNOWS_ABOUT = ['Chăm sóc da mặt', 'Lấy nhân mụn không đau', 'Acne Tweezer', 'Kiểm soát mụn', 'Biologique Recherche', 'Peel da', 'Phi kim MTS'];
+
 function jsonLd() {
-  return {
-    '@context': 'https://schema.org',
-    '@graph': BRANCHES.map((b) => ({
-      '@type': 'BeautySalon',
-      name: `Moana Beauty — ${b.name}`,
-      description: SITE.description,
-      url: SITE.url,
-      telephone: `+84${b.phone.slice(1)}`,
-      email: SITE.email,
-      image: `${SITE.url}/images/og-moana.jpg`,
-      address: { '@type': 'PostalAddress', streetAddress: b.street, addressLocality: b.district, addressRegion: 'Hà Nội', addressCountry: 'VN' },
-      openingHours: 'Mo-Su 09:00-18:00',
-      sameAs: [b.facebook, SITE.instagram, SITE.tiktok],
-    })),
+  const sameAs = [SITE.instagram, SITE.tiktok, ...BRANCHES.map((b) => b.facebook)];
+  const org = {
+    '@type': 'Organization',
+    '@id': ORG_ID,
+    name: SITE.name,
+    alternateName: ['Moana', 'Moana Beauty Spa'],
+    url: `${SITE.url}/`,
+    logo: `${SITE.url}/brand/logo-moana.png`,
+    image: `${SITE.url}/images/og-moana.jpg`,
+    description: SITE.description,
+    slogan: 'Chăm sóc bằng sự thấu hiểu từng làn da',
+    foundingDate: String(SITE.founded),
+    email: SITE.email,
+    sameAs,
+    knowsAbout: KNOWS_ABOUT,
+    subOrganization: BRANCHES.map((b) => ({ '@id': `${SITE.url}/#${b.key}` })),
   };
+  const salons = BRANCHES.map((b) => ({
+    '@type': 'BeautySalon',
+    '@id': `${SITE.url}/#${b.key}`,
+    name: `Moana Beauty – ${b.name}`,
+    description: `Moana Beauty ${b.name} (${b.address}): spa chuyên chăm sóc da mặt — lấy nhân mụn không đau, kiểm soát mụn hạn chế tái phát, đầy đủ liệu trình Biologique Recherche (Pháp).`,
+    url: `${SITE.url}/lien-he`,
+    parentOrganization: { '@id': ORG_ID },
+    telephone: `+84${b.phone.slice(1)}`,
+    email: SITE.email,
+    image: [`${SITE.url}/images/og-moana.jpg`, `${SITE.url}/images/khong-gian.webp`, `${SITE.url}/images/tu-van.webp`],
+    logo: `${SITE.url}/brand/logo-moana.png`,
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: b.address.replace(/,\s*Hà Nội$/, ''),
+      addressLocality: 'Hà Nội',
+      addressRegion: 'Hà Nội',
+      addressCountry: 'VN',
+    },
+    hasMap: b.map,
+    areaServed: { '@type': 'City', name: 'Hà Nội' },
+    openingHoursSpecification: [{
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+      opens: '09:00',
+      closes: '18:00',
+    }],
+    currenciesAccepted: 'VND',
+    paymentAccepted: 'Tiền mặt, chuyển khoản, thẻ',
+    knowsAbout: KNOWS_ABOUT,
+    brand: [{ '@type': 'Brand', name: 'Biologique Recherche' }],
+    hasOfferCatalog: {
+      '@type': 'OfferCatalog',
+      name: 'Liệu trình chăm sóc da tại Moana Beauty',
+      url: `${SITE.url}/lieu-trinh`,
+      itemListElement: SPECIALTIES.map((x) => ({
+        '@type': 'Offer',
+        itemOffered: { '@type': 'Service', name: x.name, description: x.description, url: `${SITE.url}${x.url}`, provider: { '@id': `${SITE.url}/#${b.key}` } },
+      })),
+    },
+    potentialAction: { '@type': 'ReserveAction', target: SITE.bookingUrl, name: 'Đặt lịch' },
+    sameAs: [b.facebook, SITE.instagram, SITE.tiktok],
+  }));
+  return { '@context': 'https://schema.org', '@graph': [org, ...salons] };
 }
 
 export function page({ path = '/', title, description = SITE.description, body, buildId, noindex = false, ld = false }) {
