@@ -121,7 +121,7 @@ export default function ProductPicker({ value, onChange, placeholder = "Đổi s
         <div className="absolute inset-x-0 top-full z-40 mt-1 max-h-64 overflow-y-auto rounded-xl border border-beige-dark bg-white shadow-lg">
           {busy && !hits && <p className="px-3 py-2 text-xs text-ink/60">Đang tìm…</p>}
           {hits && hits.length === 0 && (
-            <p className="px-3 py-2 text-xs text-ink/60">Không thấy sản phẩm trong kho – vẫn gửi được với tên đã gõ.</p>
+            <p className="px-3 py-2 text-xs text-ink/60">Không thấy sản phẩm – thử gõ tên khác / quét mã, hoặc báo kho thêm sản phẩm vào hệ thống.</p>
           )}
           {hits?.map((p) => (
             <button key={p.id} type="button" onClick={() => pick(p)} className="block w-full border-b border-cream px-3 py-2 text-left text-sm last:border-0 hover:bg-cream">

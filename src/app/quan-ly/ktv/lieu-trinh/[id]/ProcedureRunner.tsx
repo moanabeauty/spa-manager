@@ -59,6 +59,23 @@ const KIND_TITLE: Record<ChangeKind, string> = {
 
 const qtyText = (q: number | null | undefined, unit?: string) => (q == null ? "" : `${fmtQty(q)}${unit ? ` ${unit}` : ""}`);
 
+/** Định lượng gợi ý theo các liệu trình khác đang dùng sản phẩm */
+type DoseHint = { unit: string | null; suggest: number | null; options: number[]; services: { name: string; qty: number }[] };
+
+/** Số → chữ để điền vào ô (dấu phẩy thập phân, không dấu chấm ngăn nghìn) */
+const inputQty = (n: number) => String(Math.round(n * 1000) / 1000).replace(".", ",");
+
+/** Đọc định lượng KTV gõ: "0,5" · "0.5" · ",5" · "1/2" · "1 1/2" → số; không hợp lệ → NaN */
+function parseQty(raw: string): number {
+  const t = raw.trim().replace(/\s+/g, " ");
+  const mixed = t.match(/^(\d+) (\d+)\/(\d+)$/);
+  if (mixed) return Number(mixed[1]) + Number(mixed[2]) / Number(mixed[3]);
+  const frac = t.match(/^(\d+(?:[.,]\d+)?)\/(\d+(?:[.,]\d+)?)$/);
+  if (frac) return Number(frac[1].replace(",", ".")) / Number(frac[2].replace(",", "."));
+  const n = t.replace(",", ".");
+  return /^\d*\.?\d+$/.test(n) ? Number(n) : NaN;
+}
+
 export default function ProcedureRunner(props: {
   apsId: string;
   backHref: string;
@@ -93,6 +110,8 @@ export default function ProcedureRunner(props: {
   const [toId, setToId] = useState<string | null>(null);
   const [toUnit, setToUnit] = useState("");
   const [qty, setQty] = useState("");
+  const [hint, setHint] = useState<DoseHint | null>(null);
+  const [hintBusy, setHintBusy] = useState(false);
   const [title, setTitle] = useState("");
   const [finishing, setFinishing] = useState(false);
   const [reason, setReason] = useState("");
@@ -150,20 +169,35 @@ export default function ProcedureRunner(props: {
     setTo("");
     setToId(null);
     setToUnit(f.unit ?? "");
-    setQty(f.kind === "qty" && f.oldQty != null ? String(f.oldQty) : "");
+    setQty(f.kind === "qty" && f.oldQty != null ? inputQty(f.oldQty) : "");
+    setHint(null);
     setTitle("");
     setReason("");
     setError(null);
+  }
+
+  /** KTV chọn sản phẩm trong danh sách → lấy định lượng gợi ý theo liệu trình khác, tự điền vào ô định lượng */
+  async function pickProduct(id: string) {
+    setHint(null);
+    setHintBusy(true);
+    const { data } = await createClient().rpc("product_dose_hint", { p_product: id });
+    setHintBusy(false);
+    const h = (data ?? null) as DoseHint | null;
+    setHint(h);
+    if (h?.unit) setToUnit(h.unit);
+    if (h?.suggest != null) setQty(inputQty(h.suggest));
   }
 
   async function sendForm() {
     if (!form) return;
     const k = form.kind;
     const needProduct = k === "swap" || k === "add_product";
-    if (needProduct && !to.trim()) return setError("Chọn hoặc gõ tên sản phẩm.");
+    if (needProduct && !to.trim()) return setError("Gõ tên rồi chọn sản phẩm trong danh sách.");
+    if ((needProduct || (k === "add_step" && to.trim())) && !toId)
+      return setError("Chọn sản phẩm trong danh sách gợi ý (hoặc quét mã). Sản phẩm chưa có trong danh sách → báo kho thêm vào hệ thống.");
     if (k === "add_step" && !title.trim()) return setError("Ghi tên bước muốn thêm.");
-    const q = qty.trim() ? Number(qty.replace(",", ".")) : null;
-    if (q !== null && !(q > 0)) return setError("Định lượng phải là số lớn hơn 0.");
+    const q = qty.trim() && !form.legacyFrom ? Math.round(parseQty(qty) * 1000) / 1000 : null;
+    if (q !== null && !(q > 0)) return setError("Định lượng phải là số lớn hơn 0 – số lẻ gõ 0,5 hoặc 1/2.");
     if (k === "qty" && q === null) return setError("Nhập định lượng mới.");
     if ((k === "add_product" || (k === "add_step" && to.trim())) && toId && q === null) return setError("Nhập định lượng sản phẩm dùng cho 1 buổi.");
     if (!reason.trim()) return setError("Ghi lý do để quản lý duyệt.");
@@ -467,20 +501,56 @@ export default function ProcedureRunner(props: {
                   setTo(v);
                   setToId(id ?? null);
                   if (u !== undefined) setToUnit(u);
+                  if (id) pickProduct(id);
+                  else setHint(null);
                 }}
               />
             )}
-            {(form.kind === "qty" || form.kind === "swap" || form.kind === "add_product" || (form.kind === "add_step" && to.trim())) && (
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  className="input py-2 text-sm"
-                  inputMode="decimal"
-                  placeholder={form.kind === "swap" ? "Định lượng / buổi (bỏ trống = giữ như cũ)" : "Định lượng / buổi"}
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                />
-                <span className="shrink-0 text-xs text-[#646464]">{(form.kind === "qty" ? form.unit : toUnit || form.unit) || ""}</span>
-              </label>
+            {(form.kind === "qty" || ((form.kind === "swap" || form.kind === "add_product" || form.kind === "add_step") && toId && !form.legacyFrom)) && (
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    className="input py-2 text-sm"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder={form.kind === "swap" ? "Định lượng / buổi (bỏ trống = giữ như cũ)" : "Định lượng / buổi (vd 0,5)"}
+                    value={qty}
+                    onChange={(e) => setQty(e.target.value)}
+                  />
+                  <span className="shrink-0 text-xs text-[#646464]">{(form.kind === "qty" ? form.unit : toUnit || form.unit) || ""}</span>
+                </label>
+                {hintBusy && <p className="text-[11px] text-[#646464]">Đang tìm định lượng ở các liệu trình khác…</p>}
+                {form.kind !== "qty" && hint && hint.options.length > 0 && (
+                  <div className="space-y-1 rounded-[10px] bg-cream px-2.5 py-2 text-[11px] text-[#5E4B30]">
+                    <p className="font-semibold">Gợi ý theo liệu trình khác đang dùng sản phẩm này (đã tự điền, sửa được):</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {hint.options.map((o) => {
+                        const used = hint.services.filter((s) => s.qty === o).map((s) => s.name);
+                        return (
+                          <button
+                            key={o}
+                            type="button"
+                            onClick={() => setQty(inputQty(o))}
+                            className={`rounded-full border px-2.5 py-1 font-semibold ${parseQty(qty) === o ? "border-navy bg-navy text-white" : "border-[#C9B79A] bg-white"}`}
+                          >
+                            {qtyText(o, hint.unit ?? toUnit)}
+                            {used.length > 0 && <span className="font-normal opacity-75"> · {used.length} liệu trình</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {hint.services.length > 0 && (
+                      <p className="opacity-80">
+                        Dùng ở: {hint.services.slice(0, 4).map((s) => `${s.name} (${qtyText(s.qty, hint.unit ?? "")})`).join(", ")}
+                        {hint.services.length > 4 ? ` +${hint.services.length - 4} liệu trình khác` : ""}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {form.kind !== "qty" && hint && hint.options.length === 0 && (
+                  <p className="text-[11px] text-[#646464]">Sản phẩm này chưa có trong quy trình liệu trình nào – nhập định lượng / buổi (số lẻ gõ 0,5).</p>
+                )}
+              </div>
             )}
             <input className="input py-2 text-sm" placeholder="Lý do (vd da khách đang đỏ)" value={reason} onChange={(e) => setReason(e.target.value)} />
             {error && <p className="text-xs text-[#B3261E]">{error}</p>}
