@@ -37,7 +37,7 @@ export function renderHome(data, buildId) {
   <div class="hero-text">
     <p class="eyebrow">Spa chăm sóc da mặt tại Hà Nội</p>
     <h1>Chăm sóc bằng sự thấu hiểu từng làn da</h1>
-    <p class="hero-sub">Lấy nhân mụn không đau, kiểm soát mụn hạn chế tái phát và đầy đủ liệu trình Biologique Recherche (Pháp).</p>
+    <p class="hero-sub"><span>Lấy nhân mụn không đau</span><span>Kiểm soát mụn, hạn chế tái phát</span><span>Liệu trình Biologique Recherche</span></p>
     <div class="btn-row center">
       <a class="btn btn-light" href="${SITE.bookingUrl}">Đặt lịch chăm sóc</a>
       <a class="btn btn-outline-light" href="#ghe-tham">Nhắn Zalo để tư vấn</a>
