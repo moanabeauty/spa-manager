@@ -460,8 +460,8 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const grp = sp.nhom && groupById.has(sp.nhom) ? sp.nhom : null;
   const cn = sp.cn && branches.some((b) => b.id === sp.cn) ? sp.cn : null;
   const { data: rows, error } = await supabase.rpc("crm_customers", {
-    // mã KH gõ tắt (KH12) → KH00012
-    p_q: (/^kh\s*\d{1,5}$/i.test(q) ? `KH${q.replace(/\D/g, "").padStart(5, "0")}` : q) || null,
+    // mã khách theo hệ Moana: M0085, M00418… (gõ thường "m0085" cũng được)
+    p_q: (/^m\s*\d{1,6}$/i.test(q) ? q.toUpperCase().replace(/\s/g, "") : q) || null,
     p_segment: seg,
     p_group: grp,
     p_branch: cn,
