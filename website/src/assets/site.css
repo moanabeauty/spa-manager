@@ -296,6 +296,9 @@ a:hover { color: var(--navy-2); }
 .product-detail-img { aspect-ratio: 1; border: 0; }
 .product-detail-img img { object-fit: contain; }
 .product-detail-img .product-ph { font-size: 80px; }
+.product-gallery { display: grid; gap: 16px; align-self: start; }
+.product-gallery .product-detail-img { border: 0; background: var(--sand); }
+.product-gallery .product-detail-img img { object-fit: cover; }
 .price-big { margin: 8px 0 0; font-size: 24px; font-weight: 400; letter-spacing: 0.02em; }
 .price-big + .small { margin-top: 2px; }
 .buy-box { margin-top: 28px; padding: 22px 22px 24px; background: var(--sand); }

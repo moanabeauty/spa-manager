@@ -80,13 +80,16 @@ function renderProduct(p, ctx, buildId) {
   const ld = {
     '@context': 'https://schema.org', '@type': 'Product', name: `${p.nice}${p.capacity ? ` ${p.capacity}` : ''}`, sku: p.sku,
     brand: { '@type': 'Brand', name: BRAND }, category: catLabel(p.cat),
-    ...(p.image_url ? { image: p.image_url } : {}),
+    ...(p.image_url ? { image: [p.image_url, p.texture_image_url].filter(Boolean) } : {}),
     ...(p.web_description ? { description: p.web_description } : {}),
     ...(p.retail_price ? { offers: { '@type': 'Offer', price: Number(p.retail_price), priceCurrency: 'VND', availability: 'https://schema.org/InStoreOnly', url: `${SITE.url}/san-pham/${p.slug}` } } : {}),
   };
   const body = `${crumbs([{ href: '/san-pham', label: 'Sản phẩm' }, { href: `/san-pham#loai-${cat.slug}`, label: cat.label }, { label: p.nice }])}
 <section class="wrap detail">
-  <div class="detail-img product-img product-detail-img">${thumb(p, true)}</div>
+  ${p.texture_image_url ? `<div class="product-gallery">
+    <div class="product-img product-detail-img">${thumb(p, true)}</div>
+    <div class="product-img product-detail-img"><img src="${esc(p.texture_image_url)}" alt="${esc(`Kết cấu ${p.nice}`)}" loading="lazy" decoding="async"></div>
+  </div>` : `<div class="detail-img product-img product-detail-img">${thumb(p, true)}</div>`}
   <div class="detail-text">
     <p class="label">${BRAND} · ${esc(catLabel(p.cat))}</p>
     <h1 class="detail-title">${esc(p.nice)}</h1>
