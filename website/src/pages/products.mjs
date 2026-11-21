@@ -37,8 +37,8 @@ function prepare(data) {
     line.sizes.push(p); p.line = line;
   }
   for (const l of lines) {
-    // Ô đại diện: bản 150 ml khi có 3 size, bản lớn hơn khi có 2 size (kem: 50 ml).
-    l.main = l.sizes[Math.min(1, l.sizes.length - 1)];
+    // Ô đại diện: bản dung tích lớn nhất (sizes đã xếp tăng dần theo dung tích).
+    l.main = l.sizes[l.sizes.length - 1];
     l.tex = l.sizes.map((x) => x.tex).find(Boolean) || null;
   }
   const cats = [...new Set(lines.map((l) => l.cat))].map((key) => ({
