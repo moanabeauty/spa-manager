@@ -10,6 +10,7 @@ import crypto from 'node:crypto';
 
 export const INDEXNOW_KEY = 'cc8187c3892153dc97a21f4f05d7cbf7';
 export const STATE_FILE = 'indexnow-state.json';
+const STATE_VERSION = 2; // tăng số này để buộc gửi lại toàn bộ ở lần deploy sau
 const ENDPOINT = 'https://api.indexnow.org/indexnow';
 
 // buildId đổi mỗi lần build (dùng làm ?v= cho CSS) → bỏ ra trước khi tính hash để trang không bị coi là "đổi".
@@ -22,7 +23,7 @@ export async function loadPreviousState(siteUrl) {
     const res = await fetch(`${siteUrl}/${STATE_FILE}`, { signal: AbortSignal.timeout(15000) });
     if (!res.ok) return null;
     const json = await res.json();
-    return json && typeof json.pages === 'object' ? json : null;
+    return json && json.v === STATE_VERSION && typeof json.pages === 'object' ? json : null;
   } catch {
     return null;
   }
@@ -42,7 +43,13 @@ export function diffState(prev, current, today) {
     }
   }
   const removed = Object.keys(old).filter((p) => !(p in current));
-  return { state: { pages }, changed, removed };
+  return { state: { v: STATE_VERSION, pages }, changed, removed };
+}
+
+// Gửi lỗi → đánh dấu để lần deploy sau gửi lại (trang đổi: hash 'unsent'; trang xoá: giữ lại dạng 'gone').
+export function markUnsent(state, changed, removed, today) {
+  for (const p of changed) state.pages[p] = { ...state.pages[p], h: 'unsent' };
+  for (const p of removed) state.pages[p] = { h: 'gone', lastmod: today };
 }
 
 export async function submitIndexNow(siteUrl, paths) {

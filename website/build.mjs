@@ -9,7 +9,7 @@ import { renderHome } from './src/pages/home.mjs';
 import { renderAbout, vlogPages, renderPrivacy, renderContact, render404 } from './src/pages/other.mjs';
 import { catalogPages } from './src/pages/catalog.mjs';
 import { productPages } from './src/pages/products.mjs';
-import { INDEXNOW_KEY, STATE_FILE, pageHash, loadPreviousState, diffState, submitIndexNow } from './src/indexnow.mjs';
+import { INDEXNOW_KEY, STATE_FILE, pageHash, loadPreviousState, diffState, submitIndexNow, markUnsent } from './src/indexnow.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(ROOT, 'dist');
@@ -59,8 +59,6 @@ const goodData = data.source === 'supabase';
 const { state, changed, removed } = goodData
   ? diffState(prev, Object.fromEntries(pages.map((p) => [p.path, pageHash(p.html, buildId)])), today)
   : { state: prev || { pages: {} }, changed: [], removed: [] }; // dữ liệu dự phòng → không coi là thay đổi thật
-state.updated = new Date().toISOString();
-fs.writeFileSync(path.join(OUT, STATE_FILE), JSON.stringify(state));
 fs.writeFileSync(path.join(OUT, `${INDEXNOW_KEY}.txt`), INDEXNOW_KEY);
 
 fs.writeFileSync(path.join(OUT, 'sitemap.xml'),
@@ -77,8 +75,11 @@ else if (toSubmit.length) {
     await submitIndexNow(SITE.url, toSubmit);
     console.log(`IndexNow: đã gửi ${toSubmit.length} đường dẫn`);
   } catch (err) {
-    console.warn('⚠ IndexNow: gửi không được (website vẫn deploy bình thường):', err.message);
+    console.warn('⚠ IndexNow: gửi không được, lần deploy sau sẽ gửi lại (website vẫn deploy bình thường):', err.message);
+    markUnsent(state, changed, removed, today);
   }
 }
+state.updated = new Date().toISOString();
+fs.writeFileSync(path.join(OUT, STATE_FILE), JSON.stringify(state));
 
 console.log(`Xong: ${fs.readdirSync(OUT).length} mục trong dist/`);
