@@ -13,6 +13,6 @@ Website giới thiệu, tách riêng với app quản lý (thư mục gốc củ
 - Giao diện: `src/assets/site.css`; trang: `src/pages/`; ảnh: `public/images/` (từ thư mục Photo trên Drive).
 - Vercel: dự án riêng, Root Directory = `website`, cấu hình trong `vercel.json` (cleanUrls, chuyển hướng link WordPress cũ, cache ảnh).
 
-- IndexNow (Bing, Yandex…): mỗi lần deploy Production, `build.mjs` so nội dung từng trang với bản đang chạy (`/indexnow-state.json`) rồi tự gửi các trang mới/đổi/bị xoá lên IndexNow; `sitemap.xml` giữ đúng ngày sửa cuối (lastmod) từng trang. Khoá: `src/indexnow.mjs` (file `/<khoá>.txt` tự sinh khi build). Dùng dữ liệu dự phòng thì không gửi.
+- IndexNow (Bing, Yandex…): mỗi lần deploy Production, `build.mjs` so nội dung từng trang với bản đang chạy (`/indexnow-state.json`) rồi tự gửi các trang mới/đổi/bị xoá lên IndexNow; `sitemap.xml` giữ đúng ngày sửa cuối (lastmod) từng trang. Khoá: `src/indexnow.mjs` (file `/<khoá>.txt` tự sinh khi build). Dùng dữ liệu dự phòng thì không gửi; gửi lỗi thì lần deploy sau gửi lại. Kết quả xem ở Build Logs, dòng "IndexNow: …". Lưu ý: Vercel chỉ build khi thư mục `website/` có thay đổi (commit rỗng sẽ bị bỏ qua) — muốn build lại thì bấm Redeploy.
 
 Chạy thử trên máy: `node build.mjs` rồi mở `dist/index.html` (hoặc `npx serve dist`).
