@@ -10,7 +10,7 @@ export const SITE = {
   // Tiêu đề trang chủ hiện trên Google (nên dưới ~60 ký tự)
   homeTitle: 'Spa da mặt Hà Nội – Lấy nhân mụn không đau | Moana Beauty',
   founded: 2019,
-  hours: 'Mở cửa 9:00 – 18:00 hằng ngày, trừ ngày lễ Tết',
+  hours: 'Mở cửa T2–T6 9:00 – 18:30, T7–CN 9:00 – 19:00, trừ ngày lễ Tết',
   email: 'info@moanabeauty.vn',
   bookingUrl: 'https://spa-manager-five.vercel.app/dat-lich',
   gaId: 'G-VSFLDPBPZK',

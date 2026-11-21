@@ -133,9 +133,14 @@ function jsonLd() {
     areaServed: { '@type': 'City', name: 'Hà Nội' },
     openingHoursSpecification: [{
       '@type': 'OpeningHoursSpecification',
-      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
       opens: '09:00',
-      closes: '18:00',
+      closes: '18:30',
+    }, {
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: ['Saturday', 'Sunday'],
+      opens: '09:00',
+      closes: '19:00',
     }],
     currenciesAccepted: 'VND',
     paymentAccepted: 'Tiền mặt, chuyển khoản, thẻ',

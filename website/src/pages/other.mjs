@@ -104,7 +104,7 @@ export function renderAbout(data, buildId) {
   <h2 class="h2 center">Hai cơ sở của Moana</h2>
   ${contactBlock('h3')}
 </section>
-${ctaBand('Đặt lịch chăm sóc da cùng Moana', 'Moana mở cửa 9:00 – 18:00 tất cả các ngày, trừ ngày lễ Tết.')}`;
+${ctaBand('Đặt lịch chăm sóc da cùng Moana', 'Moana mở cửa thứ Hai – thứ Sáu 9:00 – 18:30, thứ Bảy – Chủ nhật 9:00 – 19:00, trừ ngày lễ Tết.')}`;
   return page({
     path: '/ve-moana', title: 'Về Moana – Spa chăm sóc da mặt Hà Nội', body, buildId, ld: true,
     description: `Moana Beauty — spa chuyên chăm sóc da mặt tại Hà Nội từ ${SITE.founded}: lấy nhân mụn không đau; kiểm soát mụn nội tiết, mụn dậy thì, mụn do thay đổi thời tiết; đầy đủ liệu trình Biologique Recherche (Pháp).`,
@@ -237,7 +237,7 @@ export function renderPrivacy(buildId) {
 
 // ---------- /lien-he ----------
 export function renderContact(buildId) {
-  const body = `${banner('Liên hệ', 'Moana mở cửa 9:00 – 18:00 tất cả các ngày, trừ ngày lễ Tết. Bạn có thể đặt lịch trực tuyến, gọi điện hoặc nhắn Zalo cho cơ sở gần nhất.')}
+  const body = `${banner('Liên hệ', 'Moana mở cửa thứ Hai – thứ Sáu 9:00 – 18:30, thứ Bảy – Chủ nhật 9:00 – 19:00, trừ ngày lễ Tết. Bạn có thể đặt lịch trực tuyến, gọi điện hoặc nhắn Zalo cho cơ sở gần nhất.')}
 <section class="wrap section pt-0">
   ${contactBlock()}
   <p class="center mt">Email: <a href="mailto:${SITE.email}">${SITE.email}</a></p>
