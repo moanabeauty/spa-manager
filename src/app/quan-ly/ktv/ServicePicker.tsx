@@ -18,12 +18,17 @@ export default function ServicePicker({
   services,
   value,
   onChange,
+  selected,
+  onToggle,
 }: {
   customerId: string | null;
   branchId: string;
   services: PickService[];
-  value: Pick | null;
-  onChange: (p: Pick | null) => void;
+  value?: Pick | null;
+  onChange?: (p: Pick | null) => void;
+  /** Chọn nhiều liệu trình (đặt lịch): danh sách đã chọn + bấm để chọn / bỏ */
+  selected?: Pick[];
+  onToggle?: (p: Pick) => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [combos, setCombos] = useState<Combo[]>([]);
@@ -50,9 +55,13 @@ export default function ServicePicker({
   const comboRows = combos.filter((c) => byId.has(c.service_id) && match(byId.get(c.service_id)!));
 
   const label = (s: PickService) => s.name_en || s.name;
-  const choose = (s: PickService, itemId: string | null) =>
-    onChange({ serviceId: s.id, itemId, label: label(s), minutes: s.duration_minutes });
-  const isOn = (sid: string, item: string | null) => value?.serviceId === sid && (value?.itemId ?? null) === item;
+  const choose = (s: PickService, itemId: string | null) => {
+    const p = { serviceId: s.id, itemId, label: label(s), minutes: s.duration_minutes };
+    if (onToggle) onToggle(p);
+    else onChange?.(p);
+  };
+  const same = (p: Pick | null | undefined, sid: string, item: string | null) => p?.serviceId === sid && (p?.itemId ?? null) === item;
+  const isOn = (sid: string, item: string | null) => (selected ? selected.some((p) => same(p, sid, item)) : same(value, sid, item));
 
   return (
     <div className="space-y-2">

@@ -11,6 +11,7 @@ import ServicePicker, { type Pick, type PickService } from "../ServicePicker";
 
 type Found = { id: string; code: string | null; full_name: string; packages_left: number | null; card_balance: number | null };
 const DAYS = 14;
+const MAX_SERVICES = 3; // 1 khách đặt tối đa 3 liệu trình trong 1 buổi
 
 export default function KtvBookingForm({
   branchId,
@@ -36,7 +37,8 @@ export default function KtvBookingForm({
   const [newPhone, setNewPhone] = useState("");
   // dịch vụ
   const [mode, setMode] = useState<"service" | "consult">("service");
-  const [pick, setPick] = useState<Pick | null>(null);
+  const [picks, setPicks] = useState<Pick[]>([]);
+  const [pickMsg, setPickMsg] = useState<string | null>(null);
   // ngày giờ
   const [date, setDate] = useState(todayVn());
   const [time, setTime] = useState("");
@@ -83,7 +85,7 @@ export default function KtvBookingForm({
     };
   }, [date, branchId, supabase]);
 
-  const minutes = mode === "consult" ? 60 : pick?.minutes ?? 60;
+  const minutes = mode === "consult" ? 60 : picks.reduce((t, p) => t + p.minutes, 0) || 60;
   const today = todayVn();
   const nowHM = nowVnHHMM();
   const slots = daySlots().map((t) => {
@@ -100,13 +102,26 @@ export default function KtvBookingForm({
   const when = time ? `${time} · ${weekdayShort(date)}` : "";
   const cta = mode === "consult" ? `Đặt hẹn tư vấn${when ? ` ${when}` : ""}` : `Đặt lịch${when ? ` ${when}` : ""}`;
 
+  function toggle(p: Pick) {
+    setPickMsg(null);
+    setPicks((cur) => {
+      const has = cur.some((x) => x.serviceId === p.serviceId && x.itemId === p.itemId);
+      if (has) return cur.filter((x) => !(x.serviceId === p.serviceId && x.itemId === p.itemId));
+      if (cur.length >= MAX_SERVICES) {
+        setPickMsg(`Mỗi buổi đặt tối đa ${MAX_SERVICES} liệu trình cho 1 khách.`);
+        return cur;
+      }
+      return [...cur, p];
+    });
+  }
+
   async function submit() {
     setError(null);
     if (!customer && !isNew) return setError("Vui lòng chọn khách hàng.");
     const phone = normalizePhone(newPhone);
     if (isNew && !newName.trim()) return setError("Khách mới: vui lòng nhập tên khách.");
     if (isNew && phone && (phone.length < 9 || phone.length > 11)) return setError("Số điện thoại phải có 9–11 số – hoặc để trống.");
-    if (mode === "service" && !pick) return setError("Vui lòng chọn liệu trình, hoặc chọn Hẹn tư vấn.");
+    if (mode === "service" && picks.length === 0) return setError("Vui lòng chọn liệu trình, hoặc chọn Hẹn tư vấn.");
     if (!time) return setError("Vui lòng chọn khung giờ còn trống.");
     setSaving(true);
     const { error: e } = await supabase.rpc("ktv_book", {
@@ -115,13 +130,14 @@ export default function KtvBookingForm({
       p_customer_id: customer?.id ?? null,
       p_customer_name: customer ? null : newName.trim(),
       p_customer_phone: customer || !phone ? null : phone,
-      p_service_id: mode === "service" ? pick!.serviceId : null,
-      p_package_item_id: mode === "service" ? pick!.itemId : null,
+      p_service_id: null,
+      p_package_item_id: null,
       p_note: note.trim() || null,
+      p_items: mode === "service" ? picks.map((p) => ({ service_id: p.serviceId, package_item_id: p.itemId })) : null,
     });
     setSaving(false);
     if (e) return setError(vnError(e.message));
-    setDone(`${mode === "consult" ? "Đã đặt hẹn tư vấn" : `Đã đặt ${pick!.label}`} cho ${customer?.full_name ?? newName.trim()} · ${when}`);
+    setDone(`${mode === "consult" ? "Đã đặt hẹn tư vấn" : `Đã đặt ${picks.map((p) => p.label).join(" + ")}`} cho ${customer?.full_name ?? newName.trim()} · ${when}`);
   }
 
   function reset() {
@@ -132,7 +148,8 @@ export default function KtvBookingForm({
     setIsNew(false);
     setNewName("");
     setNewPhone("");
-    setPick(null);
+    setPicks([]);
+    setPickMsg(null);
     setTime("");
     setNote("");
     setMode("service");
@@ -173,7 +190,7 @@ export default function KtvBookingForm({
                   {[customer.code, customer.packages_left ? `combo còn ${customer.packages_left} buổi` : "", Number(customer.card_balance) > 0 ? "có thẻ" : ""].filter(Boolean).join(" · ")}
                 </span>
               </span>
-              <button className="text-sm font-semibold text-navy underline" onClick={() => { setCustomer(null); setPick(null); }}>Đổi</button>
+              <button className="text-sm font-semibold text-navy underline" onClick={() => { setCustomer(null); setPicks([]); }}>Đổi</button>
             </div>
           ) : isNew ? (
             <div className="space-y-2 rounded-xl bg-white p-3 ring-1 ring-beige-dark">
@@ -224,12 +241,24 @@ export default function KtvBookingForm({
             </button>
           </div>
           {mode === "service" && (
-            <ServicePicker customerId={customer?.id ?? null} branchId={branchId} services={services} value={pick} onChange={setPick} />
+            <>
+              <p className="text-xs text-[#646464]">Khách làm nhiều liệu trình trong 1 buổi: bấm chọn tối đa {MAX_SERVICES} liệu trình, làm nối tiếp nhau. Bấm lại để bỏ.</p>
+              <ServicePicker customerId={customer?.id ?? null} branchId={branchId} services={services} selected={picks} onToggle={toggle} />
+            </>
           )}
-          {mode === "service" && pick && (
-            <p className="text-xs text-[#646464]">
-              Đã chọn: <b className="text-ink">{pick.label}</b> · {pick.minutes} phút{pick.itemId ? " · trừ buổi combo khi hoàn thành" : ""}
-            </p>
+          {pickMsg && <p className="text-xs text-[#B3261E]">{pickMsg}</p>}
+          {mode === "service" && picks.length > 0 && (
+            <div className="space-y-1 rounded-xl bg-white p-2.5 ring-1 ring-beige-dark">
+              <p className="text-xs font-semibold">Đã chọn {picks.length} liệu trình · tổng {minutes} phút</p>
+              {picks.map((p, i) => (
+                <div key={`${p.serviceId}-${p.itemId}`} className="flex items-center justify-between gap-2 text-xs">
+                  <span>
+                    {i + 1}. <b className="text-ink">{p.label}</b> · {p.minutes} phút{p.itemId ? " · trừ buổi combo" : ""}
+                  </span>
+                  <button type="button" className="shrink-0 font-semibold text-navy underline" onClick={() => toggle(p)}>Bỏ</button>
+                </div>
+              ))}
+            </div>
           )}
         </section>
 
