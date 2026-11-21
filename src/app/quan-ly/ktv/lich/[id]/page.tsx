@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { formatShortDate, formatTime, formatVnd } from "@/lib/format";
 import { CARD_ALERT, COMBO_ALERT } from "@/lib/ktv";
 import type { PickService } from "../../ServicePicker";
-import DetailActions from "./DetailActions";
+import DetailActions, { type BookedRow } from "./DetailActions";
 import SessionPhotos from "@/components/SessionPhotos";
 import PhotoHistory from "@/components/PhotoHistory";
 import { loadCustomerPhotos, photosRequired } from "@/lib/photos";
@@ -20,6 +20,7 @@ type Aps = {
   work_started_at: string | null;
   work_done_at: string | null;
   service_id: string;
+  customer_package_item_id: string | null;
   services: { name: string; name_en: string | null } | null;
 };
 type Appt = {
@@ -64,7 +65,7 @@ export default async function KtvAppointmentPage({ params }: { params: Promise<{
     supabase
       .from("appointments")
       .select(
-        "id, start_at, end_at, status, branch_id, customer_id, note, ktv_confirmed_at, ktv_confirmed_auto, is_consultation, photo_skip_reason, customers(full_name, code), appointment_services(id, technician_id, service_id, start_at, end_at, is_active, work_started_at, work_done_at, services(name, name_en))",
+        "id, start_at, end_at, status, branch_id, customer_id, note, ktv_confirmed_at, ktv_confirmed_auto, is_consultation, photo_skip_reason, customers(full_name, code), appointment_services(id, technician_id, service_id, customer_package_item_id, start_at, end_at, is_active, work_started_at, work_done_at, services(name, name_en))",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -102,8 +103,23 @@ export default async function KtvAppointmentPage({ params }: { params: Promise<{
     category: s.service_categories?.name ?? null,
   }));
 
+  // toàn bộ liệu trình của lịch (để KTV đổi / thêm / bỏ): đã bắt đầu thì khoá; liệu trình của KTV khác thì KTV không sửa được
+  const booked: BookedRow[] = a.appointment_services
+    .filter((s) => s.is_active)
+    .sort((x, y) => x.start_at.localeCompare(y.start_at))
+    .map((s) => ({
+      id: s.id,
+      serviceId: s.service_id,
+      itemId: s.customer_package_item_id,
+      label: s.services?.name_en || s.services?.name || "Liệu trình",
+      minutes: Math.max(5, Math.round((new Date(s.end_at).getTime() - new Date(s.start_at).getTime()) / 60000)),
+      started: !!s.work_started_at,
+      done: !!s.work_done_at,
+      locked: profile.role === "technician" && !!s.technician_id && s.technician_id !== profile.id,
+    }));
+
   return (
-    <div className="-mx-4 -mt-6 pb-40">
+    <div className="-mx-4 -mt-6 pb-56">
       <div className="space-y-1.5 bg-navy px-5 pb-5 pt-4 text-white">
         <Link href="/quan-ly" className="flex min-h-8 items-center text-sm text-beige-dark">‹ Hôm nay</Link>
         <h1 className="text-[22px] font-bold">{a.customers?.full_name ?? "Khách"}</h1>
@@ -242,6 +258,7 @@ export default async function KtvAppointmentPage({ params }: { params: Promise<{
         branchId={a.branch_id}
         services={services}
         closed={closed}
+        booked={booked}
       />
     </div>
   );

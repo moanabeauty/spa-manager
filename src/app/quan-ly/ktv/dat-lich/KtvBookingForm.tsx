@@ -11,7 +11,7 @@ import ServicePicker, { type Pick, type PickService } from "../ServicePicker";
 
 type Found = { id: string; code: string | null; full_name: string; packages_left: number | null; card_balance: number | null };
 const DAYS = 14;
-const MAX_SERVICES = 3; // 1 khách đặt tối đa 3 liệu trình trong 1 buổi
+const MAX_SERVICES = 10; // 1 khách đặt tối đa 10 dịch vụ trong 1 buổi
 
 export default function KtvBookingForm({
   branchId,
@@ -108,7 +108,7 @@ export default function KtvBookingForm({
       const has = cur.some((x) => x.serviceId === p.serviceId && x.itemId === p.itemId);
       if (has) return cur.filter((x) => !(x.serviceId === p.serviceId && x.itemId === p.itemId));
       if (cur.length >= MAX_SERVICES) {
-        setPickMsg(`Mỗi buổi đặt tối đa ${MAX_SERVICES} liệu trình cho 1 khách.`);
+        setPickMsg(`Mỗi buổi tối đa ${MAX_SERVICES} dịch vụ cho 1 khách.`);
         return cur;
       }
       return [...cur, p];
@@ -242,7 +242,7 @@ export default function KtvBookingForm({
           </div>
           {mode === "service" && (
             <>
-              <p className="text-xs text-[#646464]">Khách làm nhiều liệu trình trong 1 buổi: bấm chọn tối đa {MAX_SERVICES} liệu trình, làm nối tiếp nhau. Bấm lại để bỏ.</p>
+              <p className="text-xs text-[#646464]">Khách làm nhiều liệu trình trong 1 buổi: bấm chọn tối đa {MAX_SERVICES} dịch vụ, làm nối tiếp nhau. Bấm lại để bỏ.</p>
               <ServicePicker customerId={customer?.id ?? null} branchId={branchId} services={services} selected={picks} onToggle={toggle} />
             </>
           )}
