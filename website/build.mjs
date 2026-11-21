@@ -9,6 +9,7 @@ import { renderHome } from './src/pages/home.mjs';
 import { renderAbout, vlogPages, renderPrivacy, renderContact, render404 } from './src/pages/other.mjs';
 import { catalogPages } from './src/pages/catalog.mjs';
 import { productPages } from './src/pages/products.mjs';
+import { INDEXNOW_KEY, STATE_FILE, pageHash, loadPreviousState, diffState, submitIndexNow } from './src/indexnow.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(ROOT, 'dist');
@@ -51,9 +52,33 @@ const indexed = pages.map((p) => p.path);
 console.log(`${pages.length} trang`);
 
 const today = new Date().toISOString().slice(0, 10);
+
+// IndexNow + lastmod: so với bản đang chạy trên moanabeauty.vn (xem src/indexnow.mjs)
+const prev = await loadPreviousState(SITE.url);
+const goodData = data.source === 'supabase';
+const { state, changed, removed } = goodData
+  ? diffState(prev, Object.fromEntries(pages.map((p) => [p.path, pageHash(p.html, buildId)])), today)
+  : { state: prev || { pages: {} }, changed: [], removed: [] }; // dữ liệu dự phòng → không coi là thay đổi thật
+state.updated = new Date().toISOString();
+fs.writeFileSync(path.join(OUT, STATE_FILE), JSON.stringify(state));
+fs.writeFileSync(path.join(OUT, `${INDEXNOW_KEY}.txt`), INDEXNOW_KEY);
+
 fs.writeFileSync(path.join(OUT, 'sitemap.xml'),
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${indexed
-    .map((p) => `  <url><loc>${SITE.url}${p}</loc><lastmod>${today}</lastmod></url>`).join('\n')}\n</urlset>\n`);
+    .map((p) => `  <url><loc>${SITE.url}${p}</loc><lastmod>${state.pages[p]?.lastmod || today}</lastmod></url>`).join('\n')}\n</urlset>\n`);
 fs.writeFileSync(path.join(OUT, 'robots.txt'), `User-agent: *\nAllow: /\n\nSitemap: ${SITE.url}/sitemap.xml\n`);
+
+const toSubmit = [...changed, ...removed];
+console.log(`IndexNow: ${prev ? 'so với bản đang chạy' : 'chưa có bản trước'} → ${changed.length} trang mới/đổi, ${removed.length} trang bị xoá`);
+if (!goodData) console.log('IndexNow: bỏ qua (đang dùng dữ liệu dự phòng)');
+else if (process.env.VERCEL_ENV !== 'production') console.log('IndexNow: bỏ qua (không phải bản Production)');
+else if (toSubmit.length) {
+  try {
+    await submitIndexNow(SITE.url, toSubmit);
+    console.log(`IndexNow: đã gửi ${toSubmit.length} đường dẫn`);
+  } catch (err) {
+    console.warn('⚠ IndexNow: gửi không được (website vẫn deploy bình thường):', err.message);
+  }
+}
 
 console.log(`Xong: ${fs.readdirSync(OUT).length} mục trong dist/`);
