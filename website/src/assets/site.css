@@ -383,3 +383,64 @@ a:hover { color: var(--navy-2); }
 .about-focus { padding-top: 32px; padding-bottom: 0; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+
+/* ===== Sản phẩm kiểu Biologique Recherche (21/11/2026) ===== */
+:root { --br-bg: #EEECE8; }
+.br-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); margin-top: 32px; }
+@media (max-width: 1000px) { .br-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .br-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.br-tile { position: relative; display: flex; flex-direction: column; background: var(--br-bg); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-decoration: none; color: var(--navy); }
+.br-tile[hidden] { display: none; }
+.br-tile-img { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 1; overflow: hidden; }
+.br-tile-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity .45s ease, transform .6s ease; }
+.br-tile .img-accent { opacity: 0; }
+.br-tile.is-accent.has-flat .img-flat { opacity: 0; }
+.br-tile.is-accent.has-flat .img-accent { opacity: 1; }
+.br-tile .img-tex { opacity: 0; }
+@media (hover: hover) {
+  .br-tile:hover .br-tile-img img:not(.img-tex) { opacity: 0; }
+  .br-tile:hover .img-tex { opacity: 1; transform: scale(1.03); }
+}
+.br-tile-name { position: relative; display: block; padding: 18px 16px 22px; font-size: 13px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.35; }
+.br-tile-name::before { content: ''; position: absolute; left: 0; top: -1px; width: 33%; height: 2px; background: var(--navy); transform: scaleX(0); transform-origin: left; transition: transform .35s ease; }
+.br-tile:hover .br-tile-name::before { transform: scaleX(1); }
+/* Ô điểm nhấn: nền màu của ảnh lan xuống phần tên */
+.br-tile.is-accent { background: var(--sand); }
+@media (max-width: 700px) { .br-tile-name { padding: 12px 10px 16px; font-size: 11px; } }
+
+.br-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 0; align-items: start; padding-top: 16px; padding-bottom: 64px; }
+.br-gallery { position: sticky; top: 88px; aspect-ratio: 1; background: var(--br-bg); overflow: hidden; }
+.br-slide { position: absolute; inset: 0; opacity: 0; transition: opacity .4s ease; display: flex; align-items: center; justify-content: center; }
+.br-slide.is-on { opacity: 1; }
+.br-slide img { width: 100%; height: 100%; object-fit: cover; }
+.br-slide .product-ph { font-size: 80px; }
+.br-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border: 0; background: transparent; color: var(--navy); font-size: 34px; line-height: 1; cursor: pointer; }
+.br-arrow[hidden] { display: none; }
+.br-prev { left: 8px; } .br-next { right: 8px; }
+.br-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: rgba(43,45,100,.12); }
+.br-progress span { display: block; height: 100%; background: var(--navy); transition: transform .35s ease; }
+.br-info { padding: 32px clamp(20px, 6vw, 96px); max-width: 640px; }
+.br-title { margin: 0 0 12px; font-weight: 400; font-size: clamp(22px, 2.4vw, 28px); letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.25; }
+.br-tags { margin: 0 0 22px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.br-tags span { margin: 0 6px; opacity: .6; }
+.br-sizes { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 0 0 22px; padding: 0; border: 0; }
+.br-sizes label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; letter-spacing: 0.06em; }
+.br-sizes input { appearance: none; width: 15px; height: 15px; margin: 0; border: 1px solid var(--navy); border-radius: 50%; display: grid; place-content: center; cursor: pointer; }
+.br-sizes input::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--navy); transform: scale(0); transition: transform .15s; }
+.br-sizes input:checked::before { transform: scale(1); }
+.br-sizes-one span { font-size: 12px; letter-spacing: 0.06em; }
+.br-price { margin: 0 0 4px; font-size: 20px; letter-spacing: 0.02em; }
+.br-sku { margin: 0 0 18px; }
+.br-buy { margin: 0 0 12px; }
+.br-acc { margin-top: 28px; border-top: 1px solid var(--line); }
+.br-acc details { border-bottom: 1px solid var(--line); }
+.br-acc summary { list-style: none; display: flex; justify-content: space-between; align-items: center; padding: 16px 0; cursor: pointer; font-size: 14px; }
+.br-acc summary::-webkit-details-marker { display: none; }
+.br-acc summary::after { content: ''; width: 7px; height: 7px; border-right: 1.5px solid var(--navy); border-bottom: 1.5px solid var(--navy); transform: rotate(45deg); transition: transform .2s; margin-right: 4px; }
+.br-acc details[open] summary::after { transform: rotate(-135deg); }
+.br-acc .prose { padding-bottom: 12px; font-size: 14px; color: var(--muted); }
+@media (max-width: 900px) {
+  .br-detail { grid-template-columns: 1fr; padding-top: 8px; }
+  .br-gallery { position: relative; top: 0; margin: 0 calc(-1 * var(--pad)); }
+  .br-info { padding: 24px 0 0; }
+}
