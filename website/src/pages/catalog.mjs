@@ -1,10 +1,6 @@
 // Trang Liệu trình, Promotion (ưu đãi theo tháng + các gói/combo), Bảng giá (+ trang chi tiết).
 // Giá liệu trình & gói CHỈ hiện ở trang Bảng giá (quy ước đã chốt). Trên web, "combo" trong app được gọi là Promotion.
-import { SITE, GROUPS, COMBO_IMAGES, SERVICE_IMAGES } from '../site.mjs';
-
-// Tạm ẩn giá Promotion (combo) trên web (chốt 24/11/2026): Bảng giá chỉ hiện giá liệu trình lẻ.
-// Muốn hiện lại giá Promotion: đổi thành true.
-const SHOW_PROMO_PRICES = false;
+import { SITE, GROUPS, COMBO_IMAGES, SERVICE_IMAGES, SHOW_COMBOS } from '../site.mjs';
 import { esc, page } from '../layout.mjs';
 import { banner, crumbs, ctaBand, zaloButtons } from '../parts.mjs';
 import { slugify, img, money, webText, svcName, titleEn, svcSlug, pkgSlug, paragraphs, fmtDate } from '../util.mjs';
@@ -30,7 +26,8 @@ export function prepare(data) {
     groups.push(g);
   }
 
-  const packages = (data.packages || []).map((p) => ({
+  // SHOW_COMBOS = false: không dựng combo nào -> không có trang/thẻ/giá combo ở bất kỳ đâu.
+  const packages = (SHOW_COMBOS ? (data.packages || []) : []).map((p) => ({
     ...p, slug: pkgSlug(p), desc: webText(p.description),
     items: (p.items || []).map((i) => ({ ...i, label: webText(i.label) })),
   }));
@@ -192,11 +189,13 @@ const promoDates = (p) => {
 
 function renderCombosIndex(ctx, buildId) {
   const promos = ctx.promotions;
-  const body = `${banner('Promotion', 'Ưu đãi theo tháng và các gói chăm sóc nhiều buổi của Moana. Moana tư vấn để bạn chọn lựa chọn phù hợp với làn da và lịch của mình.')}
-<nav class="chips wrap" aria-label="Chọn nhóm">
+  const body = `${banner('Promotion', SHOW_COMBOS
+    ? 'Ưu đãi theo tháng và các gói chăm sóc nhiều buổi của Moana. Moana tư vấn để bạn chọn lựa chọn phù hợp với làn da và lịch của mình.'
+    : 'Ưu đãi của Moana theo từng đợt. Moana tư vấn để bạn chọn lựa chọn phù hợp với làn da và lịch của mình.')}
+${ctx.pkgGroups.length ? `<nav class="chips wrap" aria-label="Chọn nhóm">
   <a href="#uu-dai">Ưu đãi tháng này</a>
   ${ctx.pkgGroups.map((g) => `<a href="#${g.slug}">${esc(webText(g.title))}</a>`).join('\n  ')}
-</nav>
+</nav>` : ''}
 
 <section class="wrap group group-first" id="uu-dai">
   <h2 class="h2">Ưu đãi tháng này</h2>
@@ -224,13 +223,13 @@ ${ctx.pkgGroups.map((g) => `
   <div class="grid-combos">${g.items.map(comboCard).join('')}
   </div>
 </section>`).join('')}
-${SHOW_PROMO_PRICES ? `<div class="wrap center section-s">
+${SHOW_COMBOS ? `<div class="wrap center section-s">
   <a class="btn btn-outline" href="/bang-gia#promotion">Xem giá các gói</a>
 </div>` : ''}
-${ctaBand('Chưa biết chọn gói nào?', 'Nhắn Moana để được tư vấn theo tình trạng da và tần suất bạn có thể đến spa.')}`;
+${SHOW_COMBOS ? ctaBand('Chưa biết chọn gói nào?', 'Nhắn Moana để được tư vấn theo tình trạng da và tần suất bạn có thể đến spa.') : ctaBand()}`;
   return page({
-    path: '/promotion', title: 'Promotion — Ưu đãi & gói chăm sóc', body, buildId,
-    description: 'Promotion tại Moana Beauty: ưu đãi theo tháng và các gói chăm sóc da nhiều buổi — chăm sóc da cơ bản, mụn – lỗ chân lông, sáng da, Biologique Recherche, tóc – da đầu, triệt lông.',
+    path: '/promotion', title: SHOW_COMBOS ? 'Promotion — Ưu đãi & gói chăm sóc' : 'Promotion — Ưu đãi', body, buildId,
+    description: !SHOW_COMBOS ? 'Promotion tại Moana Beauty: ưu đãi chăm sóc da theo từng đợt tại 67 Lưu Quang Vũ (Cầu Giấy) và 109 Nguyễn Sơn (Long Biên), Hà Nội.' : 'Promotion tại Moana Beauty: ưu đãi theo tháng và các gói chăm sóc da nhiều buổi — chăm sóc da cơ bản, mụn – lỗ chân lông, sáng da, Biologique Recherche, tóc – da đầu, triệt lông.',
   });
 }
 
@@ -251,7 +250,7 @@ function renderCombo(p, ctx, buildId) {
       <a class="btn btn-solid" href="${SITE.bookingUrl}">Đặt lịch</a>
       ${zaloButtons()}
     </div>
-    ${SHOW_PROMO_PRICES ? `<p class="mt-s"><a class="link" href="/bang-gia#${p.slug}">Xem giá tại Bảng giá</a></p>` : ''}
+    ${SHOW_COMBOS ? `<p class="mt-s"><a class="link" href="/bang-gia#${p.slug}">Xem giá tại Bảng giá</a></p>` : ''}
   </div>
 </section>
 
@@ -277,10 +276,10 @@ ${ctaBand()}`;
 
 // ---------- /bang-gia ----------
 function renderPrices(ctx, buildId) {
-  const body = `${banner('Bảng giá', SHOW_PROMO_PRICES
+  const body = `${banner('Bảng giá', SHOW_COMBOS
     ? 'Giá niêm yết các liệu trình và gói Promotion tại Moana Beauty, áp dụng cho cả hai cơ sở.'
     : 'Giá niêm yết các liệu trình tại Moana Beauty, áp dụng cho cả hai cơ sở.')}
-${SHOW_PROMO_PRICES ? `<nav class="chips wrap" aria-label="Chọn bảng giá">
+${SHOW_COMBOS ? `<nav class="chips wrap" aria-label="Chọn bảng giá">
   <a href="#lieu-trinh">Liệu trình</a>
   <a href="#promotion">Promotion</a>
 </nav>` : ''}
@@ -307,9 +306,9 @@ ${SHOW_PROMO_PRICES ? `<nav class="chips wrap" aria-label="Chọn bảng giá">
       </div>`).join('')}
     </div>
   </div>`).join('')}
-  ${SHOW_PROMO_PRICES ? '' : `<p class="muted note">Giá có thể thay đổi theo từng thời điểm. Vui lòng nhắn Zalo hoặc gọi hotline để Moana xác nhận giá và ưu đãi hiện hành trước khi đặt lịch.</p>`}
+  ${SHOW_COMBOS ? '' : `<p class="muted note">Giá có thể thay đổi theo từng thời điểm. Vui lòng nhắn Zalo hoặc gọi hotline để Moana xác nhận giá và ưu đãi hiện hành trước khi đặt lịch.</p>`}
 </section>
-${SHOW_PROMO_PRICES ? `
+${SHOW_COMBOS ? `
 <section class="wrap group" id="promotion">
   <h2 class="h2">Promotion</h2>
   ${ctx.pkgGroups.map((g) => `
@@ -334,7 +333,7 @@ ${SHOW_PROMO_PRICES ? `
 ${ctaBand()}`;
   return page({
     path: '/bang-gia', title: 'Bảng giá', body, buildId,
-    description: SHOW_PROMO_PRICES ? 'Bảng giá liệu trình và Promotion tại Moana Beauty — spa chăm sóc da tại 67 Lưu Quang Vũ (Cầu Giấy) và 109 Nguyễn Sơn (Long Biên), Hà Nội.' : 'Bảng giá liệu trình chăm sóc da tại Moana Beauty — spa chăm sóc da tại 67 Lưu Quang Vũ (Cầu Giấy) và 109 Nguyễn Sơn (Long Biên), Hà Nội.',
+    description: SHOW_COMBOS ? 'Bảng giá liệu trình và Promotion tại Moana Beauty — spa chăm sóc da tại 67 Lưu Quang Vũ (Cầu Giấy) và 109 Nguyễn Sơn (Long Biên), Hà Nội.' : 'Bảng giá liệu trình chăm sóc da tại Moana Beauty — spa chăm sóc da tại 67 Lưu Quang Vũ (Cầu Giấy) và 109 Nguyễn Sơn (Long Biên), Hà Nội.',
   });
 }
 

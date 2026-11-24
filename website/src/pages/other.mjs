@@ -1,5 +1,5 @@
 // Trang Về Moana, Beauty Vlog (+ bài viết), Chính sách bảo mật, Liên hệ, 404.
-import { SITE, BRANCHES, BRANDS } from '../site.mjs';
+import { SITE, BRANCHES, BRANDS, SHOW_COMBOS } from '../site.mjs';
 import { esc, page, zaloIcon } from '../layout.mjs';
 import { banner, crumbs, ctaBand, zaloButtons } from '../parts.mjs';
 import { img, fmtDate, webText, postBody, videoBlock, videoEmbed, svcSlug, pkgSlug } from '../util.mjs';
@@ -57,7 +57,7 @@ export function renderAbout(data, buildId) {
       <div class="entry-img">${img('tu-van-da', 'Chuyên viên Moana tư vấn lộ trình kiểm soát mụn cho khách', { sizes: '(min-width: 900px) 33vw, 100vw' })}</div>
       <h3 class="h3">Kiểm soát mụn, hạn chế tái phát</h3>
       <p>Không dừng ở một buổi lấy nhân mụn, Moana xây dựng lộ trình kiểm soát mụn theo từng làn da, theo dõi da qua từng buổi và hướng dẫn bạn chăm sóc tại nhà.</p>
-      <a class="btn btn-outline" href="${acnePkgLink}">Gói kiểm soát mụn</a>
+      ${SHOW_COMBOS ? `<a class="btn btn-outline" href="${acnePkgLink}">Gói kiểm soát mụn</a>` : `<a class="btn btn-outline" href="/lieu-trinh#cham-soc-da-co-ban">Xem liệu trình kiểm soát mụn</a>`}
     </article>
     <article class="entry">
       <div class="entry-img">${img('nhom-biologique', 'Liệu trình Biologique Recherche tại Moana', { sizes: '(min-width: 900px) 33vw, 100vw' })}</div>
@@ -208,7 +208,7 @@ export function renderPrivacy(buildId) {
   <h2>2. Mục đích sử dụng</h2>
   <ul>
     <li>Xác nhận, sắp xếp và nhắc lịch hẹn.</li>
-    <li>Tư vấn liệu trình, combo và sản phẩm theo yêu cầu của bạn.</li>
+    <li>Tư vấn liệu trình${SHOW_COMBOS ? ', combo' : ''} và sản phẩm theo yêu cầu của bạn.</li>
     <li>Theo dõi tình trạng da để điều chỉnh cách chăm sóc ở các buổi sau.</li>
     <li>Gửi thông tin ưu đãi khi bạn đồng ý nhận.</li>
     <li>Cải thiện nội dung và trải nghiệm trên website.</li>

@@ -1,4 +1,4 @@
-import { SITE, BRANCHES, BRANDS, GROUPS, FEATURED, HOME_PRODUCTS } from '../site.mjs';
+import { SITE, BRANCHES, BRANDS, GROUPS, FEATURED, HOME_PRODUCTS, SHOW_COMBOS } from '../site.mjs';
 import { esc, page, zaloIcon } from '../layout.mjs';
 import { niceName, prodSlug, svcSlug } from '../util.mjs';
 
@@ -61,7 +61,7 @@ export function renderHome(data, buildId) {
   <article class="entry">
     <div class="entry-img">${img('uu-dai-san-pham', 'Sản phẩm Biologique Recherche dùng tại Moana', { sizes: '(min-width: 900px) 33vw, 100vw' })}</div>
     <h2 class="h3">Ưu đãi của Moana</h2>
-    <p>Ưu đãi theo tháng và các gói chăm sóc nhiều buổi.</p>
+    <p>${SHOW_COMBOS ? 'Ưu đãi theo tháng và các gói chăm sóc nhiều buổi.' : 'Ưu đãi của Moana theo từng đợt.'}</p>
     <a class="btn btn-outline" href="/promotion">Xem Promotion</a>
   </article>
 </section>
