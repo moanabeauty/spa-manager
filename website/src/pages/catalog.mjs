@@ -1,6 +1,10 @@
 // Trang Liệu trình, Promotion (ưu đãi theo tháng + các gói/combo), Bảng giá (+ trang chi tiết).
 // Giá liệu trình & gói CHỈ hiện ở trang Bảng giá (quy ước đã chốt). Trên web, "combo" trong app được gọi là Promotion.
 import { SITE, GROUPS, COMBO_IMAGES, SERVICE_IMAGES } from '../site.mjs';
+
+// Tạm ẩn giá Promotion (combo) trên web (chốt 24/11/2026): Bảng giá chỉ hiện giá liệu trình lẻ.
+// Muốn hiện lại giá Promotion: đổi thành true.
+const SHOW_PROMO_PRICES = false;
 import { esc, page } from '../layout.mjs';
 import { banner, crumbs, ctaBand, zaloButtons } from '../parts.mjs';
 import { slugify, img, money, webText, svcName, titleEn, svcSlug, pkgSlug, paragraphs, fmtDate } from '../util.mjs';
@@ -220,9 +224,9 @@ ${ctx.pkgGroups.map((g) => `
   <div class="grid-combos">${g.items.map(comboCard).join('')}
   </div>
 </section>`).join('')}
-<div class="wrap center section-s">
+${SHOW_PROMO_PRICES ? `<div class="wrap center section-s">
   <a class="btn btn-outline" href="/bang-gia#promotion">Xem giá các gói</a>
-</div>
+</div>` : ''}
 ${ctaBand('Chưa biết chọn gói nào?', 'Nhắn Moana để được tư vấn theo tình trạng da và tần suất bạn có thể đến spa.')}`;
   return page({
     path: '/promotion', title: 'Promotion — Ưu đãi & gói chăm sóc', body, buildId,
@@ -247,7 +251,7 @@ function renderCombo(p, ctx, buildId) {
       <a class="btn btn-solid" href="${SITE.bookingUrl}">Đặt lịch</a>
       ${zaloButtons()}
     </div>
-    <p class="mt-s"><a class="link" href="/bang-gia#${p.slug}">Xem giá tại Bảng giá</a></p>
+    ${SHOW_PROMO_PRICES ? `<p class="mt-s"><a class="link" href="/bang-gia#${p.slug}">Xem giá tại Bảng giá</a></p>` : ''}
   </div>
 </section>
 
@@ -273,11 +277,13 @@ ${ctaBand()}`;
 
 // ---------- /bang-gia ----------
 function renderPrices(ctx, buildId) {
-  const body = `${banner('Bảng giá', 'Giá niêm yết các liệu trình và gói Promotion tại Moana Beauty, áp dụng cho cả hai cơ sở.')}
-<nav class="chips wrap" aria-label="Chọn bảng giá">
+  const body = `${banner('Bảng giá', SHOW_PROMO_PRICES
+    ? 'Giá niêm yết các liệu trình và gói Promotion tại Moana Beauty, áp dụng cho cả hai cơ sở.'
+    : 'Giá niêm yết các liệu trình tại Moana Beauty, áp dụng cho cả hai cơ sở.')}
+${SHOW_PROMO_PRICES ? `<nav class="chips wrap" aria-label="Chọn bảng giá">
   <a href="#lieu-trinh">Liệu trình</a>
   <a href="#promotion">Promotion</a>
-</nav>
+</nav>` : ''}
 
 <section class="wrap group group-first" id="lieu-trinh">
   <h2 class="h2">Liệu trình</h2>
@@ -301,8 +307,9 @@ function renderPrices(ctx, buildId) {
       </div>`).join('')}
     </div>
   </div>`).join('')}
+  ${SHOW_PROMO_PRICES ? '' : `<p class="muted note">Giá có thể thay đổi theo từng thời điểm. Vui lòng nhắn Zalo hoặc gọi hotline để Moana xác nhận giá và ưu đãi hiện hành trước khi đặt lịch.</p>`}
 </section>
-
+${SHOW_PROMO_PRICES ? `
 <section class="wrap group" id="promotion">
   <h2 class="h2">Promotion</h2>
   ${ctx.pkgGroups.map((g) => `
@@ -323,11 +330,11 @@ function renderPrices(ctx, buildId) {
     </div>
   </div>`).join('')}
   <p class="muted note">Giá có thể thay đổi theo từng thời điểm. Vui lòng nhắn Zalo hoặc gọi hotline để Moana xác nhận giá và ưu đãi hiện hành trước khi đặt lịch.</p>
-</section>
+</section>` : ''}
 ${ctaBand()}`;
   return page({
     path: '/bang-gia', title: 'Bảng giá', body, buildId,
-    description: 'Bảng giá liệu trình và Promotion tại Moana Beauty — spa chăm sóc da tại 67 Lưu Quang Vũ (Cầu Giấy) và 109 Nguyễn Sơn (Long Biên), Hà Nội.',
+    description: SHOW_PROMO_PRICES ? 'Bảng giá liệu trình và Promotion tại Moana Beauty — spa chăm sóc da tại 67 Lưu Quang Vũ (Cầu Giấy) và 109 Nguyễn Sơn (Long Biên), Hà Nội.' : 'Bảng giá liệu trình chăm sóc da tại Moana Beauty — spa chăm sóc da tại 67 Lưu Quang Vũ (Cầu Giấy) và 109 Nguyễn Sơn (Long Biên), Hà Nội.',
   });
 }
 
