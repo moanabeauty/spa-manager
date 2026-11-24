@@ -1,4 +1,9 @@
 // Thông tin cố định của Moana Beauty — sửa ở đây là đổi trên toàn website.
+// Tạm ẩn toàn bộ combo/gói trên web (chốt 24/11/2026): trang Promotion chỉ còn "Ưu đãi tháng này"
+// (chủ spa đăng từng đợt trong app, bật "hiện online"); Bảng giá không có thông tin combo; ẩn trang chi tiết gói.
+// Muốn hiện lại combo: đổi thành true VÀ xoá redirect "/promotion/:slug" -> "/promotion" trong vercel.json.
+export const SHOW_COMBOS = false;
+
 export const SITE = {
   name: 'Moana Beauty',
   url: 'https://moanabeauty.vn',
