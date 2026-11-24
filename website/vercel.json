@@ -8,6 +8,11 @@
   "trailingSlash": false,
   "redirects": [
     {
+      "source": "/promotion/:slug",
+      "destination": "/promotion",
+      "permanent": false
+    },
+    {
       "source": "/combo",
       "destination": "/promotion",
       "permanent": true
