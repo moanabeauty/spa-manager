@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cleanBarcode } from "@/lib/inventory";
 
 type Detector = { detect: (src: HTMLVideoElement | ImageBitmap | HTMLCanvasElement) => Promise<{ rawValue: string; format?: string }[]> };
@@ -350,8 +351,10 @@ export default function CameraScanner({
     emitRef.current(code);
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-black/90 p-4 text-white">
+  // Gắn thẳng vào <body>: nếu để trong thanh trên cùng (có hiệu ứng mờ nền backdrop-blur), khung quét
+  // "fixed inset-0" bị nhốt trong chiều cao thanh đó → camera bị che, chỉ thấy dòng chữ (lỗi 25/11/2026).
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex flex-col overflow-y-auto overscroll-contain bg-black/90 p-4 text-white">
       {holding && (
         <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/80 text-center">
           <p className="text-4xl">✓</p>
@@ -402,6 +405,7 @@ export default function CameraScanner({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
