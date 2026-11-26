@@ -17,6 +17,8 @@ export type Shipment = {
   cod_amount: number;
   status: string;
   note: string | null;
+  stock_out_at?: string | null;
+  stock_back_at?: string | null;
 };
 
 /** Cập nhật mã vận đơn, trạng thái giao hàng của đơn online */
@@ -37,6 +39,17 @@ export default function ShipmentEditor({ invoiceId, initial }: { invoiceId: stri
   const [msg, setMsg] = useState<string | null>(null);
 
   async function save(status?: string) {
+    if (status && status !== s.status) {
+      const ask =
+        (status === "shipping" || status === "delivered") && !initial.stock_out_at
+          ? "Xác nhận hàng đã gửi đi? Hàng sẽ bị TRỪ KHO bán lẻ ngay."
+          : status === "returned"
+            ? initial.stock_out_at
+              ? "Xác nhận khách hoàn hàng? Hàng sẽ được NHẬP LẠI kho bán lẻ. Sau đó không đổi trạng thái được nữa."
+              : "Xác nhận huỷ giao (hàng chưa gửi)? Hàng đang giữ sẽ được trả lại để bán. Sau đó không đổi trạng thái được nữa."
+            : null;
+      if (ask && !window.confirm(ask)) return;
+    }
     setBusy(true);
     setMsg(null);
     const { error } = await createClient().rpc("update_shipment", { p_invoice: invoiceId, p: { ...s, status: status ?? s.status } });
@@ -64,6 +77,15 @@ export default function ShipmentEditor({ invoiceId, initial }: { invoiceId: stri
           ))}
         </div>
       </div>
+      <p className="text-xs text-ink/60">
+        {initial.status === "returned"
+          ? initial.stock_back_at
+            ? "Hàng hoàn đã nhập lại kho."
+            : "Đơn đã hoàn – hàng chưa gửi nên không trừ kho."
+          : initial.stock_out_at
+            ? "Hàng đã rời kho (đã trừ tồn)."
+            : "Hàng đang được giữ trong kho cho đơn này (chưa trừ tồn). Bấm “Đang giao” khi gửi hàng đi → trừ kho."}
+      </p>
       {!open ? (
         <button className="text-xs text-navy underline" onClick={() => setOpen(true)}>Sửa mã vận đơn / thông tin giao hàng</button>
       ) : (

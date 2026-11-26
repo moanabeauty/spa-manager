@@ -112,6 +112,7 @@ export default function CheckoutForm({
   retailStock,
   retailPct,
   meId,
+  initialChannel,
 }: {
   appt: ApptInfo | null;
   initialCustomer: CustomerInfo | null;
@@ -129,6 +130,7 @@ export default function CheckoutForm({
   retailStock: Record<string, Record<string, number>>; // chi nhánh -> sản phẩm -> tồn kho bán lẻ
   retailPct: number; // % giảm tối đa chung khi nhân viên bán lẻ
   meId: string;
+  initialChannel?: "store" | "online";
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -181,7 +183,7 @@ export default function CheckoutForm({
   const [cashGiven, setCashGiven] = useState(0);
   const [note, setNote] = useState("");
   // kênh bán + giao hàng (đơn online)
-  const [channel, setChannel] = useState<"store" | "online">("store");
+  const [channel, setChannel] = useState<"store" | "online">(initialChannel ?? "store");
   const [ship, setShip] = useState({ carrier: "", tracking_code: "", recipient_name: "", recipient_phone: "", address: "", shipping_fee: 0 });
   const [cod, setCod] = useState(0);
   // ghi nợ: khách trả thiếu

@@ -32,6 +32,7 @@ export default function StockList({
   warehouseName,
   products,
   qty,
+  reserved = {},
   canManage,
   canEdit,
   defaultPct,
@@ -42,6 +43,7 @@ export default function StockList({
   warehouseName: string;
   products: Product[];
   qty: Record<string, number>;
+  reserved?: Record<string, number>; // hàng đang giữ cho đơn online (chưa gửi)
   canManage: boolean;
   canEdit: boolean;
   defaultPct: number;
@@ -245,6 +247,11 @@ export default function StockList({
                         <td className="whitespace-nowrap px-3 py-3 text-right">
                           <b className={`text-base ${st === "out" ? "text-[#8A2323]" : st === "low" ? "text-[#7A5600]" : "text-navy"}`}>{q}</b>{" "}
                           <span className="text-xs text-ink/50">{p.unit}</span>
+                          {(reserved[p.id] ?? 0) > 0 && (
+                            <Link href="/quan-ly/ban-online?gh=preparing" className="block text-[11px] font-semibold text-[#7A5600]">
+                              Đã lên đơn {reserved[p.id]} · còn bán {q - reserved[p.id]}
+                            </Link>
+                          )}
                         </td>
                         <td className="px-3 py-3">
                           <span className={`chip ${STATUS[st].cls}`}>

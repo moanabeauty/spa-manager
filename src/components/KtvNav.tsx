@@ -14,7 +14,7 @@ const svg = (d: React.ReactNode) => (
 const TABS: Tab[] = [
   { href: "/quan-ly", label: "Hôm nay", match: ["/quan-ly", "/quan-ly/ktv/lich", "/quan-ly/ktv/lieu-trinh", "/quan-ly/ngoai-gio"], icon: svg(<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />) },
   { href: "/quan-ly/ktv/dat-lich", label: "Lịch", match: ["/quan-ly/ktv/dat-lich"], icon: svg(<><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></>) },
-  { href: "/quan-ly/thu-tien", label: "Bán hàng", match: ["/quan-ly/thu-tien", "/quan-ly/hoa-don"], icon: svg(<><path d="M4 6h16l-2 9H6z" /><circle cx="9" cy="19" r="1.5" /><circle cx="16" cy="19" r="1.5" /></>) },
+  { href: "/quan-ly/thu-tien", label: "Bán hàng", match: ["/quan-ly/thu-tien", "/quan-ly/hoa-don", "/quan-ly/ban-online"], icon: svg(<><path d="M4 6h16l-2 9H6z" /><circle cx="9" cy="19" r="1.5" /><circle cx="16" cy="19" r="1.5" /></>) },
   { href: "/quan-ly/kho", label: "Kho", match: ["/quan-ly/kho"], icon: svg(<><path d="M3 8l9-5 9 5v8l-9 5-9-5z" /><path d="M3 8l9 5 9-5M12 13v8" /></>) },
   { href: "/quan-ly/ca-nhan", label: "Cá nhân", match: ["/quan-ly/ca-nhan", "/quan-ly/doanh-so", "/quan-ly/nghi-phep", "/quan-ly/phieu-thu-chi"], icon: svg(<><circle cx="12" cy="8" r="4" /><path d="M4 21c1-4 4-6 8-6s7 2 8 6" /></>) },
 ];
@@ -35,6 +35,7 @@ const SUB: { group: string; items: { href: string; label: string }[] }[] = [
     group: "/quan-ly/thu-tien",
     items: [
       { href: "/quan-ly/thu-tien", label: "Thu tiền / bán hàng" },
+      { href: "/quan-ly/ban-online", label: "Bán hàng online" },
       { href: "/quan-ly/hoa-don", label: "Hoá đơn tôi bán" },
     ],
   },

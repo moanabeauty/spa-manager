@@ -43,7 +43,8 @@ export default async function InvoicesPage({
   if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   if (!canCheckout(profile?.role)) return <p className="card text-sm">Trang dành cho nhân viên thu ngân.</p>;
   const sp = await searchParams;
-  const tab: Tab = sp.loai === "online" || sp.loai === "no" ? sp.loai : "quay";
+  if (sp.loai === "online") redirect(`/quan-ly/ban-online${sp.cn ? `?cn=${sp.cn}` : ""}`); // đơn online xem ở mục Bán hàng online
+  const tab: Tab = sp.loai === "no" ? "no" : "quay";
   const date = sp.ngay && /^\d{4}-\d{2}-\d{2}$/.test(sp.ngay) ? sp.ngay : todayVn();
   const { data: branches } = await activeBranches();
   const branchId = sp.cn === "tat-ca" ? "" : (sp.cn ?? profile?.branch_id ?? (tab === "quay" ? branches?.[0]?.id : "") ?? "");
@@ -176,7 +177,7 @@ export default async function InvoicesPage({
         ).map(([k, label]) => (
           <Link
             key={k}
-            href={link({ loai: k, cn: branchId || "tat-ca" })}
+            href={k === "online" ? "/quan-ly/ban-online" : link({ loai: k, cn: branchId || "tat-ca" })}
             className={`flex-1 rounded-full px-3 py-2 text-center text-sm font-semibold ${tab === k ? "bg-navy text-white" : "text-navy"}`}
           >
             {label}

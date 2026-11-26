@@ -5,7 +5,7 @@ import { fillPhones } from "@/lib/phones";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { fetchSellers, canCheckout } from "@/lib/staff";
 import { fetchWallet, type Wallet } from "@/lib/billing";
-import { fetchDefaultDiscountPct, fetchStock } from "@/lib/inventory";
+import { fetchDefaultDiscountPct, fetchReserved, fetchStock } from "@/lib/inventory";
 import { fetchCustomerPromos, type CustomerPromo } from "@/lib/promotions";
 import CheckoutForm, {
   type ApptInfo,
@@ -18,7 +18,7 @@ import CheckoutForm, {
 
 export const metadata = { title: "Thu tiền – Moana Beauty" };
 
-export default async function CheckoutPage({ searchParams }: { searchParams: Promise<{ lich?: string; kh?: string }> }) {
+export default async function CheckoutPage({ searchParams }: { searchParams: Promise<{ lich?: string; kh?: string; kenh?: string }> }) {
   const { supabase, profile } = await getCurrentUser();
   if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   if (!canCheckout(profile?.role)) {
@@ -86,7 +86,12 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   const loadRetailStock = async () => {
     const { data: retailWh } = await supabase.from("warehouses").select("id, branch_id").eq("type", "retail");
     const whList = (retailWh ?? []) as { id: string; branch_id: string }[];
-    const stock = await fetchStock(supabase, whList.map((w) => w.id));
+    const [stock, reserved] = await Promise.all([fetchStock(supabase, whList.map((w) => w.id)), fetchReserved(supabase)]);
+    // còn bán được = tồn − hàng đang giữ cho đơn online
+    reserved.forEach((r) => {
+      const m = stock.get(r.warehouse_id);
+      if (m) m.set(r.product_id, (m.get(r.product_id) ?? 0) - r.quantity);
+    });
     return Object.fromEntries(
       whList.map((w) => [w.branch_id, Object.fromEntries(stock.get(w.id) ?? new Map())]),
     ) as Record<string, Record<string, number>>;
@@ -153,6 +158,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       retailStock={retailStock}
       retailPct={retailPct}
       meId={profile!.id}
+      initialChannel={sp.kenh === "online" && !appt ? "online" : "store"}
     />
   );
 }

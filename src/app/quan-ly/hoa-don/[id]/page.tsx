@@ -67,7 +67,7 @@ export default async function InvoicePage({
          invoice_item_sellers(amount, profiles(full_name))),
        payments(id, method, amount), channel, debt_amount, debt_reason,
        debt_payments(id, method, amount, created_at, note),
-       invoice_shipments(carrier, tracking_code, recipient_name, recipient_phone, address, shipping_fee, cod_amount, status, note)`,
+       invoice_shipments(carrier, tracking_code, recipient_name, recipient_phone, address, shipping_fee, cod_amount, status, note, stock_out_at, stock_back_at)`,
     )
     .eq("id", id)
     .maybeSingle();

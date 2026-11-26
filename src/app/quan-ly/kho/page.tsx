@@ -1,9 +1,10 @@
 import { activeBranches } from "@/lib/refData";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { fetchAll, PRODUCT_COLUMNS, WAREHOUSE_LABEL, canEditProducts, canManageStock, fetchDefaultDiscountPct, fetchStock, type Product, type Warehouse, type WarehouseType } from "@/lib/inventory";
+import { fetchAll, PRODUCT_COLUMNS, WAREHOUSE_LABEL, canEditProducts, canManageStock, fetchDefaultDiscountPct, fetchReserved, fetchStock, type Product, type Warehouse, type WarehouseType } from "@/lib/inventory";
 import { KhoNav, pickBranch } from "./shared";
 import StockList from "./StockList";
+import type { Reserved } from "@/lib/shipping";
 
 export const metadata = { title: "Tồn kho – Moana Beauty" };
 
@@ -23,7 +24,11 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   ]);
   const warehouses = (whs ?? []) as Warehouse[];
   const wh = warehouses.find((w) => w.type === type);
-  const stock = await fetchStock(supabase, warehouses.map((w) => w.id));
+  const [stock, reservedAll] = await Promise.all([
+    fetchStock(supabase, warehouses.map((w) => w.id)),
+    type === "retail" ? fetchReserved(supabase) : Promise.resolve([] as Reserved[]),
+  ]);
+  const reserved = Object.fromEntries(reservedAll.filter((r) => r.warehouse_id === wh?.id).map((r) => [r.product_id, r.quantity]));
   const qty = Object.fromEntries(stock.get(wh?.id ?? "") ?? new Map());
 
   const { count: pending } = await supabase
@@ -102,6 +107,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
           warehouseName={`${WAREHOUSE_LABEL[type]} ${branchName}`}
           products={list}
           qty={qty}
+          reserved={reserved}
           canManage={manage}
           canEdit={canEdit}
           defaultPct={defaultPct}

@@ -1,6 +1,9 @@
 // Dùng chung cho các trang Kho + bán lẻ ở Thu tiền
+import type { Reserved } from "@/lib/shipping";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = { from: (table: string) => any };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RpcDb = { rpc: (fn: string, args?: Record<string, unknown>) => any };
 
 export type WarehouseType = "treatment" | "retail";
 
@@ -109,6 +112,12 @@ export async function fetchStock(supabase: Db, warehouseIds: string[]): Promise<
     out.get(r.warehouse_id)?.set(r.product_id, Number(r.quantity)),
   );
   return out;
+}
+
+/** Hàng đang giữ cho đơn online (đã lên đơn, chưa gửi) – theo kho bán lẻ */
+export async function fetchReserved(supabase: RpcDb): Promise<Reserved[]> {
+  const { data } = await supabase.rpc("online_reserved_stock");
+  return ((data ?? []) as Reserved[]).map((r) => ({ ...r, quantity: Number(r.quantity) }));
 }
 
 /** Chủ / quản lý: mọi chi nhánh; quản lý kho: chi nhánh của mình */
