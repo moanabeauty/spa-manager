@@ -66,12 +66,17 @@ export default function ShipmentEditor({ invoiceId, initial, owed = 0 }: { invoi
         <p className="font-semibold text-navy">Đơn giao hàng</p>
         <div className="flex flex-wrap gap-1">
           {Object.entries(SHIP_STATUS)
-            .filter(([k]) => k !== "delivered" || s.status === "delivered")
+            // nút theo trạng thái: Đã lên đơn → [Đã ship khách, Hoàn hàng]; Đã ship / Đã hoàn thành → [Hoàn hàng]
+            .filter(([k]) =>
+              k === s.status ||
+              (s.status === "preparing" && (k === "shipping" || k === "returned")) ||
+              ((s.status === "shipping" || s.status === "delivered") && k === "returned"),
+            )
             .map(([k, v]) => (
             <button
               key={k}
               disabled={busy}
-              onClick={() => k !== "delivered" && save(k)}
+              onClick={() => k !== s.status && save(k)}
               className={`rounded-full px-3 py-1 text-xs font-semibold ${s.status === k ? v.cls + " ring-1 ring-current" : "bg-white text-ink/60 ring-1 ring-beige-dark"}`}
             >
               {v.label}
