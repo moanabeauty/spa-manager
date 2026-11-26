@@ -96,7 +96,7 @@ begin
       raise exception 'Đơn đã hoàn hàng, không đổi trạng thái được (lên đơn mới nếu khách mua lại)';
     end if;
     if v_old.stock_out_at is not null and v_status = 'preparing' then
-      raise exception 'Hàng đã xuất kho, không đưa về "Đang chuẩn bị" được';
+      raise exception 'Hàng đã xuất kho, không đưa về "Đã lên đơn" được';
     end if;
   end if;
 
