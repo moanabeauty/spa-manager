@@ -65,3 +65,7 @@ select pg_temp.patch_fn('public.update_shipment(uuid, jsonb)',
 select pg_temp.patch_fn('public.update_shipment(uuid, jsonb)',
   $o$    note = excluded.note, status = excluded.status,$o$,
   $n$    note = excluded.note, status = excluded.status, ship_fee_payer = excluded.ship_fee_payer,$n$);
+
+-- hotline 2 cơ sở (chủ spa cung cấp 26/11/2026)
+update public.branches set phone = '0835288888' where address like '67 Lưu Quang Vũ%';
+update public.branches set phone = '0829989999' where address like '109 Nguyễn Sơn%';
