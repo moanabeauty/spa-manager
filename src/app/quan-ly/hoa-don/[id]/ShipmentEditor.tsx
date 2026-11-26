@@ -22,7 +22,7 @@ export type Shipment = {
 };
 
 /** Cập nhật mã vận đơn, trạng thái giao hàng của đơn online */
-export default function ShipmentEditor({ invoiceId, initial }: { invoiceId: string; initial: Shipment }) {
+export default function ShipmentEditor({ invoiceId, initial, owed = 0 }: { invoiceId: string; initial: Shipment; owed?: number }) {
   const router = useRouter();
   const [open, setOpen] = useState(!initial.tracking_code);
   const [s, setS] = useState({
@@ -42,7 +42,7 @@ export default function ShipmentEditor({ invoiceId, initial }: { invoiceId: stri
     if (status && status !== s.status) {
       const ask =
         (status === "shipping" || status === "delivered") && !initial.stock_out_at
-          ? "Xác nhận hàng đã gửi đi? Hàng sẽ bị TRỪ KHO bán lẻ ngay."
+          ? "Xác nhận đã ship hàng cho khách? Hàng sẽ bị TRỪ KHO bán lẻ ngay."
           : status === "returned"
             ? initial.stock_out_at
               ? "Xác nhận khách hoàn hàng? Hàng sẽ được NHẬP LẠI kho bán lẻ. Sau đó không đổi trạng thái được nữa."
@@ -65,11 +65,13 @@ export default function ShipmentEditor({ invoiceId, initial }: { invoiceId: stri
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-semibold text-navy">Đơn giao hàng</p>
         <div className="flex flex-wrap gap-1">
-          {Object.entries(SHIP_STATUS).map(([k, v]) => (
+          {Object.entries(SHIP_STATUS)
+            .filter(([k]) => k !== "delivered" || s.status === "delivered")
+            .map(([k, v]) => (
             <button
               key={k}
               disabled={busy}
-              onClick={() => save(k)}
+              onClick={() => k !== "delivered" && save(k)}
               className={`rounded-full px-3 py-1 text-xs font-semibold ${s.status === k ? v.cls + " ring-1 ring-current" : "bg-white text-ink/60 ring-1 ring-beige-dark"}`}
             >
               {v.label}
@@ -82,9 +84,13 @@ export default function ShipmentEditor({ invoiceId, initial }: { invoiceId: stri
           ? initial.stock_back_at
             ? "Hàng hoàn đã nhập lại kho."
             : "Đơn đã hoàn – hàng chưa gửi nên không trừ kho."
-          : initial.stock_out_at
-            ? "Hàng đã rời kho (đã trừ tồn)."
-            : "Hàng đang được giữ trong kho cho đơn này (chưa trừ tồn). Bấm “Đang giao” khi gửi hàng đi → trừ kho."}
+          : initial.status === "delivered"
+            ? "Đơn đã hoàn thành: đã ship và khách đã thanh toán đủ."
+            : initial.stock_out_at
+              ? owed > 0
+                ? `Đã ship, hàng đã trừ kho. Còn thu ${owed.toLocaleString("vi-VN")}đ – khi khách trả / thu được COD, bấm “Thu nợ” ở trên, đơn sẽ tự hoàn thành.`
+                : "Đã ship, hàng đã trừ kho."
+              : "Hàng đang được giữ trong kho cho đơn này (chưa trừ tồn). In hoá đơn gửi kèm hàng, rồi bấm “Đã ship khách” → trừ kho. Đơn tự hoàn thành khi khách đã trả đủ."}
       </p>
       {!open ? (
         <button className="text-xs text-navy underline" onClick={() => setOpen(true)}>Sửa mã vận đơn / thông tin giao hàng</button>

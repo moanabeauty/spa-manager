@@ -106,7 +106,7 @@ export default async function OnlineSalesPage({
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold text-navy">Bán hàng online</h1>
-          <p className="text-sm text-ink/70">Lên đơn theo yêu cầu khách, không cần đặt lịch. Đã lên đơn = giữ hàng · Đang giao = trừ kho.</p>
+          <p className="text-sm text-ink/70">Lên đơn theo yêu cầu khách, không cần đặt lịch. Đã lên đơn = giữ hàng · Đã ship khách = trừ kho · Đã hoàn thành = đã ship và khách trả đủ (app tự chuyển).</p>
         </div>
         <Link href="/quan-ly/thu-tien?kenh=online" className="btn-primary">+ Lên đơn mới</Link>
       </div>

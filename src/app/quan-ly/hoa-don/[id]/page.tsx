@@ -88,10 +88,14 @@ export default async function InvoicePage({
     <div className="space-y-4">
       {sp.moi && !cancelled && (
         <div className="card flex flex-wrap items-center justify-between gap-2 border-l-4 border-l-[#22612A] p-4 text-sm print:hidden">
-          <span>✓ Đã thu tiền và chốt hoá đơn.</span>
+          <span>{inv.channel === "online" ? "✓ Đã lên đơn online. In hoá đơn gửi kèm hàng cho khách." : "✓ Đã thu tiền và chốt hoá đơn."}</span>
           <span className="flex gap-2">
-            <Link href={inv.appointment_id ? "/quan-ly/lich-hen" : "/quan-ly/thu-tien"} className="btn-outline py-2">
-              {inv.appointment_id ? "Về lịch hẹn" : "Thu hoá đơn khác"}
+            {inv.channel === "online" && <PrintButton />}
+            <Link
+              href={inv.channel === "online" ? "/quan-ly/ban-online" : inv.appointment_id ? "/quan-ly/lich-hen" : "/quan-ly/thu-tien"}
+              className="btn-outline py-2"
+            >
+              {inv.channel === "online" ? "Về Bán hàng online" : inv.appointment_id ? "Về lịch hẹn" : "Thu hoá đơn khác"}
             </Link>
             {inv.customers && <Link href={`/quan-ly/khach-hang?id=${inv.customers.id}`} className="btn-ghost py-2">Hồ sơ khách</Link>}
           </span>
@@ -102,7 +106,7 @@ export default async function InvoicePage({
         <div className="text-center">
           <p className="text-lg font-bold tracking-[0.2em] text-navy">MOANA BEAUTY</p>
           {inv.branches && <p className="text-xs text-ink/60">{inv.branches.address}</p>}
-          <p className="mt-2 font-semibold">HOÁ ĐƠN {inv.code}{inv.channel === "online" ? " · ONLINE" : ""}</p>
+          <p className="mt-2 font-semibold">HOÁ ĐƠN {inv.code}{inv.channel === "online" ? " · ĐƠN ONLINE" : ""}</p>
           <p className="text-xs text-ink/60">
             {inv.paid_at ? `${formatTime(inv.paid_at)} · ${formatDate(inv.paid_at)}` : formatDate(inv.created_at)}
           </p>
@@ -194,6 +198,12 @@ export default async function InvoicePage({
               </p>
             )}
             {sh.note && <p className="text-xs text-ink/60">{sh.note}</p>}
+            {!cancelled && owed > 0 && sh.status !== "returned" && (
+              <p className="mt-2 rounded-lg border-2 border-navy px-3 py-2 text-center text-base font-bold text-navy">
+                Khách cần thanh toán khi nhận hàng: {formatVnd(owed)}
+              </p>
+            )}
+            {!cancelled && owed === 0 && <p className="mt-1 text-center font-semibold text-[#22612A]">Khách đã thanh toán đủ</p>}
           </div>
         )}
         {inv.note && <p className="text-sm text-ink/70">Ghi chú: {inv.note}</p>}
@@ -201,7 +211,7 @@ export default async function InvoicePage({
       </div>
 
       {owed > 0 && canCheckout(profile?.role) && <DebtCollect invoiceId={inv.id} owed={owed} />}
-      {sh && !cancelled && canCheckout(profile?.role) && <ShipmentEditor invoiceId={inv.id} initial={sh} />}
+      {sh && !cancelled && canCheckout(profile?.role) && <ShipmentEditor invoiceId={inv.id} initial={sh} owed={owed} />}
 
       <div className="flex flex-wrap justify-between gap-2 print:hidden">
         <Link href="/quan-ly/hoa-don" className="btn-ghost">‹ Danh sách hoá đơn</Link>
