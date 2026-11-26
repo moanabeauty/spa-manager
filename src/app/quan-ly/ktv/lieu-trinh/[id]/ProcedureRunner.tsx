@@ -15,6 +15,8 @@ import type { Photo } from "@/lib/photos";
 
 export type Step = { step_no: number; title: string; products: string[]; instructions: string | null; note: string | null };
 export type Usage = { label: string; unit: string; qty: number };
+/** Liệu trình trong cùng lịch của KTV (chuyển qua lại không phải ra màn chi tiết) */
+export type Sibling = { id: string; label: string; state: "done" | "doing" | "todo" };
 export type Item = { id: string; step_no: number; name: string; product_id: string | null; qty: number | null; unit: string };
 export type ChangeKind = "swap" | "remove" | "qty" | "add_product" | "remove_step" | "add_step";
 export type Change = {
@@ -78,6 +80,7 @@ function parseQty(raw: string): number {
 
 export default function ProcedureRunner(props: {
   apsId: string;
+  siblings: Sibling[];
   backHref: string;
   customerName: string;
   serviceName: string;
@@ -101,6 +104,9 @@ export default function ProcedureRunner(props: {
 }) {
   const { apsId, steps, changes, startedAt, doneAt, stepsDone, plannedMinutes } = props;
   const router = useRouter();
+  // liệu trình tiếp theo chưa xong trong cùng lịch
+  const myAt = props.siblings.findIndex((x) => x.id === apsId);
+  const nextSib = [...props.siblings.slice(myAt + 1), ...props.siblings.slice(0, Math.max(0, myAt))].find((x) => x.state !== "done") ?? null;
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -363,6 +369,27 @@ export default function ProcedureRunner(props: {
             </p>
           )}
         </div>
+        {props.siblings.length > 1 && (
+          <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-0.5 pt-1.5">
+            {props.siblings.map((sb, i) => {
+              const on = sb.id === apsId;
+              return (
+                <Link
+                  key={sb.id}
+                  href={`/quan-ly/ktv/lieu-trinh/${sb.id}`}
+                  replace
+                  scroll={false}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                    on ? "bg-beige text-navy" : "bg-white/15 text-white"
+                  }`}
+                >
+                  <span>{sb.state === "done" ? "✓" : sb.state === "doing" ? "●" : `${i + 1}.`}</span>
+                  <span className="max-w-[9rem] truncate">{sb.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
         <div className="h-1.5 rounded-full bg-white/20">
           <div className="h-1.5 rounded-full bg-brown" style={{ width: `${pct}%` }} />
         </div>
@@ -591,7 +618,11 @@ export default function ProcedureRunner(props: {
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E6DDCC] bg-white px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
           <div className="mx-auto max-w-3xl space-y-1.5">
             {error && <p className="text-center text-xs text-[#B3261E]">{error}</p>}
-            {doneAt ? (
+            {doneAt && nextSib ? (
+              <Link href={`/quan-ly/ktv/lieu-trinh/${nextSib.id}`} replace className="flex min-h-[52px] items-center justify-center rounded-[14px] bg-navy text-[15px] font-semibold text-white">
+                ✓ Xong · sang {nextSib.label} ›
+              </Link>
+            ) : doneAt ? (
               <Link href={props.backHref} className="flex min-h-[52px] items-center justify-center rounded-[14px] bg-[#E4F2E9] text-[15px] font-semibold text-[#1F5E3A]">
                 ✓ Đã hoàn thành buổi · quay lại
               </Link>

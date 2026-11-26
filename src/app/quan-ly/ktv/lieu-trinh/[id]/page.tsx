@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase/server";
 import type { ServiceGuide } from "@/components/ServiceGuideSections";
 import { loadCustomerPhotos, photosRequired } from "@/lib/photos";
-import ProcedureRunner, { type Change, type Item, type Step, type Usage } from "./ProcedureRunner";
+import ProcedureRunner, { type Change, type Item, type Sibling, type Step, type Usage } from "./ProcedureRunner";
 import { volumeUnit } from "@/lib/inventory";
 
 export const metadata = { title: "Quy trình liệu trình – Moana Beauty" };
@@ -44,7 +44,15 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       </div>
     );
   }
-  const [{ data: steps }, { data: changes }, { data: guide }, photoSessions, needPhotos, { data: used }, { data: itemRows }] = await Promise.all([
+  // các liệu trình khác trong cùng lịch (của KTV này) → hiện thanh chuyển nhanh, không phải ra ngoài
+  let sibQ = supabase
+    .from("appointment_services")
+    .select("id, start_at, work_started_at, work_done_at, services(name, name_en)")
+    .eq("appointment_id", row.appointment_id)
+    .eq("is_active", true)
+    .order("start_at");
+  if (profile.role === "technician") sibQ = sibQ.eq("technician_id", profile.id);
+  const [{ data: steps }, { data: changes }, { data: guide }, photoSessions, needPhotos, { data: used }, { data: itemRows }, { data: sibRows }] = await Promise.all([
     supabase
       .from("service_procedure_steps")
       .select("step_no, title, products, instructions, note")
@@ -72,7 +80,14 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
       .eq("service_id", row.services?.id ?? "")
       .order("step_no")
       .order("sort"),
+    sibQ,
   ]);
+  type SibRow = { id: string; work_started_at: string | null; work_done_at: string | null; services: { name: string; name_en: string | null } | null };
+  const siblings: Sibling[] = ((sibRows ?? []) as unknown as SibRow[]).map((r) => ({
+    id: r.id,
+    label: r.services?.name_en || r.services?.name || "Liệu trình",
+    state: r.work_done_at ? "done" : r.work_started_at ? "doing" : "todo",
+  }));
   type ItemRow = { id: string; step_no: number; sort: number; product_name: string; product_id: string | null; qty: number | null; products: { capacity: string | null; unit: string } | null };
   const items: Item[] = ((itemRows ?? []) as unknown as ItemRow[]).map((i) => ({
     id: i.id,
@@ -104,6 +119,8 @@ export default async function ProcedurePage({ params }: { params: Promise<{ id: 
 
   return (
     <ProcedureRunner
+      key={row.id}
+      siblings={siblings}
       apsId={row.id}
       backHref={`/quan-ly/ktv/lich/${row.appointment_id}`}
       customerName={row.appointments?.customers?.full_name ?? "Khách"}
