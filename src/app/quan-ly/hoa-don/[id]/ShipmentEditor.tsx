@@ -19,6 +19,7 @@ export type Shipment = {
   note: string | null;
   stock_out_at?: string | null;
   stock_back_at?: string | null;
+  ship_fee_payer?: string | null; // customer = khách trả · shop = shop trả
 };
 
 /** Cập nhật mã vận đơn, trạng thái giao hàng của đơn online */
@@ -32,6 +33,7 @@ export default function ShipmentEditor({ invoiceId, initial, owed = 0 }: { invoi
     recipient_phone: initial.recipient_phone ?? "",
     address: initial.address ?? "",
     shipping_fee: Number(initial.shipping_fee),
+    ship_fee_payer: initial.ship_fee_payer ?? "customer",
     status: initial.status,
     note: initial.note ?? "",
   });
@@ -112,6 +114,7 @@ export default function ShipmentEditor({ invoiceId, initial, owed = 0 }: { invoi
             <span className="w-20 shrink-0 text-xs">Phí ship</span>
             <MoneyInput value={s.shipping_fee} onChange={(v) => setS({ ...s, shipping_fee: v })} className="flex-1" ariaLabel="Phí ship" />
           </div>
+          <ShipPayer value={s.ship_fee_payer} onChange={(v) => setS({ ...s, ship_fee_payer: v })} />
           <input className="input py-2 text-sm" placeholder="Ghi chú giao hàng" value={s.note} onChange={(e) => setS({ ...s, note: e.target.value })} />
           <div className="flex justify-end">
             <button className="btn-primary py-2" disabled={busy} onClick={() => save()}>Lưu thông tin giao hàng</button>
@@ -119,6 +122,32 @@ export default function ShipmentEditor({ invoiceId, initial, owed = 0 }: { invoi
         </div>
       )}
       {msg && <p className="text-xs">{msg}</p>}
+    </div>
+  );
+}
+
+/** Chọn ai trả phí ship */
+export function ShipPayer({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-20 shrink-0 text-xs">Ai trả ship</span>
+      <div className="flex flex-1 gap-1 rounded-full bg-white p-1 ring-1 ring-beige-dark">
+        {(
+          [
+            ["customer", "Khách trả"],
+            ["shop", "Shop trả"],
+          ] as const
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => onChange(k)}
+            className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold ${value === k ? "bg-navy text-white" : "text-navy"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import PrintButton from "./PrintButton";
 import VoidButton from "./VoidButton";
 import DebtCollect from "./DebtCollect";
 import ShipmentEditor, { type Shipment } from "./ShipmentEditor";
+import OnlineReceipt from "./OnlineReceipt";
 import { SHIP_STATUS } from "@/lib/shipping";
 import { canCheckout } from "@/lib/staff";
 
@@ -67,7 +68,7 @@ export default async function InvoicePage({
          invoice_item_sellers(amount, profiles(full_name))),
        payments(id, method, amount), channel, debt_amount, debt_reason,
        debt_payments(id, method, amount, created_at, note),
-       invoice_shipments(carrier, tracking_code, recipient_name, recipient_phone, address, shipping_fee, cod_amount, status, note, stock_out_at, stock_back_at)`,
+       invoice_shipments(carrier, tracking_code, recipient_name, recipient_phone, address, shipping_fee, cod_amount, status, note, stock_out_at, stock_back_at, ship_fee_payer)`,
     )
     .eq("id", id)
     .maybeSingle();
@@ -83,6 +84,10 @@ export default async function InvoicePage({
   const owed = cancelled ? 0 : Math.max(0, total - paidNow - collected);
   const sh = inv.invoice_shipments;
   const showSellers = profile?.role === "owner" || profile?.role === "manager" || profile?.role === "receptionist";
+  const onlineReceipt = inv.channel === "online" && !!sh;
+  const { data: allBranches } = onlineReceipt
+    ? await supabase.from("branches").select("id, name, address, phone").eq("is_active", true).order("created_at")
+    : { data: null };
 
   return (
     <div className="space-y-4">
@@ -102,6 +107,22 @@ export default async function InvoicePage({
         </div>
       )}
 
+      {onlineReceipt && sh && (
+        <OnlineReceipt
+          code={inv.code}
+          at={inv.paid_at ?? inv.created_at}
+          items={inv.invoice_items}
+          payments={inv.payments}
+          debtPayments={inv.debt_payments}
+          sh={sh}
+          owed={owed}
+          cancelled={cancelled}
+          staff={inv.creator?.full_name ?? null}
+          branches={(allBranches ?? []) as { id: string; name: string; address: string | null; phone: string | null }[]}
+        />
+      )}
+
+      {!onlineReceipt && (
       <div className={`card space-y-4 print:border-0 print:shadow-none ${cancelled ? "opacity-70" : ""}`}>
         <div className="text-center">
           <p className="text-lg font-bold tracking-[0.2em] text-navy">MOANA BEAUTY</p>
@@ -209,6 +230,7 @@ export default async function InvoicePage({
         {inv.note && <p className="text-sm text-ink/70">Ghi chú: {inv.note}</p>}
         <p className="text-center text-xs text-ink/50">Cảm ơn quý khách!</p>
       </div>
+      )}
 
       {owed > 0 && canCheckout(profile?.role) && <DebtCollect invoiceId={inv.id} owed={owed} />}
       {sh && !cancelled && canCheckout(profile?.role) && <ShipmentEditor invoiceId={inv.id} initial={sh} owed={owed} />}

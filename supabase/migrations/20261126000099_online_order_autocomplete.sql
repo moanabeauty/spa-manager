@@ -48,3 +48,20 @@ $o$,
 
   perform public._online_autocomplete(p_invoice);
 $n$);
+
+-- Phí ship: khách trả (shipper thu thêm của khách, tiền ship thuộc đơn vị ship) hoặc shop trả
+alter table public.invoice_shipments
+  add column if not exists ship_fee_payer text not null default 'customer' check (ship_fee_payer in ('customer','shop'));
+
+select pg_temp.patch_fn('public.update_shipment(uuid, jsonb)',
+  $o$shipping_fee, cod_amount, status, note, shipped_at, delivered_at)$o$,
+  $n$shipping_fee, cod_amount, status, note, shipped_at, delivered_at, ship_fee_payer)$n$);
+select pg_temp.patch_fn('public.update_shipment(uuid, jsonb)',
+  $o$          case when v_status = 'delivered' then now() end)
+  on conflict$o$,
+  $n$          case when v_status = 'delivered' then now() end,
+          case when p->>'ship_fee_payer' = 'shop' then 'shop' else 'customer' end)
+  on conflict$n$);
+select pg_temp.patch_fn('public.update_shipment(uuid, jsonb)',
+  $o$    note = excluded.note, status = excluded.status,$o$,
+  $n$    note = excluded.note, status = excluded.status, ship_fee_payer = excluded.ship_fee_payer,$n$);

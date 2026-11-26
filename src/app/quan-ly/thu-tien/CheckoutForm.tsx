@@ -18,6 +18,7 @@ import {
 } from "@/lib/billing";
 import { techLabel, type Seller } from "@/lib/staff";
 import MoneyInput from "@/components/MoneyInput";
+import { ShipPayer } from "../hoa-don/[id]/ShipmentEditor";
 import CameraScanner from "@/components/LazyCameraScanner";
 import { cleanBarcode, productLabel, retailMinPrice } from "@/lib/inventory";
 import { dmy, fetchCustomerPromos, type CustomerPromo, type PromoItem } from "@/lib/promotions";
@@ -184,7 +185,7 @@ export default function CheckoutForm({
   const [note, setNote] = useState("");
   // kênh bán + giao hàng (đơn online)
   const [channel, setChannel] = useState<"store" | "online">(initialChannel ?? "store");
-  const [ship, setShip] = useState({ carrier: "", tracking_code: "", recipient_name: "", recipient_phone: "", address: "", shipping_fee: 0 });
+  const [ship, setShip] = useState({ carrier: "", tracking_code: "", recipient_name: "", recipient_phone: "", address: "", shipping_fee: 0, ship_fee_payer: "customer" });
   const [cod, setCod] = useState(0);
   // ghi nợ: khách trả thiếu
   const [debtOn, setDebtOn] = useState(false);
@@ -1164,6 +1165,7 @@ export default function CheckoutForm({
               <span className="w-28 shrink-0 text-xs">Phí ship</span>
               <MoneyInput value={ship.shipping_fee} onChange={(v) => setShip({ ...ship, shipping_fee: v })} className="flex-1" ariaLabel="Phí ship" />
             </div>
+            <ShipPayer value={ship.ship_fee_payer} onChange={(v) => setShip({ ...ship, ship_fee_payer: v })} />
             <div className="flex items-center gap-2">
               <span className="w-28 shrink-0 text-xs">Thu hộ (COD)</span>
               <MoneyInput value={cod} onChange={setCod} className="flex-1" ariaLabel="Tiền thu hộ COD" />
@@ -1172,8 +1174,8 @@ export default function CheckoutForm({
               </button>
             </div>
             <p className="text-xs text-ink/60">
-              Phí ship chỉ để ghi lại; tiền ship spa tự trả thì lập phiếu chi. Tiền COD được tính là khách còn nợ cho đến khi đơn vị ship trả tiền,
-              lúc đó vào hoá đơn bấm “Thu nợ”.
+              Khách trả ship: shipper thu thêm phí ship của khách (in trên hoá đơn). Shop trả ship: lập phiếu chi tiền ship.
+              Tiền COD (tiền hàng) tính là khách còn nợ cho đến khi đơn vị ship trả tiền, lúc đó vào hoá đơn bấm “Thu nợ”.
             </p>
           </div>
         )}
