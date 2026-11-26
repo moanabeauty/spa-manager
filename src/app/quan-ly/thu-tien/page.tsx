@@ -35,7 +35,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       supabase
         .from("appointments")
         .select(
-          "id, branch_id, start_at, status, customer_id, customers(id, full_name, note), appointment_services(id, service_id, technician_id, start_at, customer_package_item_id)",
+          "id, branch_id, start_at, status, customer_id, customers(id, full_name, note), appointment_services(id, service_id, technician_id, start_at, customer_package_item_id, pay_with)",
         )
         .eq("id", sp.lich)
         .maybeSingle(),

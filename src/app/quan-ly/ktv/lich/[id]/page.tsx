@@ -5,6 +5,7 @@ import { formatShortDate, formatTime, formatVnd } from "@/lib/format";
 import { CARD_ALERT, COMBO_ALERT } from "@/lib/ktv";
 import type { PickService } from "../../ServicePicker";
 import DetailActions, { type BookedRow } from "./DetailActions";
+import PaymentChoice, { type PayOptions } from "./PaymentChoice";
 import SessionPhotos from "@/components/SessionPhotos";
 import PhotoHistory from "@/components/PhotoHistory";
 import { loadCustomerPhotos, photosRequired } from "@/lib/photos";
@@ -61,7 +62,7 @@ export default async function KtvAppointmentPage({ params }: { params: Promise<{
   if (profile?.role === "marketing") redirect("/quan-ly/marketing"); // Marketing không xem khách hàng
   if (!profile) return null;
 
-  const [{ data: appt }, { data: view, error }, { data: svcs }] = await Promise.all([
+  const [{ data: appt }, { data: view, error }, { data: svcs }, { data: payOpts }] = await Promise.all([
     supabase
       .from("appointments")
       .select(
@@ -71,6 +72,7 @@ export default async function KtvAppointmentPage({ params }: { params: Promise<{
       .maybeSingle(),
     supabase.rpc("ktv_customer_view", { p_appt: id }),
     supabase.from("services").select("id, name, name_en, duration_minutes, branch_id, service_categories(name)").eq("is_active", true).order("name_en"),
+    supabase.rpc("ktv_payment_options", { p_appt: id }),
   ]);
   if (!appt || error) {
     return (
@@ -157,6 +159,8 @@ export default async function KtvAppointmentPage({ params }: { params: Promise<{
             ))}
           </div>
         )}
+        {!consult && payOpts && !["cancelled", "no_show"].includes(a.status) && <PaymentChoice options={payOpts as PayOptions} />}
+
         {a.note && <div className="rounded-xl bg-white px-3.5 py-3 text-[13px]"><b>Ghi chú lịch:</b> {a.note}</div>}
 
         <div className="grid grid-cols-2 gap-2.5">

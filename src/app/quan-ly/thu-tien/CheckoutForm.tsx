@@ -55,7 +55,7 @@ export type ApptInfo = {
   branch_id: string;
   start_at: string;
   status: string;
-  services: { id: string; service_id: string; technician_id: string | null; start_at: string; customer_package_item_id: string | null }[];
+  services: { id: string; service_id: string; technician_id: string | null; start_at: string; customer_package_item_id: string | null; pay_with?: "combo" | "card" | "cash" | null }[];
 };
 type Tier = { id: string; topup_amount: number; bonus_amount: number };
 /** Sản phẩm bán lẻ (kho bán lẻ) */
@@ -86,6 +86,7 @@ type Line = {
   discount: number;
   card: boolean;
   pkgId: string; // phần gói của khách dùng để trừ buổi ("" = trả tiền)
+  payChosen?: boolean; // KTV đã chọn cách thanh toán (trừ thẻ / trả lẻ) → không tự đổi theo mặc định
   sellers: SellerShare[];
   // khuyến mãi khách đã đăng ký (giá cố định, không tính là giảm giá)
   promoRegId?: string;
@@ -160,8 +161,9 @@ export default function CheckoutForm({
       customPrice: 0,
       qty: 1,
       discount: 0,
-      card: false,
+      card: s.pay_with === "card",
       pkgId: s.customer_package_item_id ?? "",
+      payChosen: s.pay_with === "card" || s.pay_with === "cash",
       sellers: s.technician_id ? [{ staffId: s.technician_id, share: 100 }] : [],
     })),
   );
@@ -214,9 +216,18 @@ export default function CheckoutForm({
   /** Khách còn số dư thẻ nạp sẵn: mặc định trừ thẻ (giá thành viên) cho dịch vụ dùng được thẻ, khi số dư còn đủ */
   function withCardDefaults(ls: Line[], w: Wallet): Line[] {
     let left = cardBalance(w);
+    // KTV đã chọn trừ thẻ: giữ lựa chọn khi thẻ còn đủ (theo thứ tự), không đủ thì tính giá niêm yết
+    ls = ls.map((l) => {
+      if (!l.payChosen || !l.card) return l;
+      const price = Number(svcById.get(l.serviceId!)?.member_price ?? 0);
+      if (price > left) return { ...l, card: false };
+      left -= price;
+      return l;
+    });
     if (left <= 0) return ls;
     return ls.map((l) => {
       if (l.type !== "service" || l.pkgId || l.promoItemId) return l;
+      if (l.payChosen) return l;
       const s = svcById.get(l.serviceId!);
       if (!s || !cardOk(s)) return l;
       const price = Number(s.member_price);
