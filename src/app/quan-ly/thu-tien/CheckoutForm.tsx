@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { CUSTOMER_SEARCH_HINT, autoPickCustomer, customerQueryReady } from "@/lib/customerSearch";
-import { formatDate, formatTime, formatVnd, normalizePhone, normalizeText, textMatch, vnError } from "@/lib/format";
+import { formatDate, formatTime, formatVnd, normalizeText, textMatch, vnError } from "@/lib/format";
 import {
   allocateDiscount,
   cardBalance,
@@ -319,7 +319,6 @@ export default function CheckoutForm({
   const [phone, setPhone] = useState("");
   const [matches, setMatches] = useState<CustomerInfo[] | null>(null);
   // tìm khách theo tên, mã KH hoặc SĐT; chắc chắn đúng 1 người thì tự chọn
-  const digits = /^[\d\s.+-]+$/.test(phone.trim()) ? normalizePhone(phone) : "";
   useEffect(() => {
     if (appt || !customerQueryReady(phone)) {
       setMatches(null);
@@ -342,7 +341,40 @@ export default function CheckoutForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phone, appt, supabase]);
 
+  // tạo khách mới ngay tại đây (không cần tạo lịch hẹn)
+  const [newCust, setNewCust] = useState<{ name: string; phone: string } | null>(null);
+  const [newCustBusy, setNewCustBusy] = useState(false);
+  const [newCustErr, setNewCustErr] = useState<string | null>(null);
+  function openNewCustomer(typed: string) {
+    const t = typed.trim();
+    const isPhone = /^[\d\s.+-]+$/.test(t) && t.replace(/\D/g, "").length >= 6;
+    setNewCust({ name: isPhone ? "" : t, phone: isPhone ? t : "" });
+    setNewCustErr(null);
+  }
+  async function createCustomer() {
+    if (!newCust) return;
+    setNewCustBusy(true);
+    setNewCustErr(null);
+    const { data, error } = await supabase.rpc("staff_create_customer", {
+      p_name: newCust.name,
+      p_phone: newCust.phone,
+      p_branch: branchId || null,
+    });
+    setNewCustBusy(false);
+    if (error) return setNewCustErr(vnError(error.message));
+    const c = (data as CustomerInfo[] | null)?.[0];
+    if (!c) return setNewCustErr("Không tạo được khách, thử lại.");
+    setNewCust(null);
+    await chooseCustomer(c);
+  }
+
   async function chooseCustomer(c: CustomerInfo | null) {
+    if (c)
+      setShip((sh) => ({
+        ...sh,
+        recipient_name: sh.recipient_name || c.full_name,
+        recipient_phone: sh.recipient_phone || c.phone || "",
+      }));
     setCustomer(c);
     setPhone("");
     setMatches(null);
@@ -595,48 +627,22 @@ export default function CheckoutForm({
 
   const lockedPackages = wallet.packages.filter((p) => isPackageUsable(p));
 
-  return (
-    <div className="space-y-4 pb-24">
-      <div>
-        <h1 className="text-2xl font-bold text-navy">Thu tiền</h1>
-        {appt && (
-          <p className="text-sm text-ink/70">
-            Lịch hẹn {formatTime(appt.start_at)} · <span className="capitalize">{formatDate(appt.start_at)}</span>
-          </p>
-        )}
-      </div>
+  const branchPicker = !appt && (
+    <label className="block">
+      <span className="label">{online ? "Xuất hàng từ kho bán lẻ chi nhánh" : "Chi nhánh"}</span>
+      <select className="input" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
+        {branches.map((b) => (
+          <option key={b.id} value={b.id}>{b.name}</option>
+        ))}
+      </select>
+    </label>
+  );
 
-      {!appt && (
-        <div className="flex gap-1 rounded-full bg-white p-1 ring-1 ring-beige-dark">
-          {(
-            [
-              ["store", "Bán tại quầy"],
-              ["online", "Đơn online (giao hàng)"],
-            ] as const
-          ).map(([k, label]) => (
-            <button
-              key={k}
-              onClick={() => setChannel(k)}
-              className={`flex-1 rounded-full px-3 py-2 text-sm font-semibold ${channel === k ? "bg-navy text-white" : "text-navy"}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ---- KHÁCH ---- */}
+  // ---- KHÁCH ----
+  const customerCard = (
       <div className="card space-y-3">
-        {!appt && (
-          <label className="block">
-            <span className="label">Chi nhánh</span>
-            <select className="input" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-          </label>
-        )}
+        {!online && branchPicker}
+        {online && <h2 className="font-semibold text-navy">2. Khách hàng</h2>}
         {customer ? (
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -659,14 +665,39 @@ export default function CheckoutForm({
           </div>
         ) : (
           <div>
-            <span className="label">Khách hàng (gõ tên, mã KH hoặc SĐT) — bỏ trống nếu khách lẻ chỉ làm dịch vụ</span>
-            <input className="input" placeholder={CUSTOMER_SEARCH_HINT} value={phone} onChange={(e) => setPhone(e.target.value)} />
-            {matches && (
+            <span className="label">
+              {online ? "Tìm khách cũ (gõ tên, mã KH hoặc SĐT) hoặc tạo khách mới" : "Khách hàng (gõ tên, mã KH hoặc SĐT) — bỏ trống nếu khách lẻ chỉ làm dịch vụ"}
+            </span>
+            {newCust ? (
+              <div className="space-y-2 rounded-xl border border-beige-dark p-3">
+                <p className="text-sm font-medium text-navy">Khách mới (không cần đặt lịch)</p>
+                <input className="input py-2 text-sm" placeholder="Tên khách (bắt buộc)" value={newCust.name}
+                  onChange={(e) => setNewCust({ ...newCust, name: e.target.value })} />
+                <input className="input py-2 text-sm" placeholder="SĐT (không bắt buộc)" inputMode="tel" value={newCust.phone}
+                  onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} />
+                {newCustErr && <p className="text-xs text-[#8A2323]">{newCustErr}</p>}
+                <div className="flex gap-2">
+                  <button className="btn-primary py-2" disabled={newCustBusy || !newCust.name.trim()} onClick={createCustomer}>
+                    {newCustBusy ? "Đang tạo…" : "Tạo khách"}
+                  </button>
+                  <button className="btn-ghost py-2" onClick={() => setNewCust(null)}>Huỷ</button>
+                </div>
+                <p className="text-xs text-ink/50">SĐT trùng khách đã có thì app dùng luôn hồ sơ cũ.</p>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input className="input flex-1" placeholder={CUSTOMER_SEARCH_HINT} value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <button className="btn-outline shrink-0 px-3" onClick={() => openNewCustomer(phone)}>+ Khách mới</button>
+              </div>
+            )}
+            {matches && !newCust && (
               <ul className="mt-2 divide-y divide-beige rounded-xl border border-beige-dark">
                 {matches.length === 0 && (
                   <li className="px-3 py-2 text-sm text-ink/60">
-                    Chưa có khách này. Tạo hồ sơ ở trang{" "}
-                    <Link href={digits ? `/quan-ly/tao-lich?sdt=${digits}` : "/quan-ly/tao-lich"} className="text-navy underline">Tạo lịch</Link>.
+                    Chưa có khách này.{" "}
+                    <button className="font-semibold text-navy underline" onClick={() => openNewCustomer(phone)}>
+                      + Tạo khách mới
+                    </button>
                   </li>
                 )}
                 {matches.map((c) => (
@@ -747,11 +778,18 @@ export default function CheckoutForm({
           </div>
         )}
       </div>
+  );
 
-      {/* ---- CÁC DÒNG ---- */}
+  // ---- CÁC DÒNG ----
+  const linesCard = (
       <div className="card space-y-3">
-        <h2 className="font-semibold text-navy">Nội dung thu</h2>
-        {lines.length === 0 && <p className="text-sm text-ink/60">Chưa có dòng nào. Thêm dịch vụ, gói hoặc nạp thẻ bên dưới.</p>}
+        {online && branchPicker}
+        <h2 className="font-semibold text-navy">{online ? "1. Hàng khách mua" : "Nội dung thu"}</h2>
+        {lines.length === 0 && (
+          <p className="text-sm text-ink/60">
+            {online ? "Gõ tên sản phẩm hoặc quét mã vạch bên dưới (số “còn” = còn bán được, đã trừ hàng đang giữ cho đơn khác)." : "Chưa có dòng nào. Thêm dịch vụ, gói hoặc nạp thẻ bên dưới."}
+          </p>
+        )}
         {lines.map((l, i) => (
           <LineRow
             key={l.key}
@@ -780,6 +818,8 @@ export default function CheckoutForm({
 
         {/* thêm */}
         <div className="space-y-2 border-t border-beige pt-3">
+          {!online && (
+            <>
           <input
             className="input py-2"
             placeholder={appt ? "+ Thêm dịch vụ khách làm thêm (gõ tên)" : "+ Thêm dịch vụ (gõ tên)"}
@@ -835,6 +875,8 @@ export default function CheckoutForm({
                 ))}
             </select>
           </div>
+            </>
+          )}
           <form
             className="flex gap-2"
             onSubmit={(e) => {
@@ -845,7 +887,7 @@ export default function CheckoutForm({
           >
             <input
               className="input flex-1 py-2"
-              placeholder="+ Bán sản phẩm lẻ (gõ tên hoặc quét mã vạch)"
+              placeholder={online ? "+ Thêm sản phẩm (gõ tên hoặc quét mã vạch)" : "+ Bán sản phẩm lẻ (gõ tên hoặc quét mã vạch)"}
               value={pQuery}
               onChange={(e) => {
                 setPQuery(e.target.value);
@@ -894,6 +936,8 @@ export default function CheckoutForm({
               onClose={() => setPCamera(false)}
             />
           )}
+          {!online && (
+            <>
           {packages.length === 0 && (
             <p className="text-xs text-ink/60">Chưa có gói combo nào. Chủ / quản lý tạo gói ở trang <b>Gói combo</b>.</p>
           )}
@@ -910,8 +954,59 @@ export default function CheckoutForm({
               </button>
             ))}
           </div>
+            </>
+          )}
         </div>
       </div>
+  );
+
+  return (
+    <div className="space-y-4 pb-24">
+      <div>
+        {online && initialChannel === "online" && (
+          <Link href="/quan-ly/ban-online" className="text-sm text-navy underline">← Bán hàng online</Link>
+        )}
+        <h1 className="text-2xl font-bold text-navy">{online ? "Lên đơn online" : "Thu tiền"}</h1>
+        {online && (
+          <p className="text-sm text-ink/70">Không cần đặt lịch: chọn hàng từ kho bán lẻ → chọn hoặc tạo khách → thông tin giao hàng → tiền khách đã trả.</p>
+        )}
+        {appt && (
+          <p className="text-sm text-ink/70">
+            Lịch hẹn {formatTime(appt.start_at)} · <span className="capitalize">{formatDate(appt.start_at)}</span>
+          </p>
+        )}
+      </div>
+
+      {!appt && initialChannel !== "online" && (
+        <div className="flex gap-1 rounded-full bg-white p-1 ring-1 ring-beige-dark">
+          {(
+            [
+              ["store", "Bán tại quầy"],
+              ["online", "Đơn online (giao hàng)"],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setChannel(k)}
+              className={`flex-1 rounded-full px-3 py-2 text-sm font-semibold ${channel === k ? "bg-navy text-white" : "text-navy"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {online ? (
+        <>
+          {linesCard}
+          {customerCard}
+        </>
+      ) : (
+        <>
+          {customerCard}
+          {linesCard}
+        </>
+      )}
 
       {/* ---- GIẢM GIÁ + THANH TOÁN ---- */}
       <div className="card space-y-3">
@@ -1050,7 +1145,7 @@ export default function CheckoutForm({
 
         {online && (
           <div className="space-y-2 rounded-xl border border-beige-dark p-3 text-sm">
-            <p className="font-medium text-navy">Giao hàng</p>
+            <p className="font-medium text-navy">3. Giao hàng</p>
             <div className="grid gap-2 sm:grid-cols-2">
               <input className="input py-2 text-sm" placeholder="Người nhận" value={ship.recipient_name}
                 onChange={(e) => setShip({ ...ship, recipient_name: e.target.value })} />
@@ -1146,11 +1241,17 @@ export default function CheckoutForm({
             ) : problems.length ? (
               <p className="text-[#8A2323]">{problems[0]}</p>
             ) : (
-              <p className="text-[#22612A]">{debt > 0 ? `Thu ${formatVnd(paid)}, ghi nợ ${formatVnd(debt)}. Bấm để chốt.` : "Đã đủ tiền, bấm để chốt hoá đơn."}</p>
+              <p className="text-[#22612A]">{online
+                  ? debt > 0
+                    ? `Đã trả ${formatVnd(paid)}, còn thu ${formatVnd(debt)}. Bấm để lên đơn (hàng được giữ, chưa trừ kho).`
+                    : "Khách đã trả đủ. Bấm để lên đơn (hàng được giữ, chưa trừ kho)."
+                  : debt > 0
+                    ? `Thu ${formatVnd(paid)}, ghi nợ ${formatVnd(debt)}. Bấm để chốt.`
+                    : "Đã đủ tiền, bấm để chốt hoá đơn."}</p>
             )}
           </div>
           <button className="btn-primary" disabled={saving || problems.length > 0} onClick={submit}>
-            {saving ? "Đang lưu…" : `Thu ${formatVnd(total)}`}
+            {saving ? "Đang lưu…" : online ? `Lên đơn ${formatVnd(total)}` : `Thu ${formatVnd(total)}`}
           </button>
         </div>
       </div>
