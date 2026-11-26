@@ -54,7 +54,7 @@ export default async function InvoicesPage({
 
   let q = supabase.from("invoices").select(SELECT).neq("status", "draft");
   if (branchId) q = q.eq("branch_id", branchId);
-  if (tab === "quay") q = q.eq("channel", "store").gte("created_at", from).lt("created_at", to).order("created_at", { ascending: false });
+  if (tab === "quay") q = q.gte("created_at", from).lt("created_at", to).order("created_at", { ascending: false });
   else if (tab === "online") {
     q = q.eq("channel", "online").order("created_at", { ascending: false }).limit(150);
   } else q = q.eq("status", "paid").gt("debt_amount", 0).order("paid_at", { ascending: true }).limit(300);
@@ -170,8 +170,8 @@ export default async function InvoicesPage({
       <div className="flex gap-1 rounded-full bg-white p-1 ring-1 ring-beige-dark">
         {(
           [
-            ["quay", "Tại quầy"],
-            ["online", "Online"],
+            ["quay", "Trong ngày"],
+            ["online", "Bán online"],
             ["no", "Còn nợ"],
           ] as const
         ).map(([k, label]) => (
@@ -252,6 +252,9 @@ export default async function InvoicesPage({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-semibold">
+                    {r.channel === "online" && (
+                      <span className="mr-1 rounded-full bg-navy px-2 py-0.5 text-[10px] font-semibold text-white">Online</span>
+                    )}
                     {r.customers?.full_name ?? sh?.recipient_name ?? "Khách lẻ"}{" "}
                     <span className="text-xs font-normal text-ink/50">
                       {r.code} · {tab === "quay" ? formatTime(r.paid_at ?? r.created_at) : shortDate(r.paid_at ?? r.created_at)}
