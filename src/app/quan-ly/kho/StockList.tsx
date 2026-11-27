@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatVnd, normalizeText, textMatch, vnError } from "@/lib/format";
-import { productLabel, type Product, type WarehouseType } from "@/lib/inventory";
+import { productLabel, retailMinPrice, type Product, type WarehouseType } from "@/lib/inventory";
 import { TileIconSvg, type TileIcon } from "@/components/StatTile";
 import Modal from "@/components/Modal";
 import { ProductForm } from "./san-pham/ProductEditor";
@@ -66,6 +66,8 @@ export default function StockList({
   };
   const expiryOf = (p: Product): "expired" | "soon" | null =>
     !p.expiry_date ? null : p.expiry_date < today ? "expired" : p.expiry_date <= soonLimit ? "soon" : null;
+  // giá bán thấp nhất nhân viên được bán (chỉ sản phẩm bán lẻ có giá niêm yết)
+  const minOf = (p: Product) => (p.for_retail && p.retail_price != null ? retailMinPrice(Number(p.retail_price), p.max_staff_discount_pct, defaultPct) : null);
   const groupOf = (p: Product) => (warehouseType === "treatment" ? p.category : p.brand) ?? "Khác";
   const groups = useMemo(() => [...new Set(products.map(groupOf))].sort((a, b) => a.localeCompare(b, "vi")), [products]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -90,10 +92,10 @@ export default function StockList({
   const filters = (status !== "all" ? 1 : 0) + (group ? 1 : 0) + (expiry !== "all" ? 1 : 0);
 
   function download() {
-    const head = ["Sản phẩm", "Nhãn hàng", "Dung tích", warehouseType === "treatment" ? "Nhóm" : "Nhóm", "Mã vạch", "Tồn kho", "Đơn vị", "Tình trạng", "Hạn sử dụng", "Giá niêm yết"];
+    const head = ["Sản phẩm", "Nhãn hàng", "Dung tích", "Nhóm", "Mã vạch", "Tồn kho", "Đơn vị", "Tình trạng", "Hạn sử dụng", "Giá niêm yết", "Giá bán thấp nhất"];
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const lines = rows.map((p) =>
-      [p.name, p.brand, p.capacity, p.category, p.barcode, qty[p.id] ?? 0, p.unit, STATUS[stateOf(p)].label, p.expiry_date ? fmtDate(p.expiry_date) : "", p.retail_price ?? ""]
+      [p.name, p.brand, p.capacity, p.category, p.barcode, qty[p.id] ?? 0, p.unit, STATUS[stateOf(p)].label, p.expiry_date ? fmtDate(p.expiry_date) : "", p.retail_price ?? "", minOf(p) ?? ""]
         .map(esc)
         .join(","),
     );
@@ -221,7 +223,8 @@ export default function StockList({
                   <th className="px-3 py-3 text-right">Tồn kho</th>
                   <th className="px-3 py-3">Tình trạng</th>
                   <th className="hidden px-3 py-3 sm:table-cell">Hạn sử dụng</th>
-                  {warehouseType === "retail" && <th className="hidden px-3 py-3 text-right lg:table-cell">Giá niêm yết</th>}
+                  {warehouseType === "retail" && <th className="hidden px-3 py-3 text-right sm:table-cell">Giá niêm yết</th>}
+                  {warehouseType === "retail" && <th className="hidden px-3 py-3 text-right sm:table-cell">Bán thấp nhất</th>}
                   {canManage && <th className="px-4 py-3 sm:px-5" />}
                 </tr>
               </thead>
@@ -230,7 +233,8 @@ export default function StockList({
                   const q = qty[p.id] ?? 0;
                   const st = stateOf(p);
                   const ex = expiryOf(p);
-                  const cols = 4 + (canManage ? 1 : 0) + (warehouseType === "retail" ? 1 : 0) + 1;
+                  const cols = 4 + (canManage ? 1 : 0) + (warehouseType === "retail" ? 2 : 0) + 1;
+                  const min = minOf(p);
                   return (
                     <Fragment key={p.id}>
                       <tr className="align-top transition hover:bg-cream/50">
@@ -240,6 +244,13 @@ export default function StockList({
                             {[p.brand, p.used_in && warehouseType === "treatment" ? `Dùng: ${p.used_in}` : null].filter(Boolean).join(" · ")}
                             {!p.barcode && canManage && <span className="ml-1 text-[#7A5600]">· chưa có mã vạch</span>}
                           </p>
+                          {/* điện thoại: giá niêm yết + giá thấp nhất hiện dưới tên */}
+                          {warehouseType === "retail" && p.retail_price != null && (
+                            <p className="mt-0.5 text-xs text-ink/70 sm:hidden">
+                              Niêm yết <b className="text-navy">{formatVnd(p.retail_price)}</b>
+                              {min != null && <> · Thấp nhất <b className="text-[#8A2323]">{formatVnd(min)}</b></>}
+                            </p>
+                          )}
                           {/* điện thoại: HSD hiện dưới tên */}
                           {p.expiry_date && <p className={`mt-0.5 text-xs sm:hidden ${ex === "expired" ? "text-[#8A2323]" : ex === "soon" ? "text-[#7A5600]" : "text-ink/50"}`}>HSD {fmtDate(p.expiry_date)}</p>}
                         </td>
@@ -270,7 +281,10 @@ export default function StockList({
                           )}
                         </td>
                         {warehouseType === "retail" && (
-                          <td className="hidden whitespace-nowrap px-3 py-3 text-right text-ink/70 lg:table-cell">{p.retail_price != null ? formatVnd(p.retail_price) : "—"}</td>
+                          <td className="hidden whitespace-nowrap px-3 py-3 text-right text-ink/70 sm:table-cell">{p.retail_price != null ? formatVnd(p.retail_price) : "—"}</td>
+                        )}
+                        {warehouseType === "retail" && (
+                          <td className="hidden whitespace-nowrap px-3 py-3 text-right font-semibold text-[#8A2323] sm:table-cell">{min != null ? formatVnd(min) : "—"}</td>
                         )}
                         {canManage && (
                           <td className="px-4 py-3 text-right sm:px-5">

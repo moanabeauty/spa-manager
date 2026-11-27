@@ -20,7 +20,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const [{ data: whs }, { data: products }, defaultPct] = await Promise.all([
     supabase.from("warehouses").select("id, branch_id, type, name").eq("branch_id", branchId),
     fetchAll(() => supabase.from("products").select(PRODUCT_COLUMNS).eq("is_active", true).order("name").order("id")),
-    canEdit ? fetchDefaultDiscountPct(supabase) : Promise.resolve(0),
+    fetchDefaultDiscountPct(supabase), // mọi nhân viên: tính giá bán thấp nhất ở kho bán lẻ
   ]);
   const warehouses = (whs ?? []) as Warehouse[];
   const wh = warehouses.find((w) => w.type === type);
